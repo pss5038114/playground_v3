@@ -2,76 +2,105 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Playground V3 - Lobby</title>
-    <link rel="stylesheet" href="css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground V3 - 로비</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .menu-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
-        .menu-item { background: #fff; border: 2px solid #eee; padding: 20px; border-radius: 15px; cursor: pointer; transition: 0.3s; }
-        .menu-item:hover { border-color: #1877f2; transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .menu-item h4 { margin: 0 0 10px 0; color: #333; }
-        .menu-item p { margin: 0; font-size: 13px; color: #777; }
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .dropdown-content { display: none; }
+        .dropdown-content.show { display: flex; }
     </style>
 </head>
-<body>
-    <nav class="top-bar">
-        <div class="nav-left">
-            <button class="menu-btn" onclick="alert('사이드바 기능 준비 중입니다!')">☰</button>
-            <b style="margin-left:15px; font-size:18px; color:#1877f2;">Playground V3</b>
-        </div>
-        <div class="nav-right">
-            <div class="profile-btn" onclick="toggleDropdown(event)">
-                <div class="profile-img"></div>
-                <span id="nav-nick">유저</span>
+<body class="bg-slate-100 min-h-screen">
+
+    <nav class="fixed top-0 left-0 w-full h-16 bg-white flex justify-between items-center px-6 shadow-sm z-50">
+        <div class="flex items-center gap-4">
+            <div class="cursor-pointer flex flex-col gap-1" onclick="alert('메뉴 기능 준비 중입니다.')">
+                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
+                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
+                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
             </div>
-            <div id="profile-dropdown" class="dropdown-menu">
-                <button class="dropdown-item" onclick="location.href='mailbox.html'">📩 우편함</button>
-                <button class="dropdown-item" onclick="location.href='mypage.html'">👤 My Page</button>
-                <button class="dropdown-item logout-item" onclick="handleLogout()">🚪 로그아웃</button>
+            <b class="text-xl text-blue-600 cursor-pointer font-bold" onclick="location.reload()">Playground V3</b>
+        </div>
+        
+        <div class="relative">
+            <div id="profile-btn" onclick="toggleDropdown()" class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold cursor-pointer hover:bg-blue-700 transition-colors shadow-md">
+                <span id="u-initial">?</span>
+            </div>
+            <div id="profile-dropdown" class="dropdown-content absolute top-12 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 flex-col py-2 z-50">
+                <span class="px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-2" onclick="alert('우편함 준비 중')">
+                    <i class="far fa-envelope text-slate-400"></i> 우편함
+                </span>
+                <span class="px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-2" onclick="alert('마이페이지 준비 중')">
+                    <i class="far fa-user text-slate-400"></i> My Page
+                </span>
+                <div class="h-px bg-slate-100 my-1"></div>
+                <span class="px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer flex items-center gap-2" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </span>
             </div>
         </div>
     </nav>
 
-    <div class="card" style="max-width: 500px; margin-top: 40px;">
-        <h2 id="u-welcome">로딩 중...</h2>
-        <div style="padding:20px 0; background:#f9f9f9; border-radius:15px; margin:10px 0;">
-            <p style="font-size:18px; font-weight: bold;">🎮 게임 및 콘텐츠</p>
-            <div class="menu-container">
-                <div class="menu-item" onclick="startDiceGame()">
-                    <h4>🎲 다이스 디펜스</h4>
-                    <p>주사위를 배치하여 몰려오는 적을 막아내세요!</p>
-                </div>
-                <div class="menu-item" style="opacity: 0.5; cursor: default;">
-                    <h4>🚧 준비 중</h4>
-                    <p>다음 미니게임이 곧 추가됩니다.</p>
+    <div class="flex items-center justify-center min-h-screen pt-16 p-4">
+        <div class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg text-center">
+            <h1 class="text-2xl font-bold text-slate-800 mb-8">
+                <span id="u-welcome" class="text-blue-600">로딩 중...</span>님, 환영합니다!
+            </h1>
+
+            <div class="bg-slate-50 rounded-2xl p-6 mb-8">
+                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center justify-center gap-2">
+                    <i class="fas fa-gamepad"></i> 게임 및 콘텐츠
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div onclick="startDiceGame()" class="cursor-pointer block p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all group text-left">
+                        <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">🎲</div>
+                        <div class="font-bold text-slate-700 text-sm mb-1">다이스 디펜스</div>
+                        <p class="text-[10px] text-slate-400 leading-tight">주사위를 배치하여 몰려오는 적을 막아내세요!</p>
+                    </div>
+
+                    <div class="p-4 bg-white border border-slate-100 rounded-xl opacity-60 text-left">
+                        <div class="text-2xl mb-2">🚧</div>
+                        <div class="font-bold text-slate-400 text-sm mb-1">준비 중</div>
+                        <p class="text-[10px] text-slate-300 leading-tight">다음 미니게임이 곧 추가됩니다.</p>
+                    </div>
                 </div>
             </div>
+
+            <button onclick="handleLogout()" class="w-full py-4 bg-[#ff4757] hover:bg-[#ff2e44] text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-100">
+                로그아웃
+            </button>
         </div>
     </div>
 
     <script>
+        // 세션 정보 확인 로직
         const nick = sessionStorage.getItem('nickname');
         if(!nick) { 
             alert("로그인이 필요합니다."); 
             location.href='index.html'; 
         } else {
-            document.getElementById('u-welcome').innerText = `${nick}님, 환영합니다!`;
-            document.getElementById('nav-nick').innerText = nick;
+            document.getElementById('u-welcome').innerText = nick;
+            document.getElementById('u-initial').innerText = nick.charAt(0).toUpperCase();
         }
 
-        // 드롭다운 토글 함수
-        function toggleDropdown(event) {
-            event.stopPropagation(); // 버튼 클릭 시 문서 클릭 이벤트 전파 방지
-            const dropdown = document.getElementById('profile-dropdown');
-            dropdown.classList.toggle('active');
+        // 드롭다운 토글
+        function toggleDropdown() {
+            document.getElementById('profile-dropdown').classList.toggle('show');
         }
 
-        // 다른 곳 클릭 시 드롭다운 닫기
-        window.onclick = function() {
-            const dropdown = document.getElementById('profile-dropdown');
-            if (dropdown.classList.contains('active')) {
-                dropdown.classList.remove('active');
+        // 외부 클릭 시 드롭다운 닫기
+        window.onclick = function(event) {
+            if (!event.target.closest('#profile-btn') && !event.target.closest('#profile-dropdown')) {
+                const dropdown = document.getElementById('profile-dropdown');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
             }
-        };
+        }
 
         function startDiceGame() {
             const sessionId = "room_" + Math.random().toString(36).substr(2, 9);
@@ -79,10 +108,8 @@
         }
 
         function handleLogout() {
-            if(confirm("로그아웃 하시겠습니까?")) {
-                sessionStorage.clear();
-                location.href = 'index.html';
-            }
+            sessionStorage.clear();
+            location.href = 'index.html';
         }
     </script>
 </body>

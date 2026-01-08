@@ -1,4 +1,4 @@
-body { font-family: 'Pretendard', sans-serif; background: #f0f2f5; margin: 0; padding-top: 70px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+body { font-family: 'Pretendard', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding-top: 80px; }
 .card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
 input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
 button { width: 100%; padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.2s; }
@@ -22,35 +22,34 @@ td { padding: 12px; border-bottom: 1px solid #eee; }
 .db-table input { border: none; padding: 5px; border-radius: 0; background: transparent; text-align: center; }
 .table-selector { background: #f1f3f5; padding: 10px; border-radius: 10px; margin-bottom: 20px; }
 
-/* --- 상단 바 (Top Bar) 스타일 추가 --- */
-.top-bar {
+/* --- 신규 추가: 상단 내비게이션 바 스타일 --- */
+.top-nav {
     position: fixed; top: 0; left: 0; width: 100%; height: 60px;
     background: white; display: flex; justify-content: space-between; align-items: center;
     padding: 0 20px; box-sizing: border-box; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 1000;
 }
-.nav-left { display: flex; align-items: center; }
-.menu-btn {
-    background: none; border: none; font-size: 24px; color: #333;
-    padding: 5px 10px; margin: 0; width: auto; cursor: pointer;
-}
-.nav-right { position: relative; }
-.profile-btn {
-    display: flex; align-items: center; gap: 10px; padding: 5px 15px;
-    background: #f0f2f5; border-radius: 20px; cursor: pointer; transition: 0.2s;
-}
-.profile-btn:hover { background: #e4e6eb; }
-.profile-img { width: 30px; height: 30px; background: #ccc; border-radius: 50%; }
+.nav-left, .nav-right { display: flex; align-items: center; gap: 15px; }
 
-/* 드롭다운 메뉴 */
-.dropdown-menu {
-    position: absolute; top: 50px; right: 0; width: 160px;
+/* 햄버거 버튼 스타일 */
+.menu-trigger { cursor: pointer; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+.menu-trigger span { width: 22px; height: 3px; background: #333; border-radius: 2px; }
+
+/* 프로필 및 드롭다운 스타일 */
+.profile-wrap { position: relative; }
+.profile-btn { 
+    width: 35px; height: 35px; background: #1877f2; color: white; 
+    border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+    cursor: pointer; font-size: 14px; font-weight: bold;
+}
+.dropdown-content {
+    position: absolute; top: 45px; right: 0; width: 160px;
     background: white; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-    padding: 10px; display: none; flex-direction: column; gap: 5px;
+    display: none; flex-direction: column; padding: 8px 0; overflow: hidden;
 }
-.dropdown-menu.active { display: flex; }
-.dropdown-item {
-    padding: 10px; font-size: 14px; border-radius: 8px; text-align: left;
-    background: none; border: none; margin: 0; width: 100%; transition: 0.2s;
+.dropdown-content.show { display: flex; }
+.dropdown-content a, .dropdown-content span {
+    padding: 12px 20px; font-size: 14px; color: #333; cursor: pointer; transition: 0.2s;
+    text-align: left; text-decoration: none;
 }
-.dropdown-item:hover { background: #f0f2f5; }
-.logout-item { color: #e74c3c; border-top: 1px solid #eee; border-radius: 0; padding-top: 15px; margin-top: 5px; }
+.dropdown-content a:hover, .dropdown-content span:hover { background: #f0f2f5; color: #1877f2; }
+.dropdown-divider { height: 1px; background: #eee; margin: 5px 0; }
