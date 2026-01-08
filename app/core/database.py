@@ -1,7 +1,6 @@
 import sqlite3
 import os
 
-# DB 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
 DB_PATH = os.path.join(project_root, "playground.db")
@@ -15,20 +14,20 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. 유저 테이블 (생일 컬럼 추가)
+    # 1. 유저 테이블
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             username TEXT UNIQUE, 
             password_hash TEXT, 
             nickname TEXT,
-            birthdate TEXT, -- [신규] 생일 (MMDD)
+            birthdate TEXT,
             status TEXT DEFAULT 'pending_signup',
             pending_password_hash TEXT DEFAULT NULL
         )
     """)
 
-    # 2. 우편함 테이블
+    # 2. 우편함 테이블 (batch_id 추가)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,40 +37,34 @@ def init_db():
             content TEXT,
             is_read INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            scheduled_at TIMESTAMP DEFAULT NULL
+            scheduled_at TIMESTAMP DEFAULT NULL,
+            batch_id TEXT DEFAULT NULL  -- [신규] 발송 그룹 ID (취소/관리용)
         )
     """)
 
     # --- 마이그레이션 ---
-    
-    # users 테이블 컬럼 확인 및 추가
     cursor.execute("PRAGMA table_info(users)")
     user_columns = [row['name'] for row in cursor.fetchall()]
-
     user_required = {
         "status": "TEXT DEFAULT 'pending_signup'",
         "pending_password_hash": "TEXT DEFAULT NULL",
-        "birthdate": "TEXT DEFAULT NULL" # [신규]
+        "birthdate": "TEXT DEFAULT NULL"
     }
-
     for col_name, col_def in user_required.items():
         if col_name not in user_columns:
-            try:
-                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
-                print(f"✅ DB 마이그레이션: users 테이블 '{col_name}' 추가 완료")
-            except Exception as e:
-                print(f"❌ DB 마이그레이션 오류 (users): {e}")
+            try: cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+            except: pass
 
-    # messages 테이블 컬럼 확인 (scheduled_at)
     cursor.execute("PRAGMA table_info(messages)")
     msg_columns = [row['name'] for row in cursor.fetchall()]
-    
-    if "scheduled_at" not in msg_columns:
-        try:
-            cursor.execute("ALTER TABLE messages ADD COLUMN scheduled_at TIMESTAMP DEFAULT NULL")
-            print("✅ DB 마이그레이션: messages 테이블 'scheduled_at' 추가 완료")
-        except Exception as e:
-            print(f"❌ DB 마이그레이션 오류 (messages): {e}")
+    msg_required = {
+        "scheduled_at": "TIMESTAMP DEFAULT NULL",
+        "batch_id": "TEXT DEFAULT NULL" # [신규]
+    }
+    for col_name, col_def in msg_required.items():
+        if col_name not in msg_columns:
+            try: cursor.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
+            except: pass
 
     conn.commit()
     conn.close()

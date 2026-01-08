@@ -1,50 +1,22 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 from app.core.database import get_db_connection
+import uuid
 
 router = APIRouter()
 
+# [보안 설정]
+ADMIN_SECRET_KEY = "your_secret_key"
+
 class MailSendModel(BaseModel):
     sender: str
-    receiver_username: str  # "ALL" 이면 전체 발송
+    receivers: List[str]  # [변경] 여러 명 받기 (username 리스트)
     title: str
     content: str
     scheduled_at: Optional[str] = None
 
-# 1. 읽지 않은 메일 개수 확인 (알림용)
-@router.get("/check/{username}")
-async def check_unread_mail(username: str):
-    conn = get_db_connection()
-    query = """
-        SELECT COUNT(*) as count FROM messages 
-        WHERE receiver_id = ? 
-        AND is_read = 0
-        AND (scheduled_at IS NULL OR scheduled_at <= datetime('now', 'localtime'))
-    """
-    row = conn.execute(query, (username,)).fetchone()
-    conn.close()
-    return {"count": row["count"]}
-
-# [신규] 2. 특정 메일 하나만 읽음 처리 (클릭 시 호출)
-@router.put("/read/{mail_id}")
-async def read_one_mail(mail_id: int):
-    conn = get_db_connection()
-    conn.execute("UPDATE messages SET is_read = 1 WHERE id = ?", (mail_id,))
-    conn.commit()
-    conn.close()
-    return {"message": "Read updated"}
-
-# [유지] 3. 읽은 메일 모두 삭제 (휴지통)
-@router.delete("/delete-read/{username}")
-async def delete_read_mails(username: str):
-    conn = get_db_connection()
-    conn.execute("DELETE FROM messages WHERE receiver_id = ? AND is_read = 1", (username,))
-    conn.commit()
-    conn.close()
-    return {"message": "Read mails deleted"}
-
-# 4. 내 우편함 목록 가져오기
+# 1. 내 우편함 목록 (기존 유지)
 @router.get("/list/{username}")
 async def get_my_mails(username: str):
     conn = get_db_connection()
@@ -58,41 +30,45 @@ async def get_my_mails(username: str):
     conn.close()
     return [dict(row) for row in rows]
 
-# 5. 우편 보내기
-@router.post("/send")
-async def send_mail(mail: MailSendModel):
+# 2. 알림 체크 (기존 유지)
+@router.get("/check/{username}")
+async def check_unread_mail(username: str):
     conn = get_db_connection()
-    try:
-        if mail.receiver_username == "ALL":
-            users = conn.execute("SELECT username FROM users WHERE status = 'active'").fetchall()
-            if not users: return {"message": "보낼 유저가 없습니다."}
-            
-            data_to_insert = []
-            for u in users:
-                data_to_insert.append((mail.sender, u["username"], mail.title, mail.content, mail.scheduled_at))
-            
-            conn.executemany(
-                """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
-                   VALUES (?, ?, ?, ?, ?)""",
-                data_to_insert
-            )
-            conn.commit()
-            return {"message": f"전체 유저({len(users)}명)에게 전송 완료"}
-        else:
-            user = conn.execute("SELECT username FROM users WHERE username = ?", (mail.receiver_username,)).fetchone()
-            if not user: raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
-                
-            conn.execute(
-                """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
-                   VALUES (?, ?, ?, ?, ?)""",
-                (mail.sender, mail.receiver_username, mail.title, mail.content, mail.scheduled_at)
-            )
-            conn.commit()
-            return {"message": "전송 완료"}
-    finally:
-        conn.close()
+    query = """
+        SELECT COUNT(*) as count FROM messages 
+        WHERE receiver_id = ? 
+        AND is_read = 0
+        AND (scheduled_at IS NULL OR scheduled_at <= datetime('now', 'localtime'))
+    """
+    row = conn.execute(query, (username,)).fetchone()
+    conn.close()
+    return {"count": row["count"]}
 
-# 6. 개별 우편 삭제
+# 3. 읽음/삭제 API (기존 유지)
+@router.put("/read/{mail_id}")
+async def read_one_mail(mail_id: int):
+    conn = get_db_connection()
+    conn.execute("UPDATE messages SET is_read = 1 WHERE id = ?", (mail_id,))
+    conn.commit()
+    conn.close()
+    return {"message": "Read updated"}
+
+@router.put("/read-all/{username}")
+async def mark_all_read(username: str):
+    conn = get_db_connection()
+    conn.execute("UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND is_read = 0 AND (scheduled_at IS NULL OR scheduled_at <= datetime('now', 'localtime'))", (username,))
+    conn.commit()
+    conn.close()
+    return {"message": "All read"}
+
+@router.delete("/delete-read/{username}")
+async def delete_read_mails(username: str):
+    conn = get_db_connection()
+    conn.execute("DELETE FROM messages WHERE receiver_id = ? AND is_read = 1", (username,))
+    conn.commit()
+    conn.close()
+    return {"message": "Read mails deleted"}
+
 @router.delete("/delete/{mail_id}")
 async def delete_mail(mail_id: int):
     conn = get_db_connection()
@@ -100,3 +76,61 @@ async def delete_mail(mail_id: int):
     conn.commit()
     conn.close()
     return {"message": "삭제됨"}
+
+# --- [신규/수정] 관리자 우편 기능 ---
+
+# 4. 우편 보내기 (다중 발송 + Batch ID 생성)
+@router.post("/send")
+async def send_mail(mail: MailSendModel):
+    if not mail.receivers:
+        return {"message": "받는 사람이 없습니다."}
+
+    conn = get_db_connection()
+    try:
+        # 이번 발송을 묶어주는 고유 ID 생성
+        batch_id = str(uuid.uuid4())[:8] 
+        
+        data_to_insert = []
+        for receiver in mail.receivers:
+            data_to_insert.append((
+                mail.sender, receiver, mail.title, mail.content, mail.scheduled_at, batch_id
+            ))
+        
+        conn.executemany(
+            """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at, batch_id) 
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            data_to_insert
+        )
+        conn.commit()
+        return {"message": f"{len(mail.receivers)}명에게 전송 완료 (Batch: {batch_id})"}
+    finally:
+        conn.close()
+
+# 5. [신규] 관리자 - 보낸 우편 내역 확인 (그룹별 조회)
+@router.get("/admin/history")
+async def get_mail_history(admin_key: str):
+    if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
+    
+    conn = get_db_connection()
+    # Batch ID 별로 그룹화해서 보여줌 (제목, 내용, 예약시간, 수신인 수)
+    query = """
+        SELECT batch_id, title, content, scheduled_at, created_at, COUNT(*) as receiver_count 
+        FROM messages 
+        WHERE sender = '운영자' 
+        GROUP BY batch_id 
+        ORDER BY created_at DESC
+    """
+    rows = conn.execute(query).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+# 6. [신규] 관리자 - 우편 발송 취소 (Batch 단위 삭제)
+@router.delete("/admin/cancel/{batch_id}")
+async def cancel_mail_batch(batch_id: str, admin_key: str):
+    if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
+    
+    conn = get_db_connection()
+    conn.execute("DELETE FROM messages WHERE batch_id = ?", (batch_id,))
+    conn.commit()
+    conn.close()
+    return {"message": "해당 발송 건이 모두 취소(삭제)되었습니다."}
