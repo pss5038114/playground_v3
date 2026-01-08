@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>DB Manager</title>
     <script>
-        // [보안] 인증 정보 없으면 접근 차단
         if (!sessionStorage.getItem('dbKey') || !sessionStorage.getItem('adminKey')) {
             alert("잘못된 접근입니다. 관리자 페이지에서 로그인해주세요.");
             location.href = 'admin.html';
@@ -15,104 +14,113 @@
     <style>
         body { padding: 20px; max-width: 1200px; margin: 0 auto; background: #f8f9fa; font-family: 'Pretendard', sans-serif; }
         
-        /* 헤더 스타일 */
-        .db-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .db-header h2 { margin: 0; color: #333; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        /* [수정] 헤더 컨테이너 스타일 */
+        .db-header-container { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
-        /* 테이블 버튼 영역 */
-        .table-links { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; }
-        .table-links button { margin: 0; padding: 8px 16px; font-size: 13px; background: #e9ecef; border: 1px solid #dee2e6; color: #495057; border-radius: 20px; transition: all 0.2s; }
-        .table-links button:hover, .table-links button.active { background: #1877f2; color: white; border-color: #1877f2; transform: translateY(-1px); box-shadow: 0 2px 5px rgba(24, 119, 242, 0.3); }
-
-        /* 테이블 컨테이너 (UI 깨짐 방지 핵심) */
-        .db-table-section { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: none; animation: fadeIn 0.3s ease-out; }
-        .db-table-wrapper { 
-            overflow-x: auto; /* 가로 스크롤 허용 */
-            margin-top: 15px; 
-            border: 1px solid #eee; 
-            border-radius: 8px; 
+        /* 1. 제목 + 리프레시 버튼 영역 */
+        .title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .title-row h2 { margin: 0; color: #333; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        
+        /* 리프레시 버튼 스타일 (admin.html 스타일 차용) */
+        .refresh-btn { 
+            cursor: pointer; color: #1877f2; font-size: 18px; 
+            transition: transform 0.5s ease; padding: 5px; border-radius: 50%;
         }
+        .refresh-btn:hover { background-color: #e7f1ff; transform: rotate(180deg); }
+
+        /* 2. 컨트롤 영역 (드롭다운 + 나가기 버튼) */
+        .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 15px; border-top: 1px solid #eee; padding-top: 20px; }
         
-        /* 테이블 스타일 */
+        /* 드롭다운 스타일 */
+        select#table-select {
+            padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; 
+            font-size: 14px; background-color: #fff; min-width: 200px; cursor: pointer;
+            outline: none; transition: border-color 0.2s;
+        }
+        select#table-select:focus { border-color: #1877f2; }
+
+        /* 나가기 버튼 스타일 (위치 이동됨) */
+        .btn-exit {
+            padding: 10px 20px; background: #6c757d; color: white; border: none; 
+            border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        }
+        .btn-exit:hover { background: #5a6268; }
+
+        /* 테이블 영역 스타일 */
+        .db-table-section { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: none; margin-top: 20px; animation: fadeIn 0.3s ease-out; }
+        .db-table-wrapper { overflow-x: auto; margin-top: 10px; border: 1px solid #eee; border-radius: 8px; }
         .db-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
         .db-table th { background-color: #f8f9fa; font-weight: bold; color: #495057; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; position: sticky; top: 0; }
         .db-table td { padding: 10px 12px; border-bottom: 1px solid #f1f3f5; color: #333; }
         .db-table tr:hover { background-color: #f8f9fa; }
-        
-        /* 입력창 스타일 */
-        .db-table input { width: 100%; min-width: 100px; border: 1px solid transparent; background: transparent; padding: 6px; border-radius: 4px; transition: all 0.2s; }
-        .db-table input:focus { outline: none; border-color: #1877f2; background: #fff; box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1); }
-        .db-table input:disabled { color: #aaa; background: #f9f9f9; }
+        .db-table input { width: 100%; min-width: 80px; border: 1px solid transparent; background: transparent; padding: 6px; border-radius: 4px; }
+        .db-table input:focus { outline: none; border-color: #1877f2; background: #fff; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-    <div class="db-header">
-        <h2><i class="fas fa-database text-blue-600"></i> Database Manager</h2>
-        <div style="display:flex; gap:10px;">
-            <button class="btn-secondary" onclick="initializeDBManager()" style="width:auto; padding:8px 15px; background:#1877f2; border-radius:8px;">
-                <i class="fas fa-sync-alt"></i> 새로고침
-            </button>
-            <button class="btn-admin" onclick="location.href='admin.html'" style="width:auto; padding:8px 15px; margin:0; border-radius:8px;">
-                <i class="fas fa-arrow-left"></i> 나가기
+
+    <div class="db-header-container">
+        <div class="title-row">
+            <h2><i class="fas fa-database text-blue-600"></i> Database Manager</h2>
+            <i class="fas fa-sync-alt refresh-btn" onclick="initializeDBManager()" title="새로고침"></i>
+        </div>
+
+        <div class="controls-row">
+            <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                <label style="font-weight:bold; color:#555; font-size:14px;">View Table:</label>
+                <select id="table-select" onchange="showTable(this.value)">
+                    <option value="">데이터 불러오는 중...</option>
+                </select>
+            </div>
+            
+            <button class="btn-exit" onclick="location.href='admin.html'">
+                <i class="fas fa-arrow-left mr-2"></i>나가기
             </button>
         </div>
     </div>
 
-    <div id="loading-msg" style="text-align:center; color:#666; margin-top:100px;">
+    <div id="loading-msg" style="text-align:center; color:#666; margin-top:50px;">
         <i class="fas fa-circle-notch fa-spin fa-3x text-blue-500 mb-4"></i>
         <p>데이터베이스 연결 중...</p>
     </div>
 
-    <div id="table-links" class="table-links"></div>
     <div id="db-content-area"></div>
 
-    <script src="js/admin.js?v=7"></script>
+    <script src="js/admin.js?v=8"></script>
     
     <script>
-        // [수정] 0.5초 타임아웃 대신, '모든 리소스 로딩 완료(window.onload)' 이벤트를 사용
         window.addEventListener('load', function() {
-            console.log("페이지 리소스 로드 완료. DB 매니저 실행 시도...");
             initializeDBManager();
         });
 
         function initializeDBManager() {
             const loadingMsg = document.getElementById('loading-msg');
             const contentArea = document.getElementById('db-content-area');
-            const linksArea = document.getElementById('table-links');
+            const selectBox = document.getElementById('table-select');
+            
+            // 리프레시 버튼 애니메이션
+            const btn = document.querySelector('.refresh-btn');
+            if(btn) btn.style.transform = "rotate(360deg)";
 
-            // 1. admin.js의 openDBManager 함수가 있는지 확인
             if (typeof window.openDBManager === 'function') {
-                // 로딩 메시지 표시
                 if(loadingMsg) loadingMsg.style.display = 'block';
                 if(contentArea) contentArea.innerHTML = '';
-                if(linksArea) linksArea.innerHTML = '';
+                // 드롭다운 초기화
+                if(selectBox) selectBox.innerHTML = '<option value="">데이터 불러오는 중...</option>';
 
-                // 실행 (Promise 처리를 통해 완료 후 로딩 끄기)
                 window.openDBManager()
                     .then(() => {
-                        console.log("DB 데이터 로드 성공");
                         if(loadingMsg) loadingMsg.style.display = 'none';
+                        setTimeout(() => { if(btn) btn.style.transform = "none"; }, 500);
                     })
                     .catch(err => {
-                        console.error("DB 로드 실패:", err);
-                        if(loadingMsg) {
-                            loadingMsg.innerHTML = `<div style="color:red; background: #fff0f0; padding: 20px; border-radius: 10px; display: inline-block;">
-                                <i class="fas fa-exclamation-circle fa-2x mb-2"></i><br>
-                                <strong>데이터를 불러오지 못했습니다.</strong><br>
-                                <span style="font-size:12px; color:#555;">오류 내용: ${err}</span><br><br>
-                                <button onclick="location.reload()" style="padding:5px 10px; cursor:pointer;">페이지 새로고침</button>
-                            </div>`;
-                        }
+                        console.error(err);
+                        if(loadingMsg) loadingMsg.innerHTML = "로드 실패 (새로고침 해주세요)";
                     });
             } else {
-                console.error("admin.js 로드 실패 (함수 없음)");
-                if(loadingMsg) {
-                    loadingMsg.innerHTML = `<span style="color:red; font-weight:bold;">
-                        <i class="fas fa-times-circle"></i> 스크립트 로딩 실패
-                    </span><br>네트워크가 불안정하거나 파일이 손상되었습니다.<br>Ctrl+F5를 눌러주세요.`;
-                }
+                if(loadingMsg) loadingMsg.innerHTML = "스크립트 로드 실패";
             }
         }
     </script>
