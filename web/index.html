@@ -1,18 +1,32 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8"><title>로그인</title><link rel="stylesheet" href="css/style.css"></head>
+<head>
+    <meta charset="UTF-8">
+    <title>로그인 - Playground V3</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
 <body>
     <div class="card">
-        <h2>Playground V3</h2>
-        <input id="login-id" type="text" placeholder="아이디">
-        <input id="login-pw" type="password" placeholder="비밀번호">
+        <h2>로그인</h2>
+        
+        <input id="login-id" type="text" placeholder="아이디" autofocus>
+        
+        <input id="login-pw" type="password" placeholder="비밀번호" 
+               onkeyup="if(window.event.keyCode==13){handleLogin()}">
+        
         <button class="btn-primary" onclick="handleLogin()">로그인</button>
+        
         <div class="link-group">
-            <span onclick="location.href='reset.html'">비밀번호 변경</span> | 
             <span onclick="location.href='signup.html'">회원가입</span>
+            <span class="separator">|</span>
+            <span onclick="location.href='reset.html'">비밀번호 찾기</span>
         </div>
-        <button class="btn-admin" onclick="location.href='admin.html'">관리자 모드</button>
+        
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="admin.html" style="font-size: 11px; color: #ccc; text-decoration: none;">관리자 페이지</a>
+        </div>
     </div>
+
     <script src="js/auth.js"></script>
 </body>
 </html>
