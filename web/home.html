@@ -42,15 +42,15 @@
                     <p class="text-xs text-slate-400">현재 접속 계정</p>
                     <p id="dropdown-nick" class="font-bold text-slate-800 truncate">로딩 중...</p>
                 </div>
-                <a href="#" onclick="openMailbox()" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                <a href="javascript:void(0)" onclick="openMailbox()" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex justify-between items-center">
                     <span><i class="far fa-envelope w-6"></i> 우편함</span>
                     <span id="dropdown-badge" class="w-2 h-2 bg-red-500 rounded-full hidden"></span>
                 </a>
-                <a href="#" onclick="alert('마이페이지 준비 중')" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                <a href="javascript:void(0)" onclick="alert('마이페이지 준비 중')" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
                     <i class="far fa-user w-6"></i> 마이페이지
                 </a>
                 <div class="h-px bg-slate-100 my-1"></div>
-                <a href="#" onclick="handleLogout()" class="block px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors font-semibold">
+                <a href="javascript:void(0)" onclick="handleLogout()" class="block px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors font-semibold">
                     <i class="fas fa-sign-out-alt w-6"></i> 로그아웃
                 </a>
             </div>
@@ -171,34 +171,24 @@
         function openMailbox() {
             document.getElementById('mail-modal').classList.remove('hidden');
             document.getElementById('profile-dropdown').classList.remove('show');
-            fetchMails(); // 목록 불러오기
-            // [변경] 열자마자 '읽음 처리' 하지 않음 -> 사용자가 클릭해야 읽음 처리됨
-            // 배지는 숨김 (일단 목록을 봤으니까)
+            fetchMails(); 
             document.getElementById('mail-badge').classList.add('hidden');
             document.getElementById('dropdown-badge').classList.add('hidden');
         }
 
         function closeMailbox() {
             document.getElementById('mail-modal').classList.add('hidden');
-            checkNewMail(); // 닫을 때 다시 배지 상태 체크
+            checkNewMail(); 
         }
 
-        // 메일 하나를 '읽음' 상태로 변경
         async function markAsRead(id, element) {
-            // 이미 읽은 상태면 무시
             if(element.classList.contains('bg-slate-100')) return;
-
-            // UI 즉시 변경 (회색으로)
             element.classList.remove('bg-white', 'border-slate-100');
             element.classList.add('bg-slate-100', 'border-slate-200');
-            
-            // NEW 배지 제거
             const badge = element.querySelector('.new-badge');
             if(badge) badge.remove();
-
-            // 서버에 알림
             await fetch(`${API_MAIL}/read/${id}`, { method: 'PUT' });
-            checkNewMail(); // 전체 알림 갱신
+            checkNewMail();
         }
 
         async function fetchMails() {
@@ -218,7 +208,6 @@
                 }
 
                 listEl.innerHTML = mails.map(mail => {
-                    // 읽음 여부에 따른 스타일 결정
                     const isRead = mail.is_read === 1;
                     const bgClass = isRead ? 'bg-slate-100 border-slate-200' : 'bg-white border-slate-100';
                     const textClass = isRead ? 'text-slate-400' : 'text-slate-800';
@@ -237,7 +226,6 @@
                         </div>
                         <h4 class="font-bold text-sm mb-1 ${textClass}">${mail.title}</h4>
                         <p class="text-xs text-slate-500 leading-relaxed break-words">${mail.content}</p>
-                        
                         <div onclick="deleteMail(event, ${mail.id})" class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-100 text-slate-300 hover:text-red-500 transition-colors z-20 cursor-pointer">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </div>
@@ -250,26 +238,16 @@
         }
 
         async function deleteMail(event, id) {
-            // [중요] 부모(카드) 클릭 이벤트가 발생하지 않도록 막음
             event.stopPropagation();
-            
             if(!confirm("이 우편을 삭제할까요?")) return;
-            
             const res = await fetch(`${API_MAIL}/delete/${id}`, { method: 'DELETE' });
-            if(res.ok) {
-                fetchMails(); // 목록 즉시 갱신
-            } else {
-                alert("삭제 실패");
-            }
+            if(res.ok) { fetchMails(); } else { alert("삭제 실패"); }
         }
 
         async function deleteAllRead() {
             if(!confirm("이미 읽은(회색) 우편들을 모두 삭제하시겠습니까?")) return;
             const res = await fetch(`${API_MAIL}/delete-read/${myId}`, { method: 'DELETE' });
-            if(res.ok) {
-                alert("정리되었습니다.");
-                fetchMails();
-            }
+            if(res.ok) { alert("정리되었습니다."); fetchMails(); }
         }
 
         function startDiceGame() {
