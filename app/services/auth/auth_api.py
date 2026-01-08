@@ -23,7 +23,6 @@ class DBUpdateModel(BaseModel):
     column_name: str
     new_value: Any
 
-# [신규] 마이페이지용 모델
 class ProfileUpdateModel(BaseModel):
     username: str
     nickname: str
@@ -93,7 +92,11 @@ async def login(user: AuthModel):
     if not row or not verify_password(user.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="ID/PW 불일치")
     if row["status"] != "active":
-        raise HTTPException(status_code=403, detail="승인 대기 중 또는 이용 정지 상태입니다.")
+        # 요청 상태에 따른 메시지 세분화
+        msg = "승인 대기 중입니다."
+        if row["status"] == "pending_deletion": msg = "탈퇴 처리 대기 중입니다."
+        elif row["status"] == "pending_reset": msg = "비밀번호 변경 승인 대기 중입니다."
+        raise HTTPException(status_code=403, detail=msg)
     
     return {
         "nickname": row["nickname"],
@@ -113,7 +116,7 @@ async def reset_request(user: AuthModel):
         return {"message": "성공"}
     finally: conn.close()
 
-# --- [마이페이지 API] (신규) ---
+# --- [마이페이지 API] ---
 @router.get("/profile/{username}")
 async def get_profile(username: str):
     conn = get_db_connection()
@@ -165,7 +168,7 @@ async def request_withdraw(user: AuthModel):
     conn.close()
     return {"message": "탈퇴 요청 접수"}
 
-# --- [관리자 API] (기존 유지) ---
+# --- [관리자 API] (수정된 승인/거절 로직 적용) ---
 @router.get("/admin/pending")
 async def get_pending_requests(admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
@@ -185,24 +188,44 @@ async def get_all_users(admin_key: str):
 @router.post("/admin/approve")
 async def approve_user(user_id: int, action: str, admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
+    
     conn = get_db_connection()
     try:
         row = conn.execute("SELECT status FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row: return {"message": "유저를 찾을 수 없음"}
+        
+        status = row["status"]
+
+        # [수정] 상태별 승인/거절 로직 세분화
         if action == "approve":
-            if row["status"] == "pending_reset":
-                conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
-            else:
+            # 승인 시 로직
+            if status == "pending_signup":
+                # 가입 승인 -> 정회원 등극
                 conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
-        else: # reject
-            if row["status"] == "pending_reset":
-                conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
-            else: # 가입 거절 or 탈퇴 승인 -> 삭제
+            elif status == "pending_reset":
+                # 비번 변경 승인 -> 새 비번 적용 및 정회원 복귀
+                conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
+            elif status == "pending_deletion":
+                # 탈퇴 승인 -> DB 삭제 (영구 제거)
                 conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        
+        else: 
+            # 거절(Reject) 시 로직
+            if status == "pending_signup":
+                # 가입 거절 -> 데이터 삭제 (그래야 재가입 가능)
+                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            elif status == "pending_reset":
+                # 비번 변경 거절 -> 요청 취소, 정회원 복귀 (기존 비번 유지)
+                conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
+            elif status == "pending_deletion":
+                # 탈퇴 거절 -> 탈퇴 취소, 정회원 복귀 (계정 유지)
+                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
+
         conn.commit()
     finally: conn.close()
     return {"message": "완료"}
 
-# --- [DB 브라우저 API] (기존 유지) ---
+# --- [DB 브라우저 API] ---
 @router.get("/admin/db/tables")
 async def get_tables(admin_key: str, db_key: str):
     if admin_key != ADMIN_SECRET_KEY or db_key != DB_MASTER_KEY: raise HTTPException(status_code=401)
