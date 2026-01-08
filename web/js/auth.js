@@ -22,7 +22,11 @@ async function handleLogin() {
         body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    if(res.ok) { sessionStorage.setItem('nickname', data.nickname); location.href='home.html'; }
+    if(res.ok) { 
+        sessionStorage.setItem('nickname', data.nickname); 
+        sessionStorage.setItem('username', data.username);
+        location.href = 'home.html'; 
+    }
     else alert(data.detail);
 }
 

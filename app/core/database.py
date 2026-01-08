@@ -30,7 +30,17 @@ def init_db():
     """)
 
     # 2. 마이그레이션: 현재 컬럼 목록 확인 및 부족한 컬럼 추가
-    cursor.execute("PRAGMA table_info(users)")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT,
+            receiver_id TEXT,
+            title TEXT,
+            content TEXT,
+            is_read INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     existing_columns = [row['name'] for row in cursor.fetchall()]
 
     required_columns = {

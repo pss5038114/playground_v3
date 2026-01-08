@@ -40,11 +40,16 @@ async def login(user: AuthModel):
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM users WHERE username = ?", (user.username,)).fetchone()
     conn.close()
+    
     if not row or not verify_password(user.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="ID/PW 불일치")
     if row["status"] != "active":
         raise HTTPException(status_code=403, detail="승인 대기 중")
-    return {"nickname": row["nickname"]}
+    
+    return {
+        "nickname": row["nickname"],
+        "username": row["username"]
+    }
 
 @router.post("/reset-request")
 async def reset_request(user: AuthModel):
