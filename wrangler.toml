@@ -1,0 +1,9 @@
+name = "playground-v3"   # 여기를 하이픈(-)으로 고쳐주세요.
+pages_build_output_dir = "web"
+compatibility_date = "2026-01-08"
+compatibility_flags = ["python_workers"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "playground_db"
+database_id = "85e1309e-bcaf-4905-a1ad-fe955fc35e72"

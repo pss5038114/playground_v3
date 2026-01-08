@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>관리자 인증 - Playground V3</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="card admin-container">
+        <h3>관리자 승인 센터</h3>
+        
+        <div id="admin-login-box">
+            <input id="admin-key-input" type="password" placeholder="관리자 보안 키" 
+                   onkeyup="if(window.event.keyCode==13){loadAdminRequests()}">
+            <button class="btn-primary" onclick="loadAdminRequests()">접속</button>
+        </div>
+
+        <div id="pending-list-area" class="hidden">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr><th>아이디</th><th>닉네임</th><th>요청타입</th><th>승인/거절</th></tr>
+                    </thead>
+                    <tbody id="admin-user-list"></tbody>
+                </table>
+            </div>
+            
+            <div style="background:#f1f3f5; padding:20px; border-radius:15px; margin-top:30px;">
+                <h4 style="margin-top:0;">🔓 온라인 DB Browser 접속</h4>
+                <input id="db-master-key-input" type="password" placeholder="2차 마스터 보안 키"
+                       onkeyup="if(window.event.keyCode==13){goToDBManager()}">
+                <button class="btn-primary" onclick="goToDBManager()">마스터 모드 진입</button>
+            </div>
+        </div>
+        
+        <button class="btn-admin" onclick="location.href='index.html'">나가기</button>
+    </div>
+    
+    <script src="js/admin.js"></script>
+</body>
+</html>

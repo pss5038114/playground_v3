@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>DB 브라우저</title><link rel="stylesheet" href="css/style.css"></head>
+<body>
+    <div class="db-manager-container">
+        <h2>🛠️ 온라인 DB Browser (Excel)</h2>
+        <div class="table-selector">
+            <b style="font-size:13px; margin-right:10px;">테이블 선택:</b>
+            <div id="table-links"></div>
+        </div>
+        <div id="db-content-area" style="text-align:left;"></div>
+        <button class="btn-admin" onclick="location.href='admin.html'" style="width:200px;">뒤로가기</button>
+    </div>
+    <script src="js/admin.js"></script>
+    <script>window.onload = openDBManager;</script>
+</body>
+</html>

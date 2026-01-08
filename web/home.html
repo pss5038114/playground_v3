@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Playground V3 - Lobby</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .menu-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .menu-item { background: #fff; border: 2px solid #eee; padding: 20px; border-radius: 15px; cursor: pointer; transition: 0.3s; }
+        .menu-item:hover { border-color: #1877f2; transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .menu-item h4 { margin: 0 0 10px 0; color: #333; }
+        .menu-item p { margin: 0; font-size: 13px; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="card" style="max-width: 500px;">
+        <h2 id="u-welcome">로딩 중...</h2>
+        <div style="padding:20px 0; background:#f9f9f9; border-radius:15px; margin:10px 0;">
+            <p style="font-size:18px; font-weight: bold;">🎮 게임 및 콘텐츠</p>
+            <div class="menu-container">
+                <div class="menu-item" onclick="startDiceGame()">
+                    <h4>🎲 다이스 디펜스</h4>
+                    <p>주사위를 배치하여 몰려오는 적을 막아내세요!</p>
+                </div>
+                <div class="menu-item" style="opacity: 0.5; cursor: default;">
+                    <h4>🚧 준비 중</h4>
+                    <p>다음 미니게임이 곧 추가됩니다.</p>
+                </div>
+            </div>
+        </div>
+        <button class="btn-admin" onclick="handleLogout()" style="background:#ff4757;">로그아웃</button>
+    </div>
+
+    <script>
+        const nick = sessionStorage.getItem('nickname');
+        if(!nick) { 
+            alert("로그인이 필요합니다."); 
+            location.href='login.html'; 
+        } else {
+            document.getElementById('u-welcome').innerText = `${nick}님, 환영합니다!`;
+        }
+
+        function startDiceGame() {
+            // 임의의 세션 ID 생성 (추후 멀티플레이 확장성 고려)
+            const sessionId = "room_" + Math.random().toString(36).substr(2, 9);
+            location.href = `dice_game.html?session=${sessionId}`;
+        }
+
+        function handleLogout() {
+            sessionStorage.clear();
+            location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
