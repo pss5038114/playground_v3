@@ -9,107 +9,140 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         body { font-family: 'Pretendard', sans-serif; }
-        .dropdown-content { display: none; }
-        .dropdown-content.show { display: flex; }
+        /* 드롭다운 애니메이션 */
+        .dropdown-menu {
+            opacity: 0;
+            transform: translateY(-10px);
+            pointer-events: none;
+            transition: all 0.2s ease;
+        }
+        .dropdown-menu.show {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
 
     <nav class="fixed top-0 left-0 w-full h-16 bg-white flex justify-between items-center px-6 shadow-sm z-50">
         <div class="flex items-center gap-4">
-            <div class="cursor-pointer flex flex-col gap-1" onclick="alert('메뉴 기능 준비 중입니다.')">
-                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
-                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
-                <span class="w-6 h-0.5 bg-slate-800 rounded-full"></span>
-            </div>
-            <b class="text-xl text-blue-600 cursor-pointer font-bold" onclick="location.reload()">Playground V3</b>
+            <button onclick="alert('메뉴 기능 준비 중입니다.')" class="flex flex-col gap-1.5 p-2 cursor-pointer hover:bg-slate-100 rounded-lg transition-colors">
+                <span class="w-5 h-0.5 bg-slate-600 rounded-full"></span>
+                <span class="w-5 h-0.5 bg-slate-600 rounded-full"></span>
+                <span class="w-5 h-0.5 bg-slate-600 rounded-full"></span>
+            </button>
+            <h1 class="text-xl font-bold text-blue-600 cursor-pointer select-none" onclick="location.reload()">
+                Playground V3
+            </h1>
         </div>
         
         <div class="relative">
-            <div id="profile-btn" onclick="toggleDropdown()" class="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold cursor-pointer hover:bg-blue-700 transition-colors shadow-md">
+            <button id="profile-btn" onclick="toggleDropdown()" class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold hover:bg-blue-200 transition-colors shadow-sm border border-blue-200">
                 <span id="u-initial">?</span>
-            </div>
-            <div id="profile-dropdown" class="dropdown-content absolute top-12 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 flex-col py-2 z-50">
-                <span class="px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-2" onclick="alert('우편함 준비 중')">
-                    <i class="far fa-envelope text-slate-400"></i> 우편함
-                </span>
-                <span class="px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-2" onclick="alert('마이페이지 준비 중')">
-                    <i class="far fa-user text-slate-400"></i> My Page
-                </span>
+            </button>
+
+            <div id="profile-dropdown" class="dropdown-menu absolute top-12 right-0 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden py-2">
+                <div class="px-4 py-3 border-b border-slate-100">
+                    <p class="text-xs text-slate-400">현재 접속 계정</p>
+                    <p id="dropdown-nick" class="font-bold text-slate-800 truncate">로딩 중...</p>
+                </div>
+                <a href="#" onclick="alert('우편함 준비 중')" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <i class="far fa-envelope w-6"></i> 우편함
+                </a>
+                <a href="#" onclick="alert('마이페이지 준비 중')" class="block px-4 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <i class="far fa-user w-6"></i> 마이페이지
+                </a>
                 <div class="h-px bg-slate-100 my-1"></div>
-                <span class="px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer flex items-center gap-2" onclick="handleLogout()">
-                    <i class="fas fa-sign-out-alt"></i> 로그아웃
-                </span>
+                <a href="#" onclick="handleLogout()" class="block px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors font-semibold">
+                    <i class="fas fa-sign-out-alt w-6"></i> 로그아웃
+                </a>
             </div>
         </div>
     </nav>
 
-    <div class="flex items-center justify-center min-h-screen pt-16 p-4">
-        <div class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-lg text-center">
-            <h1 class="text-2xl font-bold text-slate-800 mb-8">
-                <span id="u-welcome" class="text-blue-600">로딩 중...</span>님, 환영합니다!
-            </h1>
-
-            <div class="bg-slate-50 rounded-2xl p-6 mb-8">
-                <h2 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center justify-center gap-2">
-                    <i class="fas fa-gamepad"></i> 게임 및 콘텐츠
+    <main class="flex items-center justify-center min-h-screen pt-16 p-4">
+        <div class="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md text-center border border-slate-100">
+            
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-800">
+                    <span id="u-welcome" class="text-blue-600">...</span>님,<br>환영합니다!
                 </h2>
+                <p class="text-slate-400 text-sm mt-2">오늘도 즐거운 시간 되세요.</p>
+            </div>
+
+            <div class="bg-slate-50 rounded-2xl p-5 mb-6">
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <i class="fas fa-gamepad text-slate-400"></i>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Game Center</span>
+                </div>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div onclick="startDiceGame()" class="cursor-pointer block p-4 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all group text-left">
-                        <div class="text-2xl mb-2 group-hover:scale-110 transition-transform">🎲</div>
-                        <div class="font-bold text-slate-700 text-sm mb-1">다이스 디펜스</div>
-                        <p class="text-[10px] text-slate-400 leading-tight">주사위를 배치하여 몰려오는 적을 막아내세요!</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div onclick="startDiceGame()" class="cursor-pointer bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-md hover:-translate-y-1 transition-all group text-left relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity text-4xl">🎲</div>
+                        <div class="text-2xl mb-2">🎲</div>
+                        <div class="font-bold text-slate-700 text-sm">다이스 디펜스</div>
+                        <div class="text-[10px] text-slate-400 mt-1">적들을 막아내세요!</div>
                     </div>
 
-                    <div class="p-4 bg-white border border-slate-100 rounded-xl opacity-60 text-left">
-                        <div class="text-2xl mb-2">🚧</div>
-                        <div class="font-bold text-slate-400 text-sm mb-1">준비 중</div>
-                        <p class="text-[10px] text-slate-300 leading-tight">다음 미니게임이 곧 추가됩니다.</p>
+                    <div class="bg-slate-100 border border-slate-200 rounded-xl p-4 opacity-60 text-left">
+                        <div class="text-2xl mb-2 grayscale">🚧</div>
+                        <div class="font-bold text-slate-400 text-sm">준비 중</div>
+                        <div class="text-[10px] text-slate-400 mt-1">Coming Soon</div>
                     </div>
                 </div>
             </div>
 
-            <button onclick="handleLogout()" class="w-full py-4 bg-[#ff4757] hover:bg-[#ff2e44] text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-100">
+            <button onclick="handleLogout()" class="w-full py-4 rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100 hover:text-red-600 transition-colors">
                 로그아웃
             </button>
         </div>
-    </div>
+    </main>
 
     <script>
-        // 세션 정보 확인 로직
+        // 세션 체크 및 UI 초기화
         const nick = sessionStorage.getItem('nickname');
+        
         if(!nick) { 
-            alert("로그인이 필요합니다."); 
+            alert("로그인이 만료되었습니다."); 
             location.href='index.html'; 
         } else {
+            // 텍스트 업데이트
             document.getElementById('u-welcome').innerText = nick;
+            document.getElementById('dropdown-nick').innerText = nick;
+            
+            // 이니셜 아이콘 (첫 글자만 대문자로)
             document.getElementById('u-initial').innerText = nick.charAt(0).toUpperCase();
         }
 
-        // 드롭다운 토글
+        // 드롭다운 토글 함수
         function toggleDropdown() {
-            document.getElementById('profile-dropdown').classList.toggle('show');
+            const dropdown = document.getElementById('profile-dropdown');
+            dropdown.classList.toggle('show');
         }
 
-        // 외부 클릭 시 드롭다운 닫기
-        window.onclick = function(event) {
-            if (!event.target.closest('#profile-btn') && !event.target.closest('#profile-dropdown')) {
-                const dropdown = document.getElementById('profile-dropdown');
-                if (dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
+        // 화면 다른 곳 클릭 시 드롭다운 닫기
+        window.addEventListener('click', function(e) {
+            const btn = document.getElementById('profile-btn');
+            const dropdown = document.getElementById('profile-dropdown');
+            
+            // 버튼이나 드롭다운 내부를 클릭한 게 아니라면 닫기
+            if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
             }
-        }
+        });
 
         function startDiceGame() {
+            // 랜덤 세션 ID 생성 후 이동
             const sessionId = "room_" + Math.random().toString(36).substr(2, 9);
             location.href = `dice_game.html?session=${sessionId}`;
         }
 
         function handleLogout() {
-            sessionStorage.clear();
-            location.href = 'index.html';
+            if(confirm("정말 로그아웃 하시겠습니까?")) {
+                sessionStorage.clear();
+                location.href = 'index.html';
+            }
         }
     </script>
 </body>
