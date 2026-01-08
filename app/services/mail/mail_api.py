@@ -7,16 +7,16 @@ router = APIRouter()
 
 class MailSendModel(BaseModel):
     sender: str
-    receiver_username: str
+    receiver_username: str  # "ALL" 이면 전체 발송
     title: str
     content: str
     scheduled_at: Optional[str] = None
 
-# [신규] 1. 읽지 않은 메일 개수 확인 (알림용)
+# 1. 읽지 않은 메일 개수 확인 (알림용)
 @router.get("/check/{username}")
 async def check_unread_mail(username: str):
     conn = get_db_connection()
-    # 조건: 내 아이디 AND 읽지 않음(0) AND (예약 없거나 OR 예약 시간 지남)
+    # 캐싱 방지를 위해 쿼리 자체는 그대로 두되, 클라이언트에서 호출 시 timestamp를 붙입니다.
     query = """
         SELECT COUNT(*) as count FROM messages 
         WHERE receiver_id = ? 
@@ -27,11 +27,10 @@ async def check_unread_mail(username: str):
     conn.close()
     return {"count": row["count"]}
 
-# [신규] 2. 메일 모두 읽음 처리 (우편함 열 때 호출)
+# 2. 메일 모두 읽음 처리 (우편함 열 때 호출)
 @router.put("/read-all/{username}")
 async def mark_all_read(username: str):
     conn = get_db_connection()
-    # 현재 보여지는(예약 시간 지난) 메일만 읽음 처리
     query = """
         UPDATE messages 
         SET is_read = 1 
@@ -43,7 +42,17 @@ async def mark_all_read(username: str):
     conn.close()
     return {"message": "All read"}
 
-# 3. 내 우편함 목록 가져오기
+# [신규] 3. 읽은 메일 모두 삭제 (휴지통 기능)
+@router.delete("/delete-read/{username}")
+async def delete_read_mails(username: str):
+    conn = get_db_connection()
+    # is_read = 1 인 것만 삭제
+    conn.execute("DELETE FROM messages WHERE receiver_id = ? AND is_read = 1", (username,))
+    conn.commit()
+    conn.close()
+    return {"message": "Read mails deleted"}
+
+# 4. 내 우편함 목록 가져오기
 @router.get("/list/{username}")
 async def get_my_mails(username: str):
     conn = get_db_connection()
@@ -57,26 +66,48 @@ async def get_my_mails(username: str):
     conn.close()
     return [dict(row) for row in rows]
 
-# 4. 우편 보내기
+# 5. 우편 보내기 (1:1 및 전체 발송 지원)
 @router.post("/send")
 async def send_mail(mail: MailSendModel):
     conn = get_db_connection()
     try:
-        user = conn.execute("SELECT username FROM users WHERE username = ?", (mail.receiver_username,)).fetchone()
-        if not user:
-            raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
+        # [신규] 전체 발송 로직
+        if mail.receiver_username == "ALL":
+            # 전체 활성 유저 조회
+            users = conn.execute("SELECT username FROM users WHERE status = 'active'").fetchall()
+            if not users:
+                return {"message": "보낼 유저가 없습니다."}
             
-        conn.execute(
-            """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
-               VALUES (?, ?, ?, ?, ?)""",
-            (mail.sender, mail.receiver_username, mail.title, mail.content, mail.scheduled_at)
-        )
-        conn.commit()
-        return {"message": "전송 완료"}
+            # Bulk Insert 준비
+            data_to_insert = []
+            for u in users:
+                data_to_insert.append((mail.sender, u["username"], mail.title, mail.content, mail.scheduled_at))
+            
+            conn.executemany(
+                """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
+                   VALUES (?, ?, ?, ?, ?)""",
+                data_to_insert
+            )
+            conn.commit()
+            return {"message": f"전체 유저({len(users)}명)에게 전송 완료"}
+
+        else:
+            # 기존 1:1 발송
+            user = conn.execute("SELECT username FROM users WHERE username = ?", (mail.receiver_username,)).fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
+                
+            conn.execute(
+                """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
+                   VALUES (?, ?, ?, ?, ?)""",
+                (mail.sender, mail.receiver_username, mail.title, mail.content, mail.scheduled_at)
+            )
+            conn.commit()
+            return {"message": "전송 완료"}
     finally:
         conn.close()
 
-# 5. 우편 삭제
+# 6. 개별 우편 삭제
 @router.delete("/delete/{mail_id}")
 async def delete_mail(mail_id: int):
     conn = get_db_connection()

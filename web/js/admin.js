@@ -1,19 +1,16 @@
-// 관리자 및 DB 접속용 전역 상태 및 API 경로
 const API_BASE = "https://api.pyosh.cloud/api/auth";
-const API_MAIL = "https://api.pyosh.cloud/api/mail"; // 메일 API 경로 추가
+const API_MAIL = "https://api.pyosh.cloud/api/mail";
 
 let currentAdminKey = sessionStorage.getItem('adminKey') || "";
 let currentDBKey = sessionStorage.getItem('dbKey') || "";
+let allUsersCache = []; // 유저 목록 캐싱용
 
-// 1. 관리자 승인 목록 불러오기 (로그인 역할 겸함)
+// 1. 관리자 승인 목록
 async function loadAdminRequests() {
     const inputEl = document.getElementById('admin-key-input');
     const key = inputEl ? inputEl.value.trim() : currentAdminKey;
     
-    if (!key) { 
-        alert("보안 키를 입력해주세요."); 
-        return; 
-    }
+    if (!key) { alert("보안 키를 입력해주세요."); return; }
 
     try {
         const res = await fetch(`${API_BASE}/admin/pending?admin_key=${encodeURIComponent(key)}`);
@@ -23,11 +20,9 @@ async function loadAdminRequests() {
             sessionStorage.setItem('adminKey', key);
             const users = await res.json();
             
-            // UI 전환
             document.getElementById('admin-login-box').classList.add('hidden');
             document.getElementById('pending-list-area').classList.remove('hidden');
 
-            // 승인 대기 목록 렌더링
             const tbody = document.getElementById('admin-user-list');
             tbody.innerHTML = users.length ? "" : "<tr><td colspan='4' style='padding:20px; color:gray;'>대기 중인 요청이 없습니다.</td></tr>";
             
@@ -45,7 +40,7 @@ async function loadAdminRequests() {
                 tbody.appendChild(tr);
             });
 
-            // [신규] 유저 목록 불러오기 (우편 발송용)
+            // 유저 목록 미리 로딩
             loadUserListForMail();
 
         } else { 
@@ -58,64 +53,37 @@ async function loadAdminRequests() {
     }
 }
 
-// 2. 승인/거절 처리
 async function approve(id, action) {
     if (!confirm("정말 처리하시겠습니까?")) return;
     try {
         const res = await fetch(`${API_BASE}/admin/approve?user_id=${id}&action=${action}&admin_key=${encodeURIComponent(currentAdminKey)}`, { method: 'POST' });
-        if(res.ok) {
-            alert("완료되었습니다.");
-            loadAdminRequests(); 
-        } else {
-            alert("처리 중 오류가 발생했습니다.");
-        }
-    } catch (err) {
-        alert("서버 통신 오류");
-    }
+        if(res.ok) { alert("완료되었습니다."); loadAdminRequests(); } 
+        else { alert("오류 발생"); }
+    } catch (err) { alert("서버 통신 오류"); }
 }
 
-// 3. 2차 보안 키 입력 후 DB 매니저 진입
 function goToDBManager() {
     const dbKeyInput = document.getElementById('db-master-key-input');
     const dbKey = dbKeyInput ? dbKeyInput.value.trim() : "";
-    
-    if(!dbKey) {
-        alert("2차 보안 키를 입력하세요.");
-        return;
-    }
-    
+    if(!dbKey) { alert("2차 보안 키를 입력하세요."); return; }
     sessionStorage.setItem('dbKey', dbKey);
     location.href = 'db_manager.html';
 }
 
-// 4. DB 브라우저 초기화
 async function openDBManager() {
-    if(!currentAdminKey || !currentDBKey) {
-        alert("인증 정보가 만료되었습니다. 다시 로그인해주세요.");
-        location.href='admin.html';
-        return;
-    }
+    if(!currentAdminKey || !currentDBKey) { alert("인증 정보 만료"); location.href='admin.html'; return; }
     try {
         const res = await fetch(`${API_BASE}/admin/db/tables?admin_key=${encodeURIComponent(currentAdminKey)}&db_key=${encodeURIComponent(currentDBKey)}`);
-        if (res.ok) {
-            renderDB(await res.json());
-        } else { 
-            alert("2차 보안 인증 실패"); 
-            location.href='admin.html'; 
-        }
-    } catch (err) {
-        alert("데이터를 가져오는 중 오류가 발생했습니다.");
-    }
+        if (res.ok) { renderDB(await res.json()); } 
+        else { alert("인증 실패"); location.href='admin.html'; }
+    } catch (err) { alert("오류 발생"); }
 }
 
 function renderDB(tables) {
     const area = document.getElementById('db-content-area');
     const links = document.getElementById('table-links');
     if(!area || !links) return;
-    
-    area.innerHTML = ""; 
-    links.innerHTML = "";
-
+    area.innerHTML = ""; links.innerHTML = "";
     tables.forEach(t => {
         const btn = document.createElement('button');
         btn.innerText = t.name;
@@ -125,87 +93,96 @@ function renderDB(tables) {
             document.getElementById(`section-${t.name}`).style.display = 'block';
         };
         links.appendChild(btn);
-
         const section = document.createElement('div');
         section.id = `section-${t.name}`;
         section.className = "db-table-section";
         section.style.display = "none";
-        
-        let html = `<h4 style="margin-top:20px; color:#1877f2;">[TABLE: ${t.name}]</h4>
-                    <table class="db-table"><thead><tr>`;
+        let html = `<h4 style="margin-top:20px; color:#1877f2;">[TABLE: ${t.name}]</h4><table class="db-table"><thead><tr>`;
         t.columns.forEach(c => html += `<th>${c}</th>`);
         html += `</tr></thead><tbody>`;
-        
         t.data.forEach(row => {
             html += `<tr>`;
             t.columns.forEach(c => {
                 const isId = c === 'id';
-                html += `<td><input type="text" value="${row[c] || ''}" ${isId ? 'disabled':''} 
-                            onblur="updateDBCell('${t.name}', ${row.id}, '${c}', this.value)"
-                            style="${isId ? 'background:#f0f0f0;':''}"></td>`;
+                html += `<td><input type="text" value="${row[c] || ''}" ${isId ? 'disabled':''} onblur="updateDBCell('${t.name}', ${row.id}, '${c}', this.value)" style="${isId ? 'background:#f0f0f0;':''}"></td>`;
             });
             html += `</tr>`;
         });
         section.innerHTML = html + "</tbody></table>";
         area.appendChild(section);
     });
-
-    if(tables.length > 0) {
-        const firstSection = area.querySelector('.db-table-section');
-        if(firstSection) firstSection.style.display = 'block';
-    }
+    if(tables.length > 0) area.querySelector('.db-table-section').style.display = 'block';
 }
 
-// 5. DB 셀 실시간 수정
 async function updateDBCell(tableName, rowId, colName, newValue) {
-    try {
-        const res = await fetch(`${API_BASE}/admin/db/update?admin_key=${encodeURIComponent(currentAdminKey)}&db_key=${encodeURIComponent(currentDBKey)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ table_name: tableName, row_id: rowId, column_name: colName, new_value: newValue })
-        });
-        if(res.ok) console.log(`Updated ${tableName} ID ${rowId}: ${colName}=${newValue}`);
-    } catch (err) {
-        console.error("Update Failed:", err);
-    }
+    await fetch(`${API_BASE}/admin/db/update?admin_key=${encodeURIComponent(currentAdminKey)}&db_key=${encodeURIComponent(currentDBKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_name: tableName, row_id: rowId, column_name: colName, new_value: newValue })
+    });
 }
 
-// [신규] 6. 유저 목록 불러오기 (우편 발송용)
+// [신규] 유저 목록 로딩 (캐싱)
 async function loadUserListForMail() {
     if(!currentAdminKey) return;
     try {
         const res = await fetch(`${API_BASE}/admin/users?admin_key=${encodeURIComponent(currentAdminKey)}`);
         if(res.ok) {
-            const users = await res.json();
-            const select = document.getElementById('mail-receiver');
-            if(select) {
-                select.innerHTML = '<option value="">-- 유저 선택 --</option>';
-                users.forEach(u => {
-                    const opt = document.createElement('option');
-                    opt.value = u.username;
-                    opt.innerText = `${u.nickname} (${u.username})`;
-                    select.appendChild(opt);
-                });
-            }
+            allUsersCache = await res.json();
         }
-    } catch(err) {
-        console.error("User List Load Error:", err);
+    } catch(err) { console.error(err); }
+}
+
+// [신규] 유저 모달 관련 함수들
+function openUserModal() {
+    const modal = document.getElementById('user-modal');
+    if(modal) {
+        modal.style.display = 'flex';
+        renderUserList(allUsersCache); // 전체 목록 렌더링
     }
 }
 
-// [신규] 7. 관리자 우편 발송
+function closeUserModal() {
+    document.getElementById('user-modal').style.display = 'none';
+}
+
+function renderUserList(users) {
+    const listEl = document.getElementById('modal-user-list');
+    listEl.innerHTML = users.map(u => `
+        <div class="user-item" onclick="selectUser('${u.username}', '${u.nickname} (${u.username})')">
+            <span>${u.nickname}</span>
+            <span style="font-size:12px; color:#888;">${u.username}</span>
+        </div>
+    `).join('');
+}
+
+function filterUsers() {
+    const query = document.getElementById('user-search').value.toLowerCase();
+    const filtered = allUsersCache.filter(u => 
+        u.username.toLowerCase().includes(query) || 
+        u.nickname.toLowerCase().includes(query)
+    );
+    renderUserList(filtered);
+}
+
+function selectUser(username, displayName) {
+    document.getElementById('mail-receiver-val').value = username;
+    document.getElementById('mail-receiver-display').value = displayName;
+    closeUserModal();
+}
+
+// [신규] 우편 발송 (ALL 지원)
 async function sendAdminMail() {
-    const receiver = document.getElementById('mail-receiver').value;
+    const receiver = document.getElementById('mail-receiver-val').value; // hidden value 사용
     const title = document.getElementById('mail-title').value;
     const content = document.getElementById('mail-content').value;
-    const scheduledTime = document.getElementById('mail-scheduled').value; // YYYY-MM-DDTHH:MM 형식
+    const scheduledTime = document.getElementById('mail-scheduled').value;
 
     if(!receiver || !title || !content) {
         alert("받는 사람, 제목, 내용을 모두 입력해주세요.");
         return;
     }
 
-    // 날짜 포맷 변환 (HTML input은 'T'가 포함되므로 공백으로 변경하여 DB 저장)
     let formattedTime = null;
     if(scheduledTime) {
         formattedTime = scheduledTime.replace("T", " ") + ":00";
@@ -217,7 +194,7 @@ async function sendAdminMail() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 sender: "운영자",
-                receiver_username: receiver,
+                receiver_username: receiver, // "ALL" 또는 특정 ID
                 title: title,
                 content: content,
                 scheduled_at: formattedTime
@@ -225,7 +202,9 @@ async function sendAdminMail() {
         });
 
         if(res.ok) {
-            alert("우편이 발송되었습니다!");
+            const data = await res.json();
+            alert(data.message); // "전체 ~명에게 발송 완료" 메시지 출력
+            // 초기화
             document.getElementById('mail-title').value = "";
             document.getElementById('mail-content').value = "";
             document.getElementById('mail-scheduled').value = "";
@@ -245,3 +224,7 @@ window.openDBManager = openDBManager;
 window.updateDBCell = updateDBCell;
 window.loadUserListForMail = loadUserListForMail;
 window.sendAdminMail = sendAdminMail;
+window.openUserModal = openUserModal;
+window.closeUserModal = closeUserModal;
+window.filterUsers = filterUsers;
+window.selectUser = selectUser;

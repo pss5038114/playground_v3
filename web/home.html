@@ -13,6 +13,9 @@
         .dropdown-menu.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        /* 스크롤바 숨기기 */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -89,18 +92,26 @@
     </main>
 
     <div id="mail-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm transition-all">
-        <div class="bg-white rounded-2xl w-full max-w-md h-[500px] flex flex-col shadow-2xl animate-fade-in relative">
+        <div class="bg-white rounded-2xl w-full max-w-md h-[550px] flex flex-col shadow-2xl animate-fade-in relative">
+            
             <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <i class="far fa-envelope text-blue-500"></i> 우편함
-                </h3>
+                <div class="flex items-center gap-3">
+                    <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                        <i class="far fa-envelope text-blue-500"></i> 우편함
+                    </h3>
+                    <button onclick="deleteAllRead()" class="text-[11px] bg-white border border-slate-200 px-2 py-1 rounded text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">
+                        <i class="far fa-trash-alt mr-1"></i>읽은 우편 삭제
+                    </button>
+                </div>
                 <button onclick="closeMailbox()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+            
             <div id="mail-list" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white scrollbar-hide">
                 <p class="text-center text-slate-400 mt-10">불러오는 중...</p>
             </div>
+
             <div class="p-4 border-t border-slate-100 text-center bg-slate-50 rounded-b-2xl">
                 <button onclick="fetchMails()" class="text-sm text-blue-600 hover:text-blue-700 font-bold flex items-center justify-center gap-1 mx-auto">
                     <i class="fas fa-sync-alt"></i> 새로고침
@@ -122,17 +133,15 @@
             document.getElementById('dropdown-nick').innerText = nick;
             document.getElementById('u-initial').innerText = nick.charAt(0).toUpperCase();
             
-            // [신규] 로그인 직후 메일 체크 시작
             checkNewMail();
-            // [신규] 60초(1분)마다 주기적으로 체크
             setInterval(checkNewMail, 60000);
         }
 
-        // [신규] 새 메일 확인 함수
         async function checkNewMail() {
             if(!myId) return;
             try {
-                const res = await fetch(`${API_MAIL}/check/${myId}`);
+                // 캐싱 방지용 타임스탬프 추가
+                const res = await fetch(`${API_MAIL}/check/${myId}?t=${new Date().getTime()}`);
                 if(res.ok) {
                     const data = await res.json();
                     const badge = document.getElementById('mail-badge');
@@ -165,9 +174,9 @@
             document.getElementById('mail-modal').classList.remove('hidden');
             document.getElementById('profile-dropdown').classList.remove('show');
             
-            fetchMails(); // 메일 목록 불러오기
+            fetchMails(); // 목록 불러오기 (캐싱 방지 적용됨)
 
-            // [신규] 우편함을 열었으니 '읽음 처리' 및 '배지 숨기기'
+            // 읽음 처리
             fetch(`${API_MAIL}/read-all/${myId}`, { method: 'PUT' });
             document.getElementById('mail-badge').classList.add('hidden');
             document.getElementById('dropdown-badge').classList.add('hidden');
@@ -180,7 +189,8 @@
         async function fetchMails() {
             const listEl = document.getElementById('mail-list');
             try {
-                const res = await fetch(`${API_MAIL}/list/${myId}`);
+                // [수정] 캐싱 방지를 위해 URL 뒤에 현재 시간을 붙임 (?t=...)
+                const res = await fetch(`${API_MAIL}/list/${myId}?t=${new Date().getTime()}`);
                 if(!res.ok) throw new Error("로드 실패");
                 const mails = await res.json();
                 
@@ -195,15 +205,16 @@
 
                 listEl.innerHTML = mails.map(mail => `
                     <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative group">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
+                        <div class="flex justify-between items-start mb-2 w-full pr-6">
+                            <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px]">
                                 FROM. ${mail.sender}
                             </span>
-                            <span class="text-[10px] text-slate-300">${mail.created_at.substring(0,10)}</span>
+                            <span class="text-[10px] text-slate-300 whitespace-nowrap">${mail.created_at.substring(0,16)}</span>
                         </div>
                         <h4 class="font-bold text-slate-800 text-sm mb-1">${mail.title}</h4>
-                        <p class="text-xs text-slate-500 leading-relaxed">${mail.content}</p>
-                        <button onclick="deleteMail(${mail.id})" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50">
+                        <p class="text-xs text-slate-500 leading-relaxed break-words">${mail.content}</p>
+                        
+                        <button onclick="event.stopPropagation(); deleteMail(${mail.id})" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50 z-10 cursor-pointer">
                             <i class="fas fa-trash-alt text-xs"></i>
                         </button>
                     </div>
@@ -216,8 +227,23 @@
 
         async function deleteMail(id) {
             if(!confirm("이 우편을 삭제할까요?")) return;
-            await fetch(`${API_MAIL}/delete/${id}`, { method: 'DELETE' });
-            fetchMails();
+            // [중요] 삭제 요청 후 목록 갱신
+            const res = await fetch(`${API_MAIL}/delete/${id}`, { method: 'DELETE' });
+            if(res.ok) {
+                fetchMails();
+            } else {
+                alert("삭제 실패");
+            }
+        }
+
+        // [신규] 읽은 메일 전체 삭제
+        async function deleteAllRead() {
+            if(!confirm("이미 읽은 우편들을 모두 삭제하시겠습니까?\n(아직 안 읽은 우편은 삭제되지 않습니다.)")) return;
+            const res = await fetch(`${API_MAIL}/delete-read/${myId}`, { method: 'DELETE' });
+            if(res.ok) {
+                alert("정리되었습니다.");
+                fetchMails();
+            }
         }
 
         function startDiceGame() {
