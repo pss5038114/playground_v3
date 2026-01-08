@@ -13,7 +13,25 @@
     </style>
 </head>
 <body>
-    <div class="card" style="max-width: 500px;">
+    <nav class="top-bar">
+        <div class="nav-left">
+            <button class="menu-btn" onclick="alert('사이드바 기능 준비 중입니다!')">☰</button>
+            <b style="margin-left:15px; font-size:18px; color:#1877f2;">Playground V3</b>
+        </div>
+        <div class="nav-right">
+            <div class="profile-btn" onclick="toggleDropdown(event)">
+                <div class="profile-img"></div>
+                <span id="nav-nick">유저</span>
+            </div>
+            <div id="profile-dropdown" class="dropdown-menu">
+                <button class="dropdown-item" onclick="location.href='mailbox.html'">📩 우편함</button>
+                <button class="dropdown-item" onclick="location.href='mypage.html'">👤 My Page</button>
+                <button class="dropdown-item logout-item" onclick="handleLogout()">🚪 로그아웃</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="card" style="max-width: 500px; margin-top: 40px;">
         <h2 id="u-welcome">로딩 중...</h2>
         <div style="padding:20px 0; background:#f9f9f9; border-radius:15px; margin:10px 0;">
             <p style="font-size:18px; font-weight: bold;">🎮 게임 및 콘텐츠</p>
@@ -28,27 +46,43 @@
                 </div>
             </div>
         </div>
-        <button class="btn-admin" onclick="handleLogout()" style="background:#ff4757;">로그아웃</button>
     </div>
 
     <script>
         const nick = sessionStorage.getItem('nickname');
         if(!nick) { 
             alert("로그인이 필요합니다."); 
-            location.href='login.html'; 
+            location.href='index.html'; 
         } else {
             document.getElementById('u-welcome').innerText = `${nick}님, 환영합니다!`;
+            document.getElementById('nav-nick').innerText = nick;
         }
 
+        // 드롭다운 토글 함수
+        function toggleDropdown(event) {
+            event.stopPropagation(); // 버튼 클릭 시 문서 클릭 이벤트 전파 방지
+            const dropdown = document.getElementById('profile-dropdown');
+            dropdown.classList.toggle('active');
+        }
+
+        // 다른 곳 클릭 시 드롭다운 닫기
+        window.onclick = function() {
+            const dropdown = document.getElementById('profile-dropdown');
+            if (dropdown.classList.contains('active')) {
+                dropdown.classList.remove('active');
+            }
+        };
+
         function startDiceGame() {
-            // 임의의 세션 ID 생성 (추후 멀티플레이 확장성 고려)
             const sessionId = "room_" + Math.random().toString(36).substr(2, 9);
             location.href = `dice_game.html?session=${sessionId}`;
         }
 
         function handleLogout() {
-            sessionStorage.clear();
-            location.href = 'login.html';
+            if(confirm("로그아웃 하시겠습니까?")) {
+                sessionStorage.clear();
+                location.href = 'index.html';
+            }
         }
     </script>
 </body>
