@@ -10,35 +10,59 @@
         }
     </script>
     <link rel="stylesheet" href="css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* ... (기존 스타일 유지) ... */
-        body { padding: 20px; max-width: 1200px; margin: 0 auto; background: #f8f9fa; }
+        body { padding: 20px; max-width: 1200px; margin: 0 auto; background: #f8f9fa; font-family: 'Pretendard', sans-serif; }
         .db-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .table-links { margin-bottom: 15px; }
         .table-links button { margin-right: 5px; margin-bottom: 5px; }
-        .db-table { width: 100%; border-collapse: collapse; background: white; font-size: 12px; }
+        
+        .db-table-section { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: none; }
+        .db-table-wrapper { overflow-x: auto; margin-top: 10px; }
+        .db-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
         .db-table th, .db-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        .db-table th { background-color: #f1f3f5; }
-        .db-table input { width: 100%; border: none; background: transparent; }
-        .db-table input:focus { outline: 2px solid #1877f2; background: #fff; }
+        .db-table th { background-color: #f1f3f5; font-weight: bold; color: #333; position: sticky; top: 0; }
+        .db-table input { width: 100%; min-width: 80px; border: none; background: transparent; padding: 4px; }
+        .db-table input:focus { outline: 2px solid #1877f2; background: #fff; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="db-header">
-        <h2>🗄️ Database Manager</h2>
-        <button class="btn-secondary" onclick="location.href='admin.html'" style="width:auto; padding:8px 15px;">돌아가기</button>
+        <h2 style="margin:0; color:#333;"><i class="fas fa-database text-blue-600"></i> Database Manager</h2>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-secondary" onclick="openDBManager()" style="width:auto; padding:8px 15px; background:#1877f2;">
+                <i class="fas fa-sync-alt"></i> 새로고침
+            </button>
+            <button class="btn-admin" onclick="location.href='admin.html'" style="width:auto; padding:8px 15px; margin:0;">
+                <i class="fas fa-arrow-left"></i> 나가기
+            </button>
+        </div>
+    </div>
+
+    <div id="loading-msg" style="text-align:center; color:#666; margin-top:50px;">
+        <i class="fas fa-spinner fa-spin fa-2x"></i><br><br>데이터 불러오는 중...
     </div>
 
     <div id="table-links" class="table-links"></div>
     <div id="db-content-area"></div>
 
-    <script src="js/admin.js?v=5"></script>
+    <script src="js/admin.js?v=6"></script>
     <script>
-        // 페이지 로드 시 즉시 DB 데이터 로드
-        window.onload = function() {
-            if(window.openDBManager) {
-                window.openDBManager();
-            }
-        };
+        // 페이지 로드 완료 시 실행
+        window.addEventListener('load', function() {
+            // 0.5초 뒤에 실행 (스크립트 로딩 시간 확보)
+            setTimeout(() => {
+                if (typeof openDBManager === 'function') {
+                    openDBManager().catch(err => {
+                        console.error(err);
+                        alert("데이터 로드 중 오류 발생: " + err);
+                    });
+                } else {
+                    document.getElementById('loading-msg').innerHTML = 
+                        '<span style="color:red;"><i class="fas fa-exclamation-triangle"></i> admin.js 로드 실패</span><br>새로고침(Ctrl+F5)을 해주세요.';
+                }
+            }, 500);
+        });
     </script>
 </body>
 </html>
