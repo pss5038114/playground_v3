@@ -1,15 +1,51 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8"><title>회원가입</title><link rel="stylesheet" href="css/style.css"></head>
+<head>
+    <meta charset="UTF-8">
+    <title>회원가입</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .input-group { display: flex; gap: 8px; align-items: center; width: 100%; margin: 8px 0; }
+        .input-group input { margin: 0; flex: 1; }
+        .btn-check { width: 80px; padding: 12px 5px; font-size: 12px; margin: 0; background: #6c757d; color: white; border-radius: 10px; }
+        .btn-check.checked { background: #28a745; cursor: default; }
+        .info-text { font-size: 11px; color: #888; margin-bottom: 5px; text-align: left; width: 100%; padding-left: 5px; }
+        hr { width: 100%; border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        .section-title { font-size: 12px; font-weight: bold; color: #1877f2; width: 100%; text-align: left; margin-top: 10px; margin-bottom: 5px;}
+    </style>
+</head>
 <body>
     <div class="card">
         <h2>회원가입</h2>
-        <input id="sign-id" type="text" placeholder="아이디">
+
+        <div class="section-title">기본 정보</div>
+        <div class="input-group">
+            <input id="sign-id" type="text" placeholder="ID (4~15자)" onchange="resetCheck('id')">
+            <button id="btn-check-id" class="btn-check" onclick="checkId()">중복확인</button>
+        </div>
+        <p class="info-text">* 영문/숫자 조합, 최소 4글자 ~ 최대 15글자</p>
+
         <input id="sign-pw" type="password" placeholder="비밀번호">
-        <input id="sign-nick" type="text" placeholder="닉네임">
-        <button class="btn-secondary" onclick="handleSignup()">등록</button>
+        <input id="sign-pw-confirm" type="password" placeholder="비밀번호 재확인">
+        
+        <hr>
+
+        <div class="section-title">본인 확인 및 보상</div>
+        <input id="sign-birth" type="text" placeholder="생일 (월일 4자리 ex. 1225)" maxlength="4" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+        <p class="info-text">* 생일 기념 보상 및 비번 찾기 본인 확인용 (년도 제외)</p>
+
+        <div class="input-group">
+            <input id="sign-nick" type="text" placeholder="닉네임 (1~15자)" onchange="resetCheck('nick')">
+            <button id="btn-check-nick" class="btn-check" onclick="checkNick()">중복확인</button>
+        </div>
+        <p class="info-text">* 게임 내에서 보여질 이름 (1~15글자)</p>
+        
+        <hr>
+        
+        <button class="btn-secondary" onclick="handleSignup()">회원가입 신청</button>
         <div class="link-group"><span onclick="location.href='login.html'">돌아가기</span></div>
     </div>
+
     <script src="js/auth.js"></script>
 </body>
 </html>

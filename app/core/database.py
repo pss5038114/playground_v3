@@ -1,35 +1,34 @@
 import sqlite3
 import os
 
-# DB 경로 설정 (프로젝트 루트)
+# DB 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
 DB_PATH = os.path.join(project_root, "playground.db")
 
 def get_db_connection():
-    """DB 연결 객체를 생성하여 반환합니다."""
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """서버 시작 시 테이블 생성 및 컬럼 마이그레이션을 담당합니다."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. 유저 테이블
+    # 1. 유저 테이블 (생일 컬럼 추가)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             username TEXT UNIQUE, 
             password_hash TEXT, 
             nickname TEXT,
+            birthdate TEXT, -- [신규] 생일 (MMDD)
             status TEXT DEFAULT 'pending_signup',
             pending_password_hash TEXT DEFAULT NULL
         )
     """)
 
-    # 2. 우편함(메시지) 테이블 (예약 발송 컬럼 추가)
+    # 2. 우편함 테이블
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,15 +42,16 @@ def init_db():
         )
     """)
 
-    # --- 마이그레이션 로직 ---
+    # --- 마이그레이션 ---
     
-    # 1) users 테이블 컬럼 확인 및 추가
+    # users 테이블 컬럼 확인 및 추가
     cursor.execute("PRAGMA table_info(users)")
     user_columns = [row['name'] for row in cursor.fetchall()]
 
     user_required = {
         "status": "TEXT DEFAULT 'pending_signup'",
-        "pending_password_hash": "TEXT DEFAULT NULL"
+        "pending_password_hash": "TEXT DEFAULT NULL",
+        "birthdate": "TEXT DEFAULT NULL" # [신규]
     }
 
     for col_name, col_def in user_required.items():
@@ -62,7 +62,7 @@ def init_db():
             except Exception as e:
                 print(f"❌ DB 마이그레이션 오류 (users): {e}")
 
-    # 2) messages 테이블 컬럼 확인 및 추가 (scheduled_at)
+    # messages 테이블 컬럼 확인 (scheduled_at)
     cursor.execute("PRAGMA table_info(messages)")
     msg_columns = [row['name'] for row in cursor.fetchall()]
     
