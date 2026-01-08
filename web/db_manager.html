@@ -1,17 +1,44 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8"><title>DB 브라우저</title><link rel="stylesheet" href="css/style.css"></head>
+<head>
+    <meta charset="UTF-8">
+    <title>DB Manager</title>
+    <script>
+        if (!sessionStorage.getItem('dbKey') || !sessionStorage.getItem('adminKey')) {
+            alert("잘못된 접근입니다.");
+            location.href = 'admin.html';
+        }
+    </script>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* ... (기존 스타일 유지) ... */
+        body { padding: 20px; max-width: 1200px; margin: 0 auto; background: #f8f9fa; }
+        .db-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .table-links button { margin-right: 5px; margin-bottom: 5px; }
+        .db-table { width: 100%; border-collapse: collapse; background: white; font-size: 12px; }
+        .db-table th, .db-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .db-table th { background-color: #f1f3f5; }
+        .db-table input { width: 100%; border: none; background: transparent; }
+        .db-table input:focus { outline: 2px solid #1877f2; background: #fff; }
+    </style>
+</head>
 <body>
-    <div class="db-manager-container">
-        <h2>🛠️ 온라인 DB Browser (Excel)</h2>
-        <div class="table-selector">
-            <b style="font-size:13px; margin-right:10px;">테이블 선택:</b>
-            <div id="table-links"></div>
-        </div>
-        <div id="db-content-area" style="text-align:left;"></div>
-        <button class="btn-admin" onclick="location.href='admin.html'" style="width:200px;">뒤로가기</button>
+    <div class="db-header">
+        <h2>🗄️ Database Manager</h2>
+        <button class="btn-secondary" onclick="location.href='admin.html'" style="width:auto; padding:8px 15px;">돌아가기</button>
     </div>
-    <script src="js/admin.js"></script>
-    <script>window.onload = openDBManager;</script>
+
+    <div id="table-links" class="table-links"></div>
+    <div id="db-content-area"></div>
+
+    <script src="js/admin.js?v=5"></script>
+    <script>
+        // 페이지 로드 시 즉시 DB 데이터 로드
+        window.onload = function() {
+            if(window.openDBManager) {
+                window.openDBManager();
+            }
+        };
+    </script>
 </body>
 </html>

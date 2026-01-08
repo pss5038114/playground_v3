@@ -23,9 +23,10 @@ class DBUpdateModel(BaseModel):
     column_name: str
     new_value: Any
 
+# [수정] 모든 필드를 Optional로 변경하여 부분 업데이트 지원
 class ProfileUpdateModel(BaseModel):
     username: str
-    nickname: str
+    nickname: Optional[str] = None
     profile_image: Optional[str] = None
 
 class PasswordChangeModel(BaseModel):
@@ -39,11 +40,9 @@ class PasswordChangeModel(BaseModel):
 async def check_id_duplicate(username: str):
     if len(username) < 4 or len(username) > 15:
         return {"available": False, "message": "4~15글자여야 합니다."}
-    
     conn = get_db_connection()
     row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     conn.close()
-    
     if row: return {"available": False, "message": "이미 사용 중인 아이디입니다."}
     return {"available": True, "message": "사용 가능한 아이디입니다."}
 
@@ -51,14 +50,11 @@ async def check_id_duplicate(username: str):
 async def check_nick_duplicate(nickname: str):
     if len(nickname) < 1 or len(nickname) > 15:
         return {"available": False, "message": "1~15글자여야 합니다."}
-        
     conn = get_db_connection()
     row = conn.execute("SELECT id FROM users WHERE nickname = ?", (nickname,)).fetchone()
     conn.close()
-    
     if row: return {"available": False, "message": "이미 사용 중인 닉네임입니다."}
     return {"available": True, "message": "사용 가능한 닉네임입니다."}
-
 
 # --- [유저 인증 API] ---
 @router.post("/signup")
@@ -92,7 +88,6 @@ async def login(user: AuthModel):
     if not row or not verify_password(user.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="ID/PW 불일치")
     if row["status"] != "active":
-        # 요청 상태에 따른 메시지 세분화
         msg = "승인 대기 중입니다."
         if row["status"] == "pending_deletion": msg = "탈퇴 처리 대기 중입니다."
         elif row["status"] == "pending_reset": msg = "비밀번호 변경 승인 대기 중입니다."
@@ -125,19 +120,27 @@ async def get_profile(username: str):
     if not row: raise HTTPException(status_code=404, detail="유저 없음")
     return dict(row)
 
+# [수정] 부분 업데이트 로직 적용
 @router.post("/update-profile")
 async def update_profile(data: ProfileUpdateModel):
-    if not (1 <= len(data.nickname) <= 15): raise HTTPException(status_code=400, detail="닉네임 길이 오류")
     conn = get_db_connection()
     try:
-        exist = conn.execute("SELECT username FROM users WHERE nickname = ?", (data.nickname,)).fetchone()
-        if exist and exist['username'] != data.username:
-            raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
+        # 1. 닉네임 변경 요청이 있는 경우
+        if data.nickname:
+            if not (1 <= len(data.nickname) <= 15): 
+                raise HTTPException(status_code=400, detail="닉네임은 1~15자여야 합니다.")
+            
+            # 중복 체크 (내 닉네임 제외)
+            exist = conn.execute("SELECT username FROM users WHERE nickname = ?", (data.nickname,)).fetchone()
+            if exist and exist['username'] != data.username:
+                raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
+            
+            conn.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
 
-        conn.execute(
-            "UPDATE users SET nickname = ?, profile_image = ? WHERE username = ?",
-            (data.nickname, data.profile_image, data.username)
-        )
+        # 2. 프로필 이미지 변경 요청이 있는 경우
+        if data.profile_image:
+            conn.execute("UPDATE users SET profile_image = ? WHERE username = ?", (data.profile_image, data.username))
+
         conn.commit()
         return {"message": "업데이트 완료"}
     finally: conn.close()
@@ -168,7 +171,7 @@ async def request_withdraw(user: AuthModel):
     conn.close()
     return {"message": "탈퇴 요청 접수"}
 
-# --- [관리자 API] (수정된 승인/거절 로직 적용) ---
+# --- [관리자 API] ---
 @router.get("/admin/pending")
 async def get_pending_requests(admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
@@ -188,44 +191,32 @@ async def get_all_users(admin_key: str):
 @router.post("/admin/approve")
 async def approve_user(user_id: int, action: str, admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
-    
     conn = get_db_connection()
     try:
         row = conn.execute("SELECT status FROM users WHERE id = ?", (user_id,)).fetchone()
-        if not row: return {"message": "유저를 찾을 수 없음"}
-        
+        if not row: return {"message": "유저 없음"}
         status = row["status"]
 
-        # [수정] 상태별 승인/거절 로직 세분화
         if action == "approve":
-            # 승인 시 로직
             if status == "pending_signup":
-                # 가입 승인 -> 정회원 등극
                 conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
             elif status == "pending_reset":
-                # 비번 변경 승인 -> 새 비번 적용 및 정회원 복귀
                 conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
             elif status == "pending_deletion":
-                # 탈퇴 승인 -> DB 삭제 (영구 제거)
                 conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        
-        else: 
-            # 거절(Reject) 시 로직
+        else: # Reject
             if status == "pending_signup":
-                # 가입 거절 -> 데이터 삭제 (그래야 재가입 가능)
                 conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             elif status == "pending_reset":
-                # 비번 변경 거절 -> 요청 취소, 정회원 복귀 (기존 비번 유지)
                 conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
             elif status == "pending_deletion":
-                # 탈퇴 거절 -> 탈퇴 취소, 정회원 복귀 (계정 유지)
-                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
+                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,)) # 탈퇴 취소
 
         conn.commit()
     finally: conn.close()
     return {"message": "완료"}
 
-# --- [DB 브라우저 API] ---
+# --- [DB 브라우저 API] (기존 유지) ---
 @router.get("/admin/db/tables")
 async def get_tables(admin_key: str, db_key: str):
     if admin_key != ADMIN_SECRET_KEY or db_key != DB_MASTER_KEY: raise HTTPException(status_code=401)
