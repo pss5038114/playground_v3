@@ -13,7 +13,6 @@
         .dropdown-menu.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        /* 스크롤바 숨기기 */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -140,7 +139,6 @@
         async function checkNewMail() {
             if(!myId) return;
             try {
-                // 캐싱 방지용 타임스탬프 추가
                 const res = await fetch(`${API_MAIL}/check/${myId}?t=${new Date().getTime()}`);
                 if(res.ok) {
                     const data = await res.json();
@@ -173,23 +171,39 @@
         function openMailbox() {
             document.getElementById('mail-modal').classList.remove('hidden');
             document.getElementById('profile-dropdown').classList.remove('show');
-            
-            fetchMails(); // 목록 불러오기 (캐싱 방지 적용됨)
-
-            // 읽음 처리
-            fetch(`${API_MAIL}/read-all/${myId}`, { method: 'PUT' });
+            fetchMails(); // 목록 불러오기
+            // [변경] 열자마자 '읽음 처리' 하지 않음 -> 사용자가 클릭해야 읽음 처리됨
+            // 배지는 숨김 (일단 목록을 봤으니까)
             document.getElementById('mail-badge').classList.add('hidden');
             document.getElementById('dropdown-badge').classList.add('hidden');
         }
 
         function closeMailbox() {
             document.getElementById('mail-modal').classList.add('hidden');
+            checkNewMail(); // 닫을 때 다시 배지 상태 체크
+        }
+
+        // 메일 하나를 '읽음' 상태로 변경
+        async function markAsRead(id, element) {
+            // 이미 읽은 상태면 무시
+            if(element.classList.contains('bg-slate-100')) return;
+
+            // UI 즉시 변경 (회색으로)
+            element.classList.remove('bg-white', 'border-slate-100');
+            element.classList.add('bg-slate-100', 'border-slate-200');
+            
+            // NEW 배지 제거
+            const badge = element.querySelector('.new-badge');
+            if(badge) badge.remove();
+
+            // 서버에 알림
+            await fetch(`${API_MAIL}/read/${id}`, { method: 'PUT' });
+            checkNewMail(); // 전체 알림 갱신
         }
 
         async function fetchMails() {
             const listEl = document.getElementById('mail-list');
             try {
-                // [수정] 캐싱 방지를 위해 URL 뒤에 현재 시간을 붙임 (?t=...)
                 const res = await fetch(`${API_MAIL}/list/${myId}?t=${new Date().getTime()}`);
                 if(!res.ok) throw new Error("로드 실패");
                 const mails = await res.json();
@@ -203,42 +217,54 @@
                     return;
                 }
 
-                listEl.innerHTML = mails.map(mail => `
-                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative group">
-                        <div class="flex justify-between items-start mb-2 w-full pr-6">
-                            <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px]">
-                                FROM. ${mail.sender}
-                            </span>
+                listEl.innerHTML = mails.map(mail => {
+                    // 읽음 여부에 따른 스타일 결정
+                    const isRead = mail.is_read === 1;
+                    const bgClass = isRead ? 'bg-slate-100 border-slate-200' : 'bg-white border-slate-100';
+                    const textClass = isRead ? 'text-slate-400' : 'text-slate-800';
+                    const newBadge = !isRead ? `<span class="new-badge text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded ml-2 animate-pulse">NEW</span>` : '';
+
+                    return `
+                    <div onclick="markAsRead(${mail.id}, this)" class="cursor-pointer p-4 rounded-xl border shadow-sm transition-all relative group ${bgClass}">
+                        <div class="flex justify-between items-start mb-2 w-full pr-8">
+                            <div class="flex items-center">
+                                <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                                    FROM. ${mail.sender}
+                                </span>
+                                ${newBadge}
+                            </div>
                             <span class="text-[10px] text-slate-300 whitespace-nowrap">${mail.created_at.substring(0,16)}</span>
                         </div>
-                        <h4 class="font-bold text-slate-800 text-sm mb-1">${mail.title}</h4>
+                        <h4 class="font-bold text-sm mb-1 ${textClass}">${mail.title}</h4>
                         <p class="text-xs text-slate-500 leading-relaxed break-words">${mail.content}</p>
                         
-                        <button onclick="event.stopPropagation(); deleteMail(${mail.id})" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50 z-10 cursor-pointer">
+                        <div onclick="deleteMail(event, ${mail.id})" class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-100 text-slate-300 hover:text-red-500 transition-colors z-20 cursor-pointer">
                             <i class="fas fa-trash-alt text-xs"></i>
-                        </button>
+                        </div>
                     </div>
-                `).join('');
+                `}).join('');
             } catch(err) {
                 console.error(err);
                 listEl.innerHTML = `<p class="text-center text-red-400 text-sm mt-10">목록을 불러오지 못했습니다.</p>`;
             }
         }
 
-        async function deleteMail(id) {
+        async function deleteMail(event, id) {
+            // [중요] 부모(카드) 클릭 이벤트가 발생하지 않도록 막음
+            event.stopPropagation();
+            
             if(!confirm("이 우편을 삭제할까요?")) return;
-            // [중요] 삭제 요청 후 목록 갱신
+            
             const res = await fetch(`${API_MAIL}/delete/${id}`, { method: 'DELETE' });
             if(res.ok) {
-                fetchMails();
+                fetchMails(); // 목록 즉시 갱신
             } else {
                 alert("삭제 실패");
             }
         }
 
-        // [신규] 읽은 메일 전체 삭제
         async function deleteAllRead() {
-            if(!confirm("이미 읽은 우편들을 모두 삭제하시겠습니까?\n(아직 안 읽은 우편은 삭제되지 않습니다.)")) return;
+            if(!confirm("이미 읽은(회색) 우편들을 모두 삭제하시겠습니까?")) return;
             const res = await fetch(`${API_MAIL}/delete-read/${myId}`, { method: 'DELETE' });
             if(res.ok) {
                 alert("정리되었습니다.");

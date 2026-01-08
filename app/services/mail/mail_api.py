@@ -16,7 +16,6 @@ class MailSendModel(BaseModel):
 @router.get("/check/{username}")
 async def check_unread_mail(username: str):
     conn = get_db_connection()
-    # 캐싱 방지를 위해 쿼리 자체는 그대로 두되, 클라이언트에서 호출 시 timestamp를 붙입니다.
     query = """
         SELECT COUNT(*) as count FROM messages 
         WHERE receiver_id = ? 
@@ -27,26 +26,19 @@ async def check_unread_mail(username: str):
     conn.close()
     return {"count": row["count"]}
 
-# 2. 메일 모두 읽음 처리 (우편함 열 때 호출)
-@router.put("/read-all/{username}")
-async def mark_all_read(username: str):
+# [신규] 2. 특정 메일 하나만 읽음 처리 (클릭 시 호출)
+@router.put("/read/{mail_id}")
+async def read_one_mail(mail_id: int):
     conn = get_db_connection()
-    query = """
-        UPDATE messages 
-        SET is_read = 1 
-        WHERE receiver_id = ? 
-        AND is_read = 0
-        AND (scheduled_at IS NULL OR scheduled_at <= datetime('now', 'localtime'))
-    """
-    conn.execute(query, (username,)).commit()
+    conn.execute("UPDATE messages SET is_read = 1 WHERE id = ?", (mail_id,))
+    conn.commit()
     conn.close()
-    return {"message": "All read"}
+    return {"message": "Read updated"}
 
-# [신규] 3. 읽은 메일 모두 삭제 (휴지통 기능)
+# [유지] 3. 읽은 메일 모두 삭제 (휴지통)
 @router.delete("/delete-read/{username}")
 async def delete_read_mails(username: str):
     conn = get_db_connection()
-    # is_read = 1 인 것만 삭제
     conn.execute("DELETE FROM messages WHERE receiver_id = ? AND is_read = 1", (username,))
     conn.commit()
     conn.close()
@@ -66,19 +58,15 @@ async def get_my_mails(username: str):
     conn.close()
     return [dict(row) for row in rows]
 
-# 5. 우편 보내기 (1:1 및 전체 발송 지원)
+# 5. 우편 보내기
 @router.post("/send")
 async def send_mail(mail: MailSendModel):
     conn = get_db_connection()
     try:
-        # [신규] 전체 발송 로직
         if mail.receiver_username == "ALL":
-            # 전체 활성 유저 조회
             users = conn.execute("SELECT username FROM users WHERE status = 'active'").fetchall()
-            if not users:
-                return {"message": "보낼 유저가 없습니다."}
+            if not users: return {"message": "보낼 유저가 없습니다."}
             
-            # Bulk Insert 준비
             data_to_insert = []
             for u in users:
                 data_to_insert.append((mail.sender, u["username"], mail.title, mail.content, mail.scheduled_at))
@@ -90,12 +78,9 @@ async def send_mail(mail: MailSendModel):
             )
             conn.commit()
             return {"message": f"전체 유저({len(users)}명)에게 전송 완료"}
-
         else:
-            # 기존 1:1 발송
             user = conn.execute("SELECT username FROM users WHERE username = ?", (mail.receiver_username,)).fetchone()
-            if not user:
-                raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
+            if not user: raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
                 
             conn.execute(
                 """INSERT INTO messages (sender, receiver_id, title, content, scheduled_at) 
