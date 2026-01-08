@@ -23,9 +23,10 @@ async function handleLogin() {
     });
     const data = await res.json();
     if(res.ok) { 
+        // [수정] 닉네임과 아이디 둘 다 저장
         sessionStorage.setItem('nickname', data.nickname); 
         sessionStorage.setItem('username', data.username);
-        location.href = 'home.html'; 
+        location.href='home.html'; 
     }
     else alert(data.detail);
 }

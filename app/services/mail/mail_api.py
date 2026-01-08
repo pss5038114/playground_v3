@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from app.core.database import get_db_connection
 
 router = APIRouter()
@@ -15,7 +15,7 @@ class MailSendModel(BaseModel):
 @router.get("/list/{username}")
 async def get_my_mails(username: str):
     conn = get_db_connection()
-    # 최신순으로 정렬해서 가져오기
+    # 최신순 정렬
     rows = conn.execute(
         "SELECT * FROM messages WHERE receiver_id = ? ORDER BY id DESC", 
         (username,)
@@ -23,12 +23,11 @@ async def get_my_mails(username: str):
     conn.close()
     return [dict(row) for row in rows]
 
-# 2. 우편 보내기 (운영자용 또는 테스트용)
+# 2. 우편 보내기 (테스트/운영용)
 @router.post("/send")
 async def send_mail(mail: MailSendModel):
     conn = get_db_connection()
     try:
-        # 받는 사람이 실제 존재하는지 확인
         user = conn.execute("SELECT username FROM users WHERE username = ?", (mail.receiver_username,)).fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="받는 유저가 없습니다.")
@@ -42,7 +41,7 @@ async def send_mail(mail: MailSendModel):
     finally:
         conn.close()
 
-# 3. 우편 읽음 처리 및 삭제
+# 3. 우편 삭제
 @router.delete("/delete/{mail_id}")
 async def delete_mail(mail_id: int):
     conn = get_db_connection()

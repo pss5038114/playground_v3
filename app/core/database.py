@@ -17,7 +17,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 1. 유저 테이블 초기 생성
+    # 1. 유저 테이블
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -29,7 +29,7 @@ def init_db():
         )
     """)
 
-    # 2. 마이그레이션: 현재 컬럼 목록 확인 및 부족한 컬럼 추가
+    # [추가] 2. 우편함(메시지) 테이블
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +41,9 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # 마이그레이션: users 테이블 컬럼 확인
+    cursor.execute("PRAGMA table_info(users)")
     existing_columns = [row['name'] for row in cursor.fetchall()]
 
     required_columns = {

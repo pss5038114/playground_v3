@@ -6,7 +6,7 @@ from app.core.database import get_db_connection
 
 router = APIRouter()
 
-# [보안 설정] 관리자 모드 및 DB 매니저 접속 키
+# [보안 설정] 관리자 키
 ADMIN_SECRET_KEY = "your_secret_key"
 DB_MASTER_KEY = "master1234"
 
@@ -40,12 +40,12 @@ async def login(user: AuthModel):
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM users WHERE username = ?", (user.username,)).fetchone()
     conn.close()
-    
     if not row or not verify_password(user.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="ID/PW 불일치")
     if row["status"] != "active":
         raise HTTPException(status_code=403, detail="승인 대기 중")
     
+    # [수정] 닉네임과 함께 username도 반환
     return {
         "nickname": row["nickname"],
         "username": row["username"]
@@ -63,12 +63,11 @@ async def reset_request(user: AuthModel):
         return {"message": "성공"}
     finally: conn.close()
 
-# --- [관리자 API: 승인 대기 목록] ---
+# --- [관리자 API] ---
 @router.get("/admin/pending")
 async def get_pending_requests(admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
     conn = get_db_connection()
-    # 이미 승인된 'active' 유저는 제외하고 출력
     rows = conn.execute("SELECT id, username, nickname, status FROM users WHERE status != 'active'").fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -84,7 +83,7 @@ async def approve_user(user_id: int, action: str, admin_key: str):
                 conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
             else:
                 conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
-        else: # Reject (거절)
+        else:
             if row["status"] == "pending_reset":
                 conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
             else:
@@ -93,7 +92,7 @@ async def approve_user(user_id: int, action: str, admin_key: str):
     finally: conn.close()
     return {"message": "완료"}
 
-# --- [마스터 DB 브라우저 API] ---
+# --- [DB 브라우저 API] ---
 @router.get("/admin/db/tables")
 async def get_tables(admin_key: str, db_key: str):
     if admin_key != ADMIN_SECRET_KEY or db_key != DB_MASTER_KEY: raise HTTPException(status_code=401)
