@@ -28,7 +28,7 @@ async def signup(user: AuthModel):
     try:
         conn.execute(
             "INSERT INTO users (username, password_hash, nickname, status) VALUES (?, ?, ?, 'pending_signup')",
-            (user.username, hash_password(user.password), user.nickname or user.username)
+            (user.username, hash_password(user.password), user.nickname or user.nickname)
         )
         conn.commit()
         return {"message": "성공"}
@@ -45,7 +45,6 @@ async def login(user: AuthModel):
     if row["status"] != "active":
         raise HTTPException(status_code=403, detail="승인 대기 중")
     
-    # [수정] 닉네임과 함께 username도 반환
     return {
         "nickname": row["nickname"],
         "username": row["username"]
@@ -69,6 +68,16 @@ async def get_pending_requests(admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
     conn = get_db_connection()
     rows = conn.execute("SELECT id, username, nickname, status FROM users WHERE status != 'active'").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+# [신규] 관리자용 전체 유저 목록 조회 (메일 발송용)
+@router.get("/admin/users")
+async def get_all_users(admin_key: str):
+    if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
+    conn = get_db_connection()
+    # 탈퇴하지 않은 모든 유저 조회
+    rows = conn.execute("SELECT username, nickname FROM users WHERE status = 'active'").fetchall()
     conn.close()
     return [dict(row) for row in rows]
 

@@ -29,7 +29,7 @@ def init_db():
         )
     """)
 
-    # [추가] 2. 우편함(메시지) 테이블
+    # 2. 우편함(메시지) 테이블 (예약 발송 컬럼 추가)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,26 +38,40 @@ def init_db():
             title TEXT,
             content TEXT,
             is_read INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            scheduled_at TIMESTAMP DEFAULT NULL
         )
     """)
 
-    # 마이그레이션: users 테이블 컬럼 확인
+    # --- 마이그레이션 로직 ---
+    
+    # 1) users 테이블 컬럼 확인 및 추가
     cursor.execute("PRAGMA table_info(users)")
-    existing_columns = [row['name'] for row in cursor.fetchall()]
+    user_columns = [row['name'] for row in cursor.fetchall()]
 
-    required_columns = {
+    user_required = {
         "status": "TEXT DEFAULT 'pending_signup'",
         "pending_password_hash": "TEXT DEFAULT NULL"
     }
 
-    for col_name, col_def in required_columns.items():
-        if col_name not in existing_columns:
+    for col_name, col_def in user_required.items():
+        if col_name not in user_columns:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
-                print(f"✅ DB 마이그레이션: '{col_name}' 컬럼 추가 완료")
+                print(f"✅ DB 마이그레이션: users 테이블 '{col_name}' 추가 완료")
             except Exception as e:
-                print(f"❌ DB 마이그레이션 오류 ({col_name}): {e}")
+                print(f"❌ DB 마이그레이션 오류 (users): {e}")
+
+    # 2) messages 테이블 컬럼 확인 및 추가 (scheduled_at)
+    cursor.execute("PRAGMA table_info(messages)")
+    msg_columns = [row['name'] for row in cursor.fetchall()]
+    
+    if "scheduled_at" not in msg_columns:
+        try:
+            cursor.execute("ALTER TABLE messages ADD COLUMN scheduled_at TIMESTAMP DEFAULT NULL")
+            print("✅ DB 마이그레이션: messages 테이블 'scheduled_at' 추가 완료")
+        except Exception as e:
+            print(f"❌ DB 마이그레이션 오류 (messages): {e}")
 
     conn.commit()
     conn.close()
