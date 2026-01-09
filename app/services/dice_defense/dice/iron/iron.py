@@ -8,11 +8,9 @@ class IronDice(BaseDice):
             "grade": "일반",
             "description": "보스 몬스터에게 2배의 강력한 데미지를 입힌다.",
             "icon": "🛡️",
-            "color": "slate", # Tailwind slate-500
-            "target": "Strongest", # 체력이 가장 많은 적 우선
+            "color": "slate",
+            "target": "Strongest",
             "interval": 1.0,
-            
-            # 데미지 설정 (기본 데미지가 높음)
             "base_atk": 30,
             "class_up_atk": 8,
             "power_up_atk": 15

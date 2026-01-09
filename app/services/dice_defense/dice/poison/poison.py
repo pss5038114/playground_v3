@@ -11,8 +11,6 @@ class PoisonDice(BaseDice):
             "color": "purple",
             "target": "Front",
             "interval": 1.0,
-            
-            # 데미지 설정 (도트 데미지 기준)
             "base_atk": 12,
             "class_up_atk": 3,
             "power_up_atk": 6

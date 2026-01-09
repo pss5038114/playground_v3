@@ -11,8 +11,6 @@ class ElectricDice(BaseDice):
             "color": "yellow",
             "target": "Front",
             "interval": 0.7,
-            
-            # 데미지 설정
             "base_atk": 15,
             "class_up_atk": 4,
             "power_up_atk": 8

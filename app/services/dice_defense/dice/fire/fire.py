@@ -11,8 +11,6 @@ class FireDice(BaseDice):
             "color": "red",
             "target": "Front",
             "interval": 0.8,
-            
-            # 데미지 설정
             "base_atk": 20,
             "class_up_atk": 5,
             "power_up_atk": 10
@@ -20,7 +18,6 @@ class FireDice(BaseDice):
 
     def get_base_stats(self, class_lvl: int):
         stats = super().get_base_stats(class_lvl)
-        # 불 주사위 고유 정보: 스플래시 데미지 (현재는 기본 공격력과 동일하게 설정)
         dmg = self.calculate_damage(class_lvl, 1)
         stats.append({
             "icon": "💥", 
