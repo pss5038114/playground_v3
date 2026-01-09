@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground V3 - 다이스 디펜스</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; overflow: hidden; } /* 스크롤 방지 */
+        
+        /* 탭 전환 애니메이션 */
+        .tab-screen { display: none; height: 100%; width: 100%; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.2s ease-out; }
+        .tab-screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 게임 캔버스 영역 */
+        #game-canvas-container {
+            width: 100%; max-width: 500px; aspect-ratio: 9/16; 
+            background: #222; border-radius: 12px; position: relative; overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex flex-col">
+
+    <nav class="h-16 bg-white flex justify-between items-center px-6 shadow-sm z-50 shrink-0">
+        <div class="flex items-center gap-4">
+            <button onclick="exitGame()" class="text-slate-500 hover:text-red-500 transition-colors">
+                <i class="fas fa-chevron-left text-xl"></i>
+            </button>
+            <h1 class="text-xl font-bold text-blue-600 select-none">Dice Defense</h1>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <div class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">
+                <i class="fas fa-coins text-yellow-500 mr-1"></i> <span id="ui-gold">0</span>
+            </div>
+            <div class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">
+                <i class="fas fa-gem text-blue-400 mr-1"></i> <span id="ui-gem">0</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 relative w-full max-w-2xl mx-auto overflow-hidden">
+        
+        <button onclick="moveTab(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white/80 rounded-full shadow hover:bg-white flex items-center justify-center text-slate-400 hover:text-blue-600 transition-all">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <button onclick="moveTab(1)" class="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white/80 rounded-full shadow hover:bg-white flex items-center justify-center text-slate-400 hover:text-blue-600 transition-all">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <div id="screen-0" class="tab-screen bg-orange-50">
+            <i class="fas fa-store text-6xl text-orange-300 mb-4"></i>
+            <h2 class="text-2xl font-bold text-slate-700">상점</h2>
+            <p class="text-slate-400 text-sm">주사위와 아이템을 구매하세요.</p>
+        </div>
+
+        <div id="screen-1" class="tab-screen bg-purple-50">
+            <i class="fas fa-cubes text-6xl text-purple-300 mb-4"></i>
+            <h2 class="text-2xl font-bold text-slate-700">덱 설정 & 강화</h2>
+            <p class="text-slate-400 text-sm">최강의 주사위 조합을 만드세요.</p>
+        </div>
+
+        <div id="screen-2" class="tab-screen active bg-white">
+            <div id="game-lobby-ui" class="text-center w-full px-8">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2">Battle Ready</h2>
+                    <p class="text-slate-500 text-sm">전략적인 배치로 적을 막아내세요!</p>
+                </div>
+                
+                <button onclick="reqStartGame()" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-[1.02] transition-all active:scale-95">
+                    GAME START
+                </button>
+                
+                <div class="mt-6 grid grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 cursor-pointer hover:border-blue-300 transition-colors">
+                        <div class="text-2xl mb-1">🎲</div>
+                        <div class="font-bold text-sm text-slate-600">주사위 뽑기</div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 cursor-pointer hover:border-blue-300 transition-colors">
+                        <div class="text-2xl mb-1">🏆</div>
+                        <div class="font-bold text-sm text-slate-600">랭킹 확인</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="in-game-ui" class="hidden w-full h-full relative flex flex-col items-center justify-center bg-slate-800">
+                <p class="text-white mb-4">Game Running...</p>
+                <div id="game-canvas-container">
+                    <canvas id="gameCanvas" width="500" height="888" class="w-full h-full"></canvas>
+                    <div class="absolute top-4 left-4 text-white font-bold text-shadow">WAVE <span id="game-wave">1</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-3" class="tab-screen bg-green-50">
+            <i class="fas fa-users text-6xl text-green-300 mb-4"></i>
+            <h2 class="text-2xl font-bold text-slate-700">멀티플레이</h2>
+            <p class="text-slate-400 text-sm">친구와 협동하거나 대결하세요.</p>
+        </div>
+
+    </main>
+
+    <footer class="h-16 bg-white border-t border-slate-100 grid grid-cols-4 shrink-0">
+        <button onclick="switchTab(0)" class="tab-btn flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 transition-colors" data-idx="0">
+            <i class="fas fa-store mb-1 text-lg"></i>
+            <span class="text-[10px] font-bold">상점</span>
+        </button>
+        <button onclick="switchTab(1)" class="tab-btn flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 transition-colors" data-idx="1">
+            <i class="fas fa-layer-group mb-1 text-lg"></i>
+            <span class="text-[10px] font-bold">덱</span>
+        </button>
+        <button onclick="switchTab(2)" class="tab-btn flex flex-col items-center justify-center text-blue-600 transition-colors" data-idx="2">
+            <i class="fas fa-gamepad mb-1 text-xl"></i>
+            <span class="text-[10px] font-bold">플레이</span>
+        </button>
+        <button onclick="switchTab(3)" class="tab-btn flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 transition-colors" data-idx="3">
+            <i class="fas fa-globe mb-1 text-lg"></i>
+            <span class="text-[10px] font-bold">멀티</span>
+        </button>
+    </footer>
+
+    <script>
+        // --- 1. 탭 관리 로직 ---
+        let currentTab = 2; // 기본값: 플레이 화면
+        const totalTabs = 4;
+
+        function switchTab(idx) {
+            currentTab = idx;
+            // 스크린 전환
+            document.querySelectorAll('.tab-screen').forEach((el, i) => {
+                if(i === idx) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+            // 하단 버튼 스타일
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                if(i === idx) {
+                    btn.classList.add('text-blue-600');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('text-blue-600');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+        }
+
+        function moveTab(direction) {
+            let next = currentTab + direction;
+            if (next < 0) next = 0;
+            if (next >= totalTabs) next = totalTabs - 1;
+            switchTab(next);
+        }
+
+        // --- 2. 게임 세션 및 WebSocket 로직 ---
+        const myId = sessionStorage.getItem('username');
+        if (!myId) { alert("로그인이 필요합니다."); location.href = 'index.html'; }
+
+        // URL 파라미터에서 세션 ID 확인 (없으면 생성)
+        const urlParams = new URLSearchParams(window.location.search);
+        let sessionId = urlParams.get('session');
+        if (!sessionId) {
+            sessionId = "room_" + Math.random().toString(36).substr(2, 9);
+            // URL 업데이트 (새로고침 시 유지)
+            window.history.replaceState({}, '', `?session=${sessionId}`);
+        }
+
+        let ws = null;
+        let isGameRunning = false;
+
+        function connectWS() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            // Cloudflare 배포 시 주소 주의 (현재는 로컬/개발 환경 기준)
+            const wsUrl = `${protocol}//${location.host}/ws/dice/${sessionId}?username=${myId}`;
+            
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("🎲 게임 서버 연결됨:", sessionId);
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleServerMessage(msg);
+            };
+
+            ws.onclose = () => {
+                console.log("🔌 서버 연결 끊김");
+                if(isGameRunning) {
+                    alert("서버와의 연결이 종료되었습니다.");
+                    location.href = 'home.html';
+                }
+            };
+        }
+
+        function handleServerMessage(msg) {
+            // [TICK] 서버 심장박동 (30Hz)
+            if (msg.type === "TICK") {
+                // TODO: 캔버스 다시 그리기 (renderGame)
+                if(msg.tick % 30 === 0) console.log(`Tick: ${msg.tick}`); 
+            }
+            // [GAME_START] 게임 시작 신호
+            else if (msg.type === "GAME_START") {
+                isGameRunning = true;
+                document.getElementById('game-lobby-ui').classList.add('hidden');
+                document.getElementById('in-game-ui').classList.remove('hidden');
+            }
+        }
+
+        // 게임 시작 요청
+        function reqStartGame() {
+            if(!ws) return;
+            ws.send(JSON.stringify({ type: "START_GAME" }));
+        }
+
+        // 게임 종료(이탈) 처리
+        function exitGame() {
+            if(confirm("게임을 종료하고 로비로 돌아가시겠습니까?")) {
+                if(ws) ws.close();
+                location.href = 'home.html';
+            }
+        }
+
+        // 페이지 이탈 시 안전 장치
+        window.addEventListener('beforeunload', () => {
+            if(ws) ws.close();
+        });
+
+        // 초기화
+        connectWS();
+
+    </script>
+</body>
+</html>
