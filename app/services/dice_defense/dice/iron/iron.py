@@ -1,0 +1,25 @@
+from ..base import BaseDice
+
+class IronDice(BaseDice):
+    def __init__(self):
+        super().__init__({
+            "id": "iron",
+            "name": "쇠 주사위",
+            "grade": "일반",
+            "description": "보스 몬스터에게 2배의 강력한 데미지를 입힌다.",
+            "icon": "🛡️",
+            "color": "slate", # Tailwind slate-500
+            "target": "Strongest", # 체력이 가장 많은 적 우선
+            "interval": 1.0,
+            
+            # 데미지 설정 (기본 데미지가 높음)
+            "base_atk": 30,
+            "class_up_atk": 8,
+            "power_up_atk": 15
+        })
+
+    def get_base_stats(self, class_lvl: int):
+        stats = super().get_base_stats(class_lvl)
+        dmg = self.calculate_damage(class_lvl, 1)
+        stats.append({"icon": "👑", "name": "보스 피해", "value": f"{dmg*2:.0f}"})
+        return stats
