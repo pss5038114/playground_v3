@@ -19,9 +19,7 @@ class BaseDice(ABC):
         self.power_up_atk = config.get("power_up_atk", 5) 
 
     def calculate_damage(self, class_lvl: int, power_lvl: int = 1) -> float:
-        """
-        데미지 공식: (기본공격력 + 클래스 업 추가공격력 + 파워 업 추가공격력)
-        """
+        """데미지 공식: (기본 + 클래스업*Lv + 파워업*Lv)"""
         dmg = self.base_atk + ((class_lvl - 1) * self.class_up_atk) + ((power_lvl - 1) * self.power_up_atk)
         return float(dmg)
 
@@ -29,27 +27,14 @@ class BaseDice(ABC):
         return self.config.get("interval", 1.0)
 
     # --- UI 데이터 제공 메서드 ---
-
     def get_base_stats(self, class_lvl: int) -> List[Dict[str, str]]:
         """팝업 및 인벤토리 상세 정보"""
         dmg = self.calculate_damage(class_lvl, 1)
         
         return [
-            {
-                "icon": "⚔️", 
-                "name": "공격력", 
-                "value": f"{dmg:.0f}"
-            },
-            {
-                "icon": "⚡", 
-                "name": "공격 속도", 
-                "value": f"{self.get_interval(class_lvl):.2f}s"
-            },
-            {
-                "icon": "🎯", 
-                "name": "타겟", 
-                "value": self.config.get("target", "Front")
-            }
+            {"icon": "⚔️", "name": "공격력", "value": f"{dmg:.0f}"},
+            {"icon": "⚡", "name": "공격 속도", "value": f"{self.get_interval(class_lvl):.2f}s"},
+            {"icon": "🎯", "name": "타겟", "value": self.config.get("target", "Front")}
         ]
 
     def get_upgrade_preview(self, class_lvl: int) -> Dict[str, str]:
