@@ -42,7 +42,7 @@ DICE_DATA = {
     },
     "light": {
         "name": "Light", "rarity": "Rare", "color": "bg-yellow-400", 
-        "symbol": "ri-sun-fill", # 태양/빛
+        "symbol": "ri-arrow-up-double-line", # 위화살표/빛
         "desc": "공격 속도를 증가시킵니다.",
         "stats": { "atk": "-", "speed": "-", "target": "-", "specials": [{"name": "공속 버프", "icon": "ri-sun-line", "base": 6, "c": 0.3, "p": 1, "format": "{}%"}] }
     },
@@ -50,7 +50,7 @@ DICE_DATA = {
     # [Hero]
     "adapt": {
         "name": "Adapt", "rarity": "Hero", "color": "bg-gradient-to-br from-red-400 via-yellow-400 to-blue-400", 
-        "symbol": "ri-magic-fill", # 마법봉/적응
+        "symbol": "ri-infinity-line", # 무한/적응
         "desc": "모든 주사위와 합쳐질 수 있습니다.",
         "stats": { "atk": {"base": 20, "c": 5, "p": 10}, "speed": {"base": 1.0, "c": 0, "p": 0}, "target": "앞쪽", "specials": [] }
     },
