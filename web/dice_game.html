@@ -8,10 +8,18 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="js/auth.js"></script>
     <style>
-        /* 플랫폼 고유의 어두운 테마 보강 */
-        body { background-color: #0f172a; color: #f8fafc; }
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Pretendard', sans-serif; }
         .game-card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
         .tab-active { color: #facc15; border-bottom: 3px solid #facc15; }
+        .dice-bg { background-color: white !important; }
+        
+        /* 등급별 특수 효과 */
+        .rarity-legendary { box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); }
+        .rainbow-text {
+            background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -51,7 +59,6 @@
                         PVP START
                     </button>
                 </div>
-
                 <div class="game-card p-8 flex flex-col items-center justify-center text-center gap-4 hover:scale-[1.01] transition-transform">
                     <div class="w-20 h-20 bg-blue-400/20 rounded-full flex items-center justify-center text-4xl mb-2">🤝</div>
                     <h2 class="text-2xl font-bold">협동 모드</h2>
@@ -81,25 +88,77 @@
             </section>
 
             <section id="view-deck" class="game-view hidden">
-                <div class="game-card p-6 min-h-[400px]">
-                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
-                        <span class="text-purple-400">●</span> MY DECK CONFIG
+                <div class="game-card p-6 mb-8">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-slate-300">
+                        <span class="text-yellow-400">●</span> MY DECK CONFIG
                     </h2>
-                    <div class="grid grid-cols-5 gap-4 mb-8">
-                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700"></div>
-                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700"></div>
-                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700"></div>
-                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700"></div>
-                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700"></div>
+                    <div class="grid grid-cols-5 gap-4">
+                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-600">1</div>
+                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-600">2</div>
+                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-600">3</div>
+                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-600">4</div>
+                        <div class="aspect-square rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-600">5</div>
                     </div>
-                    <p class="text-slate-500 text-center py-10">주사위를 드래그하여 덱을 구성하세요.</p>
+                </div>
+
+                <h3 class="text-lg font-bold mb-6 text-slate-400 flex justify-between">
+                    INVENTORY <span id="inventory-count" class="text-xs font-normal">0/100</span>
+                </h3>
+                <div id="dice-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                    </div>
+            </section>
+
+            <section id="view-shop" class="game-view hidden p-4">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black">PREMIUM SHOP</h2>
+                    <div class="bg-slate-800 px-6 py-2 rounded-full border border-slate-700 shadow-inner">
+                        <span class="text-yellow-400 font-bold">🎫 TICKET: </span>
+                        <span id="shop-ticket-count" class="font-mono text-lg">0</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    <div class="game-card p-8 text-center border-slate-700 hover:border-blue-500 transition-all group">
+                        <div class="text-6xl mb-6 group-hover:scale-110 transition-transform">📦</div>
+                        <h3 class="font-bold text-xl mb-2">작은 주사위 상자</h3>
+                        <p class="text-xs text-slate-500 mb-8">주사위 카드 1매를 랜덤하게 획득합니다.</p>
+                        <button onclick="GameApp.openBox(1)" class="w-full bg-slate-700 hover:bg-slate-600 py-4 rounded-2xl font-bold shadow-lg">🎫 1개 사용</button>
+                    </div>
+                    <div class="game-card p-8 text-center border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 transition-all group">
+                        <div class="text-6xl mb-6 group-hover:scale-110 transition-transform">🎁</div>
+                        <h3 class="font-bold text-xl mb-2 text-yellow-400">거대 주사위 상자</h3>
+                        <p class="text-xs text-slate-500 mb-8">주사위 카드 11매를 획득합니다. (10+1 보너스)</p>
+                        <button onclick="GameApp.openBox(10)" class="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-900 py-4 rounded-2xl font-bold shadow-lg">🎫 10개 사용</button>
+                    </div>
+                </div>
+                
+                <div class="mt-12 text-center">
+                    <button onclick="GameApp.addTestTickets()" class="text-[10px] text-slate-600 border border-slate-800 px-4 py-2 rounded-lg hover:text-slate-400 transition-colors uppercase tracking-widest">
+                        Debug: Add +10 Tickets
+                    </button>
                 </div>
             </section>
 
-            <section id="view-shop" class="game-view hidden"> 상점 준비 중... </section>
-            <section id="view-social" class="game-view hidden"> 소셜 준비 중... </section>
+            <section id="view-social" class="game-view hidden p-8 text-center text-slate-500">
+                소셜 및 이벤트 기능이 곧 업데이트됩니다.
+            </section>
         </div>
     </main>
+
+    <div id="upgrade-modal" class="fixed inset-0 bg-black/90 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 w-full max-w-sm rounded-[2.5rem] p-10 border border-slate-700 text-center shadow-2xl">
+            <div id="modal-dice-container" class="w-32 h-32 mx-auto rounded-3xl mb-8 border-4 dice-bg flex items-center justify-center text-5xl">
+                </div>
+            <h2 id="modal-dice-name" class="text-3xl font-black mb-2">주사위</h2>
+            <p id="modal-dice-rarity" class="text-xs font-bold tracking-widest uppercase mb-4 text-slate-500">COMMON</p>
+            <div id="modal-dice-class" class="text-yellow-400 font-black text-xl mb-8 italic">CLASS 1</div>
+            
+            <div class="flex gap-4">
+                <button onclick="GameApp.closeModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 py-4 rounded-2xl font-bold transition-colors">CLOSE</button>
+                <button id="modal-upgrade-btn" class="flex-1 bg-green-600 hover:bg-green-500 disabled:opacity-30 disabled:cursor-not-allowed py-4 rounded-2xl font-bold transition-all shadow-lg shadow-green-900/20">CLASS UP</button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/dice_game.js"></script>
 </body>

@@ -82,6 +82,26 @@ def init_db():
             except Exception as e:
                 print(f"❌ DB 마이그레이션 오류 (messages): {e}")
 
+    # [추가] 유저 재화 관리 (티켓 등)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_assets (
+            username TEXT PRIMARY KEY,
+            tickets INTEGER DEFAULT 0
+        )
+    """)
+    
+    # [추가] 유저별 보유 주사위 카드 및 클래스
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_dice (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            dice_id TEXT,
+            card_count INTEGER DEFAULT 0,
+            class_level INTEGER DEFAULT 0,
+            UNIQUE(username, dice_id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     print(f"🚀 데이터베이스 시스템 준비 완료: {DB_PATH}")
