@@ -23,9 +23,12 @@ def init_db():
             password_hash TEXT, 
             nickname TEXT,
             birthdate TEXT,
-            profile_image TEXT, -- [신규] 프로필 사진 (Base64)
+            profile_image TEXT,
             status TEXT DEFAULT 'pending_signup',
-            pending_password_hash TEXT DEFAULT NULL
+            pending_password_hash TEXT DEFAULT NULL,
+            gems INTEGER DEFAULT 0,
+            gold INTEGER DEFAULT 0,
+            tickets INTEGER DEFAULT 0
         )
     """)
 
@@ -54,7 +57,10 @@ def init_db():
         "status": "TEXT DEFAULT 'pending_signup'",
         "pending_password_hash": "TEXT DEFAULT NULL",
         "birthdate": "TEXT DEFAULT NULL",
-        "profile_image": "TEXT DEFAULT NULL" # [신규]
+        "profile_image": "TEXT DEFAULT NULL",
+        "gems": "INTEGER DEFAULT 0",      # [신규] 보석
+        "gold": "INTEGER DEFAULT 0",      # [신규] 골드
+        "tickets": "INTEGER DEFAULT 0"    # [신규] 뽑기 티켓
     }
 
     for col_name, col_def in user_required.items():
