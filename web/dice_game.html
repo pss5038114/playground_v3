@@ -8,220 +8,268 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
-        body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
+        body { font-family: 'Pretendard', sans-serif; overflow: hidden; /* 게임 화면 스크롤 방지 */ }
+        
+        /* 탭 전환 애니메이션 */
         .tab-content { display: none; height: calc(100vh - 140px); overflow-y: auto; }
         .tab-content.active { display: flex; animation: fadeIn 0.3s ease-out; }
+        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 커스텀 스크롤바 숨김 */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 게임 캔버스 영역 */
         #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
-        .text-Common { color: #94a3b8; } .text-Rare { color: #3b82f6; } .text-Hero { color: #a855f7; } .text-Legend { color: #eab308; }
-        .border-Common { border-color: #e2e8f0; } .border-Rare { border-color: #bfdbfe; } .border-Hero { border-color: #e9d5ff; } .border-Legend { border-color: #fef08a; }
     </style>
 </head>
 <body class="bg-slate-100 h-screen flex flex-col">
 
     <nav class="flex-none h-16 bg-white flex justify-between items-center px-4 shadow-sm z-50">
         <div class="flex items-center gap-3">
-            <button onclick="location.href='home.html'" class="text-slate-500 hover:text-blue-600 transition-colors"><i class="fas fa-arrow-left text-xl"></i></button>
+            <button onclick="location.href='home.html'" class="text-slate-500 hover:text-blue-600 transition-colors">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </button>
             <h1 class="text-lg font-bold text-slate-800 select-none">Dice Defense</h1>
         </div>
-        <div class="flex gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-            <div class="flex items-center gap-1"><i class="fas fa-gem text-blue-500"></i> <span id="res-gem">0</span></div>
+        
+        <div class="flex gap-3 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+            <div class="flex items-center gap-1"><i class="fas fa-gem text-blue-500"></i> <span id="res-gem">1,200</span></div>
             <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="fas fa-coins text-yellow-500"></i> <span id="res-gold">0</span></div>
-            <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="fas fa-ticket-alt text-purple-500"></i> <span id="res-ticket">0</span></div>
+            <div class="flex items-center gap-1"><i class="fas fa-coins text-yellow-500"></i> <span id="res-gold">5,400</span></div>
         </div>
     </nav>
 
     <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
-        <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-6">
-            <div class="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-                <h3 class="font-bold text-slate-800 text-lg mb-4">🎲 주사위 소환</h3>
-                <div class="flex gap-3">
-                    <button onclick="pullGacha(1)" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center hover:bg-slate-100 transition-all">
-                        <div class="text-4xl mb-2">📦</div>
-                        <div class="text-sm font-bold text-slate-700">1회 소환</div>
-                        <div class="text-xs text-purple-600 font-bold mt-1">🎫 1</div>
-                    </button>
-                    <button onclick="pullGacha(10)" class="flex-1 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 flex flex-col items-center hover:shadow-md transition-all">
-                        <div class="text-4xl mb-2">🎁</div>
-                        <div class="text-sm font-bold text-indigo-700">11회 소환</div>
-                        <div class="text-xs text-purple-600 font-bold mt-1">🎫 10</div>
-                    </button>
-                </div>
+        
+        <button onclick="prevTab()" class="hidden md:block absolute left-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <button onclick="nextTab()" class="hidden md:block absolute right-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-4">
+            <div class="w-full bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl p-6 text-white shadow-lg mb-2">
+                <h2 class="text-2xl font-bold mb-1">일일 특가</h2>
+                <p class="text-sm opacity-90">오늘만 전설 주사위 확률 UP!</p>
             </div>
-            <div class="w-full bg-slate-100 rounded-2xl p-4">
-                <h3 class="font-bold text-slate-600 text-sm mb-3">테스트용 무료 충전소</h3>
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="addResource('gem', 500)" class="bg-white py-2 rounded-lg text-xs font-bold text-blue-500 shadow-sm">💎 보석+500</button>
-                    <button onclick="addResource('gold', 1000)" class="bg-white py-2 rounded-lg text-xs font-bold text-yellow-600 shadow-sm">💰 골드+1000</button>
-                    <button onclick="addResource('ticket', 10)" class="bg-white py-2 rounded-lg text-xs font-bold text-purple-600 shadow-sm">🎫 티켓+10</button>
+            <div class="grid grid-cols-2 gap-3 w-full">
+                <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center border border-slate-100">
+                    <div class="text-4xl mb-2">💎</div>
+                    <div class="font-bold text-slate-700 text-sm">보석 500개</div>
+                    <button class="mt-3 bg-blue-100 text-blue-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-blue-200">구매</button>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center border border-slate-100">
+                    <div class="text-4xl mb-2">📦</div>
+                    <div class="font-bold text-slate-700 text-sm">로얄 상자</div>
+                    <button class="mt-3 bg-blue-100 text-blue-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-blue-200">구매</button>
                 </div>
             </div>
         </div>
 
         <div id="tab-deck" class="tab-content flex-col p-4">
-            <div class="flex justify-between items-end mb-4 px-1">
-                <h4 class="text-xs font-bold text-slate-500">전체 주사위 목록</h4>
-                <button onclick="fetchDiceList()" class="text-[10px] text-blue-500">새로고침</button>
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-4">
+                <h3 class="font-bold text-slate-700 mb-3 flex justify-between">
+                    <span>현재 장착 덱</span>
+                    <span class="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded">평균 Lv.4</span>
+                </h3>
+                <div class="flex justify-between gap-2">
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🔥</div>
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🧊</div>
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">⚡</div>
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🌪️</div>
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🛡️</div>
+                </div>
             </div>
-            <div id="dice-list-container" class="space-y-3">
-                <div class="text-center py-10 text-slate-400">로딩 중...</div>
+            
+            <div class="flex-1 overflow-y-auto pb-20">
+                <h4 class="text-xs font-bold text-slate-400 mb-2 px-1">보유 주사위 목록</h4>
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="aspect-square bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
+                        <span class="text-2xl">🔥</span>
+                        <span class="text-[10px] text-slate-500 mt-1 font-bold">Lv.7</span>
+                    </div>
+                    <div class="aspect-square bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 opacity-50">
+                        <span class="text-2xl">❓</span>
+                        <span class="text-[10px] text-slate-400 mt-1">미획득</span>
+                    </div>
+                    </div>
             </div>
         </div>
 
-        <div id="tab-battle" class="tab-content active flex-col p-4">
-            <div class="flex-1 flex flex-col items-center justify-center bg-slate-50 border rounded-2xl">
-                <div class="text-6xl mb-4 animate-bounce">🎲</div>
-                <h2 class="text-2xl font-bold">DICE DEFENSE</h2>
-                <button onclick="startGame('pve')" class="mt-8 px-12 py-4 bg-blue-600 text-white font-bold rounded-2xl">게임 시작</button>
+        <div id="tab-battle" class="tab-content active flex-col p-4 relative">
+            <div class="flex-1 w-full relative flex flex-col">
+                
+                <div id="game-ui-overlay" class="absolute inset-0 pointer-events-none hidden flex-col justify-between p-2 z-10">
+                    <div class="flex justify-between items-start">
+                        <div class="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">Wave <span id="wave-num" class="text-yellow-400 font-bold">1</span></div>
+                        <div class="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">❤️ 3</div>
+                    </div>
+                    <div class="flex justify-center items-end pb-2 pointer-events-auto">
+                        <button onclick="spawnDice()" class="w-20 h-20 bg-blue-600 rounded-full border-4 border-blue-400 shadow-xl flex flex-col items-center justify-center text-white active:scale-95 transition-transform">
+                            <span class="text-xs font-bold">SP</span>
+                            <span class="text-lg font-bold" id="sp-cost">10</span>
+                        </button>
+                    </div>
+                </div>
+
+                <canvas id="game-canvas" class="w-full h-full block" width="360" height="640"></canvas>
+                
+                <div id="lobby-overlay" class="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center z-20">
+                    <div class="text-6xl mb-4 animate-bounce">🎲</div>
+                    <h2 class="text-2xl font-extrabold text-slate-800 mb-1">DICE DEFENSE</h2>
+                    <p class="text-slate-400 text-sm mb-8">최고의 덱으로 적을 막아내세요!</p>
+                    
+                    <button onclick="startGame('pve')" class="w-48 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 transition-all mb-3 text-lg">
+                        <i class="fas fa-play mr-2"></i> 게임 시작
+                    </button>
+                    <button onclick="startGame('coop')" class="w-48 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-200 transition-all text-sm">
+                        <i class="fas fa-user-friends mr-2"></i> 협동 모드
+                    </button>
+                </div>
             </div>
         </div>
 
-        <div id="tab-event" class="tab-content flex-col p-4 text-center text-slate-400">이벤트 준비 중</div>
-        <div id="tab-clan" class="tab-content flex-col p-4 text-center text-slate-400">클랜 기능 준비 중</div>
+        <div id="tab-social" class="tab-content flex-col p-4 space-y-4">
+            <div class="bg-indigo-600 text-white p-5 rounded-2xl shadow-lg">
+                <h3 class="font-bold text-lg"><i class="fas fa-users mr-2"></i>클랜</h3>
+                <p class="text-xs text-indigo-200 mt-1">클랜에 가입하여 보상을 받으세요.</p>
+                <button class="mt-3 bg-white text-indigo-600 text-xs font-bold px-3 py-1.5 rounded-lg">가입하기</button>
+            </div>
+            
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-700 mb-2 text-sm">진행 중인 이벤트</h4>
+                <div class="space-y-2">
+                    <div class="bg-slate-50 p-3 rounded-lg flex items-center gap-3">
+                        <span class="text-red-500 text-xl"><i class="fas fa-gift"></i></span>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-slate-700">오픈 기념 출석체크</div>
+                            <div class="text-[10px] text-slate-400">매일매일 보석 지급!</div>
+                        </div>
+                        <button class="text-[10px] bg-slate-200 px-2 py-1 rounded text-slate-600">보기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
-    <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
-        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400" data-target="tab-shop"><i class="fas fa-store text-xl"></i><span class="text-[10px] font-bold">상점</span></button>
-        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400" data-target="tab-deck"><i class="fas fa-th-large text-xl"></i><span class="text-[10px] font-bold">덱</span></button>
-        <div class="w-16 relative flex justify-center"><button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white ring-4 ring-white shadow-lg shadow-blue-200" data-target="tab-battle"><i class="fas fa-gamepad text-2xl"></i></button></div>
-        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400" data-target="tab-event"><i class="fas fa-gift text-xl"></i><span class="text-[10px] font-bold">이벤트</span></button>
-        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400" data-target="tab-clan"><i class="fas fa-users text-xl"></i><span class="text-[10px] font-bold">클랜</span></button>
+    <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-around items-center px-2 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
+        <button onclick="switchTab('shop')" class="nav-btn w-16 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop">
+            <i class="fas fa-store text-xl mb-0.5"></i>
+            <span class="text-[10px] font-bold">상점</span>
+        </button>
+        <button onclick="switchTab('deck')" class="nav-btn w-16 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck">
+            <i class="fas fa-th-large text-xl mb-0.5"></i>
+            <span class="text-[10px] font-bold">덱</span>
+        </button>
+        
+        <button onclick="switchTab('battle')" class="nav-btn -mt-8 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle">
+            <i class="fas fa-gamepad text-2xl"></i>
+        </button>
+        
+        <button onclick="switchTab('social')" class="nav-btn w-16 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-social">
+            <i class="fas fa-calendar-alt text-xl mb-0.5"></i>
+            <span class="text-[10px] font-bold">이벤트</span>
+        </button>
     </nav>
 
-    <div id="gacha-modal" class="fixed inset-0 bg-black/80 hidden z-[100] flex flex-col items-center justify-center p-6 backdrop-blur-sm">
-        <h2 class="text-white text-2xl font-bold mb-6 animate-bounce">🎁 획득 완료!</h2>
-        <div id="gacha-result-grid" class="grid grid-cols-4 gap-3 w-full max-w-sm mb-8"></div>
-        <button onclick="closeGachaModal()" class="bg-white text-slate-800 font-bold px-8 py-3 rounded-full hover:bg-slate-100 transition-colors shadow-lg">확인</button>
-    </div>
-
     <script>
-        // [핵심 해결책] 백엔드 주소를 명시적으로 설정하여 Pages와 Tunnel 간 통신 오류를 방지합니다.
-        const BACKEND_URL = "https://pyosh.cloud";
-        const API_AUTH = `${BACKEND_URL}/api/auth`;
-        const API_DICE = `${BACKEND_URL}/api/dice`;
-        const myId = sessionStorage.getItem('username');
-
-        const DICE_ASSETS = {
-            "fire": { icon: "🔥", color: "text-red-500" }, "electric": { icon: "⚡", color: "text-yellow-500" },
-            "wind": { icon: "🌪️", color: "text-green-500" }, "poison": { icon: "☠️", color: "text-purple-500" },
-            "ice": { icon: "🧊", color: "text-blue-400" }, "mining": { icon: "⛏️", color: "text-slate-500" },
-            "light": { icon: "✨", color: "text-yellow-300" }, "death": { icon: "💀", color: "text-slate-800" },
-            "adapt": { icon: "🎭", color: "text-pink-500" }, "typhoon": { icon: "🌀", color: "text-indigo-500" }
-        };
-        const RARITY_MAP = { "Common": "일반", "Rare": "희귀", "Hero": "영웅", "Legend": "전설" };
-
-        window.onload = async function() {
-            if(!myId) { alert("로그인이 필요합니다."); location.href='index.html'; return; }
-            // 서버 상태 확인
-            try { await fetch(`${BACKEND_URL}/api/health`); } catch(e) { console.error("백엔드 연결 실패", e); }
-            fetchMyResources();
-        };
+        // --- 탭 전환 로직 ---
+        const tabs = ['shop', 'deck', 'battle', 'social'];
+        let currentTabIdx = 2; // Default: Battle
 
         function switchTab(name) {
+            // UI 업데이트
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.getElementById(`tab-${name}`).classList.add('active');
+            
+            // 버튼 스타일 업데이트
             document.querySelectorAll('.nav-btn').forEach(btn => {
-                const isActive = btn.dataset.target === `tab-${name}`;
-                if(isActive && !btn.classList.contains('bg-blue-600')) btn.classList.add('text-blue-600');
-                else btn.classList.remove('text-blue-600');
-            });
-            if(name === 'deck') fetchDiceList();
-        }
-
-        async function fetchMyResources() {
-            if(!myId) return;
-            try {
-                const res = await fetch(`${API_AUTH}/profile/${myId}`);
-                if(res.ok) {
-                    const data = await res.json();
-                    document.getElementById('res-gem').innerText = data.gems.toLocaleString();
-                    document.getElementById('res-gold').innerText = data.gold.toLocaleString();
-                    document.getElementById('res-ticket').innerText = data.tickets.toLocaleString();
+                if(btn.dataset.target === `tab-${name}`) {
+                    if(!btn.classList.contains('bg-blue-600')) btn.classList.add('text-blue-600');
+                } else {
+                    btn.classList.remove('text-blue-600');
                 }
-            } catch(e) { console.error(e); }
-        }
-
-        async function addResource(type, amount) {
-            try {
-                const res = await fetch(`${API_AUTH}/add-resource`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: myId, type: type, amount: amount })
-                });
-                if(res.ok) { fetchMyResources(); }
-                else { alert(`에러 발생: ${res.status}`); }
-            } catch(e) { alert("서버 통신 실패"); }
-        }
-
-        async function pullGacha(count) {
-            if(!confirm(`티켓 ${count}장을 사용하여 소환하시겠습니까?`)) return;
-            try {
-                const res = await fetch(`${API_DICE}/gacha`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username: myId, draw_count: count })
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    fetchMyResources();
-                    showGachaResults(data.results);
-                } else { const d = await res.json(); alert(d.detail); }
-            } catch(e) { alert("서버 오류"); }
-        }
-
-        function showGachaResults(results) {
-            const grid = document.getElementById('gacha-result-grid');
-            grid.innerHTML = "";
-            results.forEach((item, index) => {
-                const asset = DICE_ASSETS[item.id] || { icon: "🎲", color: "text-slate-500" };
-                const el = document.createElement('div');
-                el.className = `bg-white rounded-xl p-3 flex flex-col items-center justify-center shadow-lg border-2 border-${item.rarity}`;
-                el.innerHTML = `<div class="text-3xl mb-1 ${asset.color}">${asset.icon}</div><div class="text-[10px] font-bold text-slate-700 truncate w-full text-center">${item.name}</div><div class="text-[9px] font-bold text-${item.rarity} mt-0.5">${RARITY_MAP[item.rarity]}</div>`;
-                grid.appendChild(el);
             });
-            document.getElementById('gacha-modal').classList.remove('hidden');
-            document.getElementById('gacha-modal').style.display = 'flex';
+            currentTabIdx = tabs.indexOf(name);
         }
 
-        function closeGachaModal() { document.getElementById('gacha-modal').classList.add('hidden'); }
-
-        async function fetchDiceList() {
-            const container = document.getElementById('dice-list-container');
-            try {
-                const res = await fetch(`${API_DICE}/list/${myId}`);
-                if(!res.ok) throw new Error();
-                const list = await res.json();
-                container.innerHTML = list.map(dice => {
-                    const asset = DICE_ASSETS[dice.id] || { icon: "🎲", color: "text-slate-500" };
-                    const isLocked = dice.level === 0;
-                    return `<div class="bg-white rounded-xl p-3 shadow-sm border border-slate-100 flex items-center gap-4 ${isLocked ? 'opacity-70 grayscale-[0.5]' : ''}">
-                        <div class="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center text-3xl border border-${dice.rarity}"><span class="${asset.color}">${asset.icon}</span></div>
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2"><span class="font-bold text-slate-700 text-sm">${dice.name}</span><span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 font-bold text-${dice.rarity}">${RARITY_MAP[dice.rarity]}</span>${!isLocked ? `<span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">Lv.${dice.level}</span>` : ''}</div>
-                            <div class="mt-1"><div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1"><div class="bg-green-500 h-full" style="width:${Math.min(100, (dice.card_count/dice.req_card)*100)}%"></div></div><div class="flex justify-between text-[9px] mt-0.5 text-slate-400"><span>${dice.card_count}/${dice.req_card}</span><span>💰 ${dice.req_gold}</span></div></div>
-                        </div>
-                        <div><button onclick="upgradeDice('${dice.id}')" class="px-3 py-1.5 text-xs font-bold rounded-lg ${dice.can_upgrade ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400'}" ${!dice.can_upgrade ? 'disabled' : ''}>${isLocked ? '잠금해제' : '강화'}</button></div>
-                    </div>`;
-                }).join('');
-            } catch(e) { container.innerHTML = `<div class="text-center text-red-400 p-4">데이터 로드 실패</div>`; }
+        function nextTab() {
+            currentTabIdx = (currentTabIdx + 1) % tabs.length;
+            switchTab(tabs[currentTabIdx]);
+        }
+        function prevTab() {
+            currentTabIdx = (currentTabIdx - 1 + tabs.length) % tabs.length;
+            switchTab(tabs[currentTabIdx]);
         }
 
-        async function upgradeDice(diceId) {
-            try {
-                const res = await fetch(`${API_DICE}/upgrade`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username: myId, dice_id: diceId })
-                });
-                if(res.ok) { fetchMyResources(); fetchDiceList(); }
-                else { const d = await res.json(); alert(d.detail); }
-            } catch(e) { alert("오류 발생"); }
+        // --- 게임 로직 (웹소켓 연결) ---
+        let socket = null;
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const sessionId = new URLSearchParams(window.location.search).get('session') || "test_session";
+
+        function startGame(mode) {
+            document.getElementById('lobby-overlay').classList.add('hidden');
+            document.getElementById('game-ui-overlay').classList.remove('hidden');
+            document.getElementById('game-ui-overlay').style.display = 'flex';
+            
+            // 웹소켓 연결
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/dice/${sessionId}`;
+            
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = () => {
+                console.log("Connected to Game Server");
+                socket.send(JSON.stringify({ type: "JOIN", mode: mode }));
+            };
+            
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if(data.type === 'TICK') {
+                    renderGame(data); // 서버 상태 렌더링
+                }
+            };
+
+            // 임시 렌더링 루프 (서버 연결 전 테스트용)
+            requestAnimationFrame(renderLoop);
         }
 
-        function startGame(mode) { alert("전투 로직은 다음 단계에서 구현될 예정입니다!"); }
+        function renderGame(state) {
+            // 실제 서버 데이터를 받아서 그리는 부분 (구현 예정)
+            // console.log("Server Tick:", state.tick);
+        }
+
+        // 클라이언트 사이드 임시 렌더링 (배경 등)
+        function renderLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 배경 그리드
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1;
+            const cellSize = canvas.width / 5;
+            
+            // 3x5 그리드 예시
+            for(let x=0; x<5; x++) {
+                for(let y=0; y<3; y++) {
+                    ctx.strokeRect(x * cellSize, (canvas.height - cellSize * 3) / 2 + y * cellSize, cellSize, cellSize);
+                }
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        function spawnDice() {
+            if(socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: "SPAWN" }));
+            } else {
+                // 테스트용 효과
+                alert("주사위 소환! (서버 연결 필요)");
+            }
+        }
     </script>
 </body>
 </html>
