@@ -1,31 +1,30 @@
-import asyncio
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from app.core.global_ticker import ticker
+from fastapi.staticfiles import StaticFiles
+from app.services.auth import auth_api
+from app.services.mail import mail_api
+from app.services.dice_defense import dice_api  # 추가됨
 from app.core.database import init_db
-from app.services.auth.auth_api import router as auth_router
-from app.services.dice_defense.dice_api import router as dice_router
-from app.services.mail.mail_api import router as mail_router  # [추가]
+from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db() # 서버 시작 시 DB 체크
-    task = asyncio.create_task(ticker.start())
+    # 시작 시 DB 초기화
+    init_db()
     yield
-    task.cancel()
+    # 종료 시 정리 작업 (필요하면 추가)
 
-app = FastAPI(title="Playground V3", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# API 라우터 등록
+app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(mail_api.router, prefix="/api/mail", tags=["Mail"])
+app.include_router(dice_api.router, prefix="/api/game/dice", tags=["DiceDefense"]) # 추가됨
 
-app.include_router(auth_router, prefix="/api/auth")
-app.include_router(dice_router, prefix="/ws/dice")
-app.include_router(mail_router, prefix="/api/mail") # [추가]
+# 정적 파일 서빙 (HTML, CSS, JS)
+app.mount("/static", StaticFiles(directory="web"), name="static")
+
+# 루트 경로 핸들러 (선택 사항: index.html로 리다이렉트 등)
+from fastapi.responses import FileResponse
+@app.get("/")
+async def read_root():
+    return FileResponse("web/index.html")
