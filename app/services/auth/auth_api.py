@@ -34,7 +34,6 @@ class PasswordChangeModel(BaseModel):
     birthdate: str
     new_password: str
 
-# [신규] 재화 지급 요청 모델
 class ResourceAddModel(BaseModel):
     username: str
     type: str  # 'gem', 'gold', 'ticket'
@@ -150,20 +149,16 @@ async def update_profile(data: ProfileUpdateModel):
 async def add_resource(data: ResourceAddModel):
     conn = get_db_connection()
     try:
-        # 컬럼명 매핑 (보안을 위해 직접 입력 방지)
         col_map = {'gem': 'gems', 'gold': 'gold', 'ticket': 'tickets'}
         if data.type not in col_map:
             raise HTTPException(status_code=400, detail="잘못된 재화 타입")
         
         target_col = col_map[data.type]
-        
-        # 해당 컬럼 값을 증가시킴
         conn.execute(f"UPDATE users SET {target_col} = {target_col} + ? WHERE username = ?", (data.amount, data.username))
         conn.commit()
         
-        # 갱신된 값 반환
         row = conn.execute(f"SELECT {target_col} FROM users WHERE username = ?", (data.username,)).fetchone()
-        return {"message": "지급 완료", "current_value": row[target_col]}
+        return {"message": "지급 완료", "current_value": row[0]}
     finally:
         conn.close()
 
