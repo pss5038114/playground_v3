@@ -23,7 +23,6 @@ class DBUpdateModel(BaseModel):
     column_name: str
     new_value: Any
 
-# [수정] 모든 필드를 Optional로 변경하여 부분 업데이트 지원
 class ProfileUpdateModel(BaseModel):
     username: str
     nickname: Optional[str] = None
@@ -34,6 +33,12 @@ class PasswordChangeModel(BaseModel):
     old_password: str
     birthdate: str
     new_password: str
+
+# [신규] 재화 지급 요청 모델
+class ResourceAddModel(BaseModel):
+    username: str
+    type: str  # 'gem', 'gold', 'ticket'
+    amount: int
 
 # --- [중복 확인 API] ---
 @router.get("/check-id/{username}")
@@ -115,35 +120,52 @@ async def reset_request(user: AuthModel):
 @router.get("/profile/{username}")
 async def get_profile(username: str):
     conn = get_db_connection()
-    row = conn.execute("SELECT nickname, birthdate, profile_image FROM users WHERE username = ?", (username,)).fetchone()
+    # [수정] 재화 정보 포함
+    row = conn.execute("SELECT nickname, birthdate, profile_image, gems, gold, tickets FROM users WHERE username = ?", (username,)).fetchone()
     conn.close()
     if not row: raise HTTPException(status_code=404, detail="유저 없음")
     return dict(row)
 
-# [수정] 부분 업데이트 로직 적용
 @router.post("/update-profile")
 async def update_profile(data: ProfileUpdateModel):
     conn = get_db_connection()
     try:
-        # 1. 닉네임 변경 요청이 있는 경우
         if data.nickname:
             if not (1 <= len(data.nickname) <= 15): 
                 raise HTTPException(status_code=400, detail="닉네임은 1~15자여야 합니다.")
-            
-            # 중복 체크 (내 닉네임 제외)
             exist = conn.execute("SELECT username FROM users WHERE nickname = ?", (data.nickname,)).fetchone()
             if exist and exist['username'] != data.username:
                 raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
-            
             conn.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
 
-        # 2. 프로필 이미지 변경 요청이 있는 경우
         if data.profile_image:
             conn.execute("UPDATE users SET profile_image = ? WHERE username = ?", (data.profile_image, data.username))
 
         conn.commit()
         return {"message": "업데이트 완료"}
     finally: conn.close()
+
+# [신규] 테스트용 재화 지급 API
+@router.post("/add-resource")
+async def add_resource(data: ResourceAddModel):
+    conn = get_db_connection()
+    try:
+        # 컬럼명 매핑 (보안을 위해 직접 입력 방지)
+        col_map = {'gem': 'gems', 'gold': 'gold', 'ticket': 'tickets'}
+        if data.type not in col_map:
+            raise HTTPException(status_code=400, detail="잘못된 재화 타입")
+        
+        target_col = col_map[data.type]
+        
+        # 해당 컬럼 값을 증가시킴
+        conn.execute(f"UPDATE users SET {target_col} = {target_col} + ? WHERE username = ?", (data.amount, data.username))
+        conn.commit()
+        
+        # 갱신된 값 반환
+        row = conn.execute(f"SELECT {target_col} FROM users WHERE username = ?", (data.username,)).fetchone()
+        return {"message": "지급 완료", "current_value": row[target_col]}
+    finally:
+        conn.close()
 
 @router.post("/change-password")
 async def change_password(data: PasswordChangeModel):
@@ -216,7 +238,7 @@ async def approve_user(user_id: int, action: str, admin_key: str):
     finally: conn.close()
     return {"message": "완료"}
 
-# --- [DB 브라우저 API] (기존 유지) ---
+# --- [DB 브라우저 API] ---
 @router.get("/admin/db/tables")
 async def get_tables(admin_key: str, db_key: str):
     if admin_key != ADMIN_SECRET_KEY or db_key != DB_MASTER_KEY: raise HTTPException(status_code=401)
