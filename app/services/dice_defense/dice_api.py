@@ -1,82 +1,161 @@
-# app/services/dice_defense/dice_api.py
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Body
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from app.core.session_manager import session_manager
 from app.core.database import get_db_connection
 from app.services.dice_defense.dice_logic import execute_gacha
 from app.services.dice_defense.dice_data import DICE_DATA
 from pydantic import BaseModel
+from typing import List, Optional
 
 router = APIRouter()
 
 class GachaRequest(BaseModel):
     username: str
-    draw_count: int  # 1 or 10
+    draw_count: int
 
-# --- [HTTP API] 가챠 시스템 ---
+class UpgradeRequest(BaseModel):
+    username: str
+    dice_id: str
+
+# --- [HTTP API] 가챠 및 인벤토리 시스템 ---
 
 @router.post("/gacha")
 async def pull_gacha(req: GachaRequest):
     if req.draw_count not in [1, 10]:
         raise HTTPException(status_code=400, detail="1회 또는 10회 뽑기만 가능합니다.")
 
-    cost = 1 * req.draw_count # 티켓 1장당 1회 (10회 시 10장 소모하고 11번 뽑음)
+    cost = 1 * req.draw_count 
     
     conn = get_db_connection()
     try:
         # 1. 티켓 확인 및 차감
         user = conn.execute("SELECT tickets FROM users WHERE username = ?", (req.username,)).fetchone()
-        if not user:
-            raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
-        
-        if user['tickets'] < cost:
-            raise HTTPException(status_code=400, detail="티켓이 부족합니다.")
+        if not user: raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다.")
+        if user['tickets'] < cost: raise HTTPException(status_code=400, detail="티켓이 부족합니다.")
             
         conn.execute("UPDATE users SET tickets = tickets - ? WHERE username = ?", (cost, req.username))
         
-        # 2. 가챠 실행 (로직 분리)
+        # 2. 가챠 실행
         acquired_dice_ids = execute_gacha(req.draw_count)
         
-        # 3. 결과 DB 저장 (카드 적립 방식)
-        # - user_dice 테이블에 row가 없으면 생성(class_level=0), 있으면 card_count만 증가
+        # 3. 결과 DB 저장
         for dice_id in acquired_dice_ids:
-            # 존재 여부 확인
-            row = conn.execute(
-                "SELECT id FROM user_dice WHERE user_id = ? AND dice_id = ?", 
-                (req.username, dice_id)
-            ).fetchone()
-            
+            row = conn.execute("SELECT id FROM user_dice WHERE user_id = ? AND dice_id = ?", (req.username, dice_id)).fetchone()
             if row:
-                # 이미 존재하면 카드 수 추가
-                conn.execute(
-                    "UPDATE user_dice SET card_count = card_count + 1 WHERE id = ?", 
-                    (row['id'],)
-                )
+                conn.execute("UPDATE user_dice SET card_count = card_count + 1 WHERE id = ?", (row['id'],))
             else:
-                # 없으면 신규 생성 (class_level=0: 미해금 상태, card_count=1)
-                conn.execute(
-                    "INSERT INTO user_dice (user_id, dice_id, class_level, card_count) VALUES (?, ?, 0, 1)",
-                    (req.username, dice_id)
-                )
+                conn.execute("INSERT INTO user_dice (user_id, dice_id, class_level, card_count) VALUES (?, ?, 0, 1)", (req.username, dice_id))
         
         conn.commit()
         
-        # 4. 결과 반환 (프론트엔드 연출용 데이터)
-        # 단순히 ID만 주는게 아니라, 이름과 등급 정보도 같이 줘서 연출하기 편하게 함
         result_details = []
         for did in acquired_dice_ids:
             info = DICE_DATA.get(did, {})
-            result_details.append({
-                "id": did,
-                "name": info.get("name", "Unknown"),
-                "rarity": info.get("rarity", "Common")
+            result_details.append({"id": did, "name": info.get("name", "Unknown"), "rarity": info.get("rarity", "Common")})
+            
+        return {"message": "가챠 성공", "results": result_details, "remaining_tickets": user['tickets'] - cost}
+        
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+# [신규] 인벤토리(덱) 정보 조회
+@router.get("/list/{username}")
+async def get_dice_inventory(username: str):
+    conn = get_db_connection()
+    try:
+        # 1. DB에 저장된 유저 데이터 조회 (소유했거나 카드가 있는 주사위)
+        rows = conn.execute("SELECT dice_id, class_level, card_count FROM user_dice WHERE user_id = ?", (username,)).fetchall()
+        user_dice_map = {row['dice_id']: dict(row) for row in rows}
+        
+        inventory = []
+        
+        # 2. 정적 데이터(DICE_DATA)를 기준으로 전체 목록 생성
+        for dice_id, info in DICE_DATA.items():
+            user_data = user_dice_map.get(dice_id, {"class_level": 0, "card_count": 0})
+            
+            level = user_data["class_level"]
+            card_count = user_data["card_count"]
+            
+            # 업그레이드/해금 조건 계산
+            # - 해금(Lv0->1): 카드 1장, 골드 0
+            # - 강화(LvN->N+1): 카드 5장, 골드 (Level * 500)
+            req_card = 1 if level == 0 else 5
+            req_gold = 0 if level == 0 else level * 500
+            
+            can_upgrade = card_count >= req_card
+            
+            inventory.append({
+                "id": dice_id,
+                "name": info["name"],
+                "rarity": info["rarity"],
+                "desc": info["desc"],
+                "level": level,
+                "card_count": card_count,
+                "req_card": req_card,
+                "req_gold": req_gold,
+                "can_upgrade": can_upgrade,
+                "is_owned": level > 0
             })
             
-        return {
-            "message": "가챠 성공",
-            "results": result_details,
-            "remaining_tickets": user['tickets'] - cost
-        }
+        # 3. 정렬: 보유 여부(내림차순) -> 등급(내림차순) -> 레벨(내림차순) -> 이름(오름차순)
+        # 등급 우선순위 매핑
+        rarity_rank = {"Legend": 4, "Hero": 3, "Rare": 2, "Common": 1}
         
+        inventory.sort(key=lambda x: (
+            x["is_owned"], 
+            rarity_rank.get(x["rarity"], 0), 
+            x["level"], 
+            x["name"]
+        ), reverse=True)
+        
+        return inventory
+    finally:
+        conn.close()
+
+# [신규] 주사위 강화/해금
+@router.post("/upgrade")
+async def upgrade_dice(req: UpgradeRequest):
+    conn = get_db_connection()
+    try:
+        # 1. 유저 재화 및 주사위 정보 조회
+        user = conn.execute("SELECT gold FROM users WHERE username = ?", (req.username,)).fetchone()
+        dice_row = conn.execute("SELECT id, class_level, card_count FROM user_dice WHERE user_id = ? AND dice_id = ?", (req.username, req.dice_id)).fetchone()
+        
+        if not user: raise HTTPException(status_code=404, detail="유저 정보 없음")
+        if not dice_row: raise HTTPException(status_code=400, detail="해당 주사위 카드를 보유하고 있지 않습니다.")
+        
+        level = dice_row["class_level"]
+        card_count = dice_row["card_count"]
+        
+        # 2. 비용 계산
+        req_card = 1 if level == 0 else 5
+        req_gold = 0 if level == 0 else level * 500
+        
+        # 3. 조건 확인
+        if card_count < req_card:
+            raise HTTPException(status_code=400, detail=f"카드가 부족합니다. (필요: {req_card})")
+        if user["gold"] < req_gold:
+            raise HTTPException(status_code=400, detail=f"골드가 부족합니다. (필요: {req_gold})")
+        
+        # 4. 차감 및 업데이트 수행
+        # - 골드 차감
+        if req_gold > 0:
+            conn.execute("UPDATE users SET gold = gold - ? WHERE username = ?", (req_gold, req.username))
+        
+        # - 주사위 업데이트 (카드 차감, 레벨 +1)
+        new_level = level + 1
+        new_card_count = card_count - req_card
+        conn.execute("UPDATE user_dice SET class_level = ?, card_count = ? WHERE id = ?", (new_level, new_card_count, dice_row["id"]))
+        
+        conn.commit()
+        
+        msg = "해금 완료!" if level == 0 else f"Lv.{new_level} 강화 성공!"
+        return {"message": msg, "new_level": new_level, "remaining_gold": user["gold"] - req_gold}
+        
+    except HTTPException as he:
+        raise he
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
