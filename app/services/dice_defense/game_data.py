@@ -3,7 +3,7 @@
 DICE_DATA = {
     # [Common]
     "fire": {
-        "name": "Fire", "rarity": "Common", "color": "bg-red-500", "desc": "기본적인 불 속성 주사위입니다.",
+        "name": "Fire", "rarity": "Common", "color": "bg-red-500", "symbol": "fa-fire", "desc": "기본적인 불 속성 주사위입니다.",
         "stats": {
             "atk": {"base": 20, "c": 3, "p": 10},
             "speed": {"base": 0.8, "c": -0.01, "p": 0},
@@ -14,7 +14,7 @@ DICE_DATA = {
         }
     },
     "electric": {
-        "name": "Electric", "rarity": "Common", "color": "bg-orange-300", "desc": "전기 충격을 가합니다.",
+        "name": "Electric", "rarity": "Common", "color": "bg-orange-300", "symbol": "fa-bolt", "desc": "전기 충격을 가합니다.",
         "stats": {
             "atk": {"base": 30, "c": 3, "p": 10},
             "speed": {"base": 0.7, "c": -0.02, "p": 0},
@@ -25,7 +25,7 @@ DICE_DATA = {
         }
     },
     "wind": {
-        "name": "Wind", "rarity": "Common", "color": "bg-teal-300", "desc": "빠른 공격 속도를 가집니다.",
+        "name": "Wind", "rarity": "Common", "color": "bg-teal-300", "symbol": "fa-wind", "desc": "빠른 공격 속도를 가집니다.",
         "stats": {
             "atk": {"base": 20, "c": 3, "p": 15},
             "speed": {"base": 0.45, "c": 0, "p": 0},
@@ -36,7 +36,7 @@ DICE_DATA = {
         }
     },
     "poison": {
-        "name": "Poison", "rarity": "Common", "color": "bg-green-500", "desc": "지속 데미지를 입힙니다.",
+        "name": "Poison", "rarity": "Common", "color": "bg-green-500", "symbol": "fa-skull-crossbones", "desc": "지속 데미지를 입힙니다.",
         "stats": {
             "atk": {"base": 20, "c": 2, "p": 10},
             "speed": {"base": 1.3, "c": 0, "p": 0},
@@ -47,7 +47,7 @@ DICE_DATA = {
         }
     },
     "ice": {
-        "name": "Ice", "rarity": "Common", "color": "bg-blue-300", "desc": "적을 느리게 만듭니다.",
+        "name": "Ice", "rarity": "Common", "color": "bg-blue-300", "symbol": "fa-snowflake", "desc": "적을 느리게 만듭니다.",
         "stats": {
             "atk": {"base": 30, "c": 3, "p": 30},
             "speed": {"base": 1.5, "c": -0.02, "p": 0},
@@ -60,7 +60,7 @@ DICE_DATA = {
     
     # [Rare]
     "mining": {
-        "name": "Mining", "rarity": "Rare", "color": "bg-cyan-400", "desc": "일정 확률로 SP를 획득합니다.",
+        "name": "Mining", "rarity": "Rare", "color": "bg-cyan-400", "symbol": "fa-hammer", "desc": "일정 확률로 SP를 획득합니다.",
         "stats": {
             "atk": "-", "speed": "-", "target": "-",
             "specials": [
@@ -70,7 +70,7 @@ DICE_DATA = {
         }
     },
     "light": {
-        "name": "Light", "rarity": "Rare", "color": "bg-yellow-400", "desc": "공격 속도를 증가시킵니다.",
+        "name": "Light", "rarity": "Rare", "color": "bg-yellow-400", "symbol": "fa-sun", "desc": "공격 속도를 증가시킵니다.",
         "stats": {
             "atk": "-", "speed": "-", "target": "-",
             "specials": [
@@ -81,7 +81,7 @@ DICE_DATA = {
     
     # [Hero]
     "adapt": {
-        "name": "Adapt", "rarity": "Hero", "color": "bg-gradient-to-br from-red-400 via-yellow-400 to-blue-400", "desc": "모든 주사위와 합쳐질 수 있습니다.",
+        "name": "Adapt", "rarity": "Hero", "color": "bg-gradient-to-br from-red-400 via-yellow-400 to-blue-400", "symbol": "fa-dice-d20", "desc": "모든 주사위와 합쳐질 수 있습니다.",
         "stats": {
             "atk": {"base": 20, "c": 5, "p": 10},
             "speed": {"base": 1.0, "c": 0, "p": 0},
@@ -90,7 +90,7 @@ DICE_DATA = {
         }
     },
     "infection": {
-        "name": "Infection", "rarity": "Hero", "color": "bg-lime-400", "desc": "주변 적에게 감염을 퍼뜨립니다.",
+        "name": "Infection", "rarity": "Hero", "color": "bg-lime-400", "symbol": "fa-biohazard", "desc": "주변 적에게 감염을 퍼뜨립니다.",
         "stats": {
             "atk": "-",
             "speed": {"base": 5.0, "c": -0.02, "p": 0},
@@ -104,7 +104,7 @@ DICE_DATA = {
     
     # [Legend]
     "typhoon": {
-        "name": "Typhoon", "rarity": "Legend", "color": "bg-teal-700", "desc": "일정 시간 동안 변신하여 폭풍 공격을 합니다.",
+        "name": "Typhoon", "rarity": "Legend", "color": "bg-teal-700", "symbol": "fa-tornado", "desc": "일정 시간 동안 변신하여 폭풍 공격을 합니다.",
         "stats": {
             "atk": {"base": 20, "c": 0, "p": 30},
             "speed": {"base": 0.6, "c": -0.02, "p": 0},
