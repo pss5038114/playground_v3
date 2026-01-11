@@ -84,16 +84,17 @@
     <nav class="flex-none h-16 bg-white flex justify-between items-center px-4 shadow-sm z-50">
         <div class="flex items-center gap-3">
             <button onclick="location.href='../home.html'" class="text-slate-500 hover:text-blue-600 transition-colors">
-                <i class="fas fa-arrow-left text-xl"></i>
+                <i class="ri-arrow-left-line text-2xl"></i>
             </button>
             <h1 class="text-lg font-bold text-slate-800 select-none">Dice Defense</h1>
         </div>
-        <div class="flex gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-            <div class="flex items-center gap-1"><i class="fas fa-gem text-blue-500"></i> <span id="res-gem">0</span></div>
+        
+        <div class="flex gap-3 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+            <div class="flex items-center gap-1"><i class="ri-vip-diamond-fill text-blue-500 text-sm"></i> <span id="res-gem">0</span></div>
             <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="fas fa-coins text-yellow-500"></i> <span id="res-gold">0</span></div>
+            <div class="flex items-center gap-1"><i class="ri-coins-fill text-yellow-500 text-sm"></i> <span id="res-gold">0</span></div>
             <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="fas fa-ticket-alt text-purple-500"></i> <span id="res-ticket">0</span></div>
+            <div class="flex items-center gap-1"><i class="ri-coupon-3-fill text-purple-500 text-sm"></i> <span id="res-ticket">0</span></div>
         </div>
     </nav>
 
@@ -106,7 +107,9 @@
 
         <div id="dice-popup" class="absolute inset-0 z-50 bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm">
             <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[90vh] overflow-y-auto scrollbar-hide">
-                <button onclick="closePopup()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><i class="fas fa-times text-xl"></i></button>
+                <button onclick="closePopup()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-20 p-2">
+                    <i class="ri-close-line text-2xl"></i>
+                </button>
                 
                 <div class="flex items-center gap-4 mb-4">
                     <div id="popup-dice-icon-container" class="shrink-0"></div>
@@ -123,8 +126,8 @@
                 <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-4"></div>
 
                 <div class="flex gap-2 mb-4">
-                    <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">클래스 업 정보</button>
-                    <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">파워 업 정보</button>
+                    <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">클래스 업</button>
+                    <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">파워 업</button>
                 </div>
 
                 <div class="mt-auto pt-4 border-t border-slate-100">
@@ -143,11 +146,23 @@
     </main>
 
     <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
-        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop"><i class="fas fa-store text-xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span></button>
-        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck"><i class="fas fa-th-large text-xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span></button>
-        <div class="w-16 relative flex justify-center"><button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle"><i class="fas fa-gamepad text-2xl"></i></button></div>
-        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event"><i class="fas fa-gift text-xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span></button>
-        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan"><i class="fas fa-users text-xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span></button>
+        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop">
+            <i class="ri-store-3-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span>
+        </button>
+        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck">
+            <i class="ri-layout-grid-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span>
+        </button>
+        <div class="w-16 relative flex justify-center">
+            <button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle">
+                <i class="ri-gamepad-fill text-3xl"></i>
+            </button>
+        </div>
+        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event">
+            <i class="ri-gift-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span>
+        </button>
+        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan">
+            <i class="ri-group-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span>
+        </button>
     </nav>
 
     <script>
@@ -387,29 +402,18 @@
 
         function updateStatsView() {
             if(!currentSelectedDice) return;
-            const dice = currentSelectedDice;
-            const stats = dice.stats;
-            const level = Math.max(1, dice.class_level);
-            const grid = document.getElementById('popup-stats-grid');
-            grid.innerHTML = "";
+            const dice = currentSelectedDice; const stats = dice.stats; const level = Math.max(1, dice.class_level);
+            const grid = document.getElementById('popup-stats-grid'); grid.innerHTML = "";
 
-            addStatBox(grid, "공격력", "fa-sword", stats.atk, level);
-            addStatBox(grid, "공격속도", "fa-stopwatch", stats.speed, level, "s");
-            addStatBoxStatic(grid, "타겟", "fa-crosshairs", stats.target);
+            addStatBox(grid, "공격력", "ri-sword-fill", stats.atk, level); // 칼
+            addStatBox(grid, "공격속도", "ri-speed-fill", stats.speed, level, "s"); // 속도
+            addStatBoxStatic(grid, "타겟", "ri-crosshair-2-fill", stats.target); // 조준경
             
-            if(stats.specials) {
-                stats.specials.forEach(sp => {
-                    addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format);
-                });
-            }
+            if(stats.specials) { stats.specials.forEach(sp => { addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format); }); }
             const filled = 3 + (stats.specials ? stats.specials.length : 0);
-            for(let i=filled; i<6; i++) {
-                 grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`;
-            }
+            for(let i=filled; i<6; i++) { grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`; }
 
-            const btnClass = document.getElementById('btn-view-class');
-            const btnPower = document.getElementById('btn-view-power');
-            
+            const btnClass = document.getElementById('btn-view-class'); const btnPower = document.getElementById('btn-view-power');
             btnClass.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='class' ? 'bg-green-100 border-green-300 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
             btnPower.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='power' ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
         }
