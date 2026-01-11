@@ -1,6 +1,7 @@
 # app/services/dice_defense/dice_logic.py
 import random
-from app.services.dice_defense.dice_data import DICE_DATA, GACHA_PROBABILITY
+# [수정] dice 폴더 안의 dice_data를 바라보도록 경로 변경
+from app.services.dice_defense.dice.dice_data import DICE_DATA, GACHA_PROBABILITY
 
 def execute_gacha(draw_count: int):
     """

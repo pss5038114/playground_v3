@@ -1,8 +1,10 @@
+# app/services/dice_defense/dice_api.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from app.core.session_manager import session_manager
 from app.core.database import get_db_connection
 from app.services.dice_defense.dice_logic import execute_gacha
-from app.services.dice_defense.dice_data import DICE_DATA
+# [수정] dice 폴더 안의 dice_data를 바라보도록 경로 변경
+from app.services.dice_defense.dice.dice_data import DICE_DATA
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -79,8 +81,6 @@ async def get_dice_inventory(username: str):
             card_count = user_data["card_count"]
             
             # 업그레이드/해금 조건 계산
-            # - 해금(Lv0->1): 카드 1장, 골드 0
-            # - 강화(LvN->N+1): 카드 5장, 골드 (Level * 500)
             req_card = 1 if level == 0 else 5
             req_gold = 0 if level == 0 else level * 500
             
@@ -99,16 +99,9 @@ async def get_dice_inventory(username: str):
                 "is_owned": level > 0
             })
             
-        # 3. 정렬: 보유 여부(내림차순) -> 등급(내림차순) -> 레벨(내림차순) -> 이름(오름차순)
-        # 등급 우선순위 매핑
+        # 3. 정렬: 보유 여부 -> 등급 -> 레벨 -> 이름
         rarity_rank = {"Legend": 4, "Hero": 3, "Rare": 2, "Common": 1}
-        
-        inventory.sort(key=lambda x: (
-            x["is_owned"], 
-            rarity_rank.get(x["rarity"], 0), 
-            x["level"], 
-            x["name"]
-        ), reverse=True)
+        inventory.sort(key=lambda x: (x["is_owned"], rarity_rank.get(x["rarity"], 0), x["level"], x["name"]), reverse=True)
         
         return inventory
     finally:
@@ -140,11 +133,9 @@ async def upgrade_dice(req: UpgradeRequest):
             raise HTTPException(status_code=400, detail=f"골드가 부족합니다. (필요: {req_gold})")
         
         # 4. 차감 및 업데이트 수행
-        # - 골드 차감
         if req_gold > 0:
             conn.execute("UPDATE users SET gold = gold - ? WHERE username = ?", (req_gold, req.username))
         
-        # - 주사위 업데이트 (카드 차감, 레벨 +1)
         new_level = level + 1
         new_card_count = card_count - req_card
         conn.execute("UPDATE user_dice SET class_level = ?, card_count = ? WHERE id = ?", (new_level, new_card_count, dice_row["id"]))
@@ -162,7 +153,7 @@ async def upgrade_dice(req: UpgradeRequest):
     finally:
         conn.close()
 
-# --- [WebSocket] 게임 세션 (기존 유지) ---
+# --- [WebSocket] 게임 세션 ---
 @router.websocket("/ws/game/{session_id}")
 async def dice_game_ws(websocket: WebSocket, session_id: str):
     session = session_manager.get_or_create_session(session_id)
