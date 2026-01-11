@@ -20,36 +20,72 @@
         .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
         .stat-box { position: relative; height: 3.5rem; background-color: #f1f5f9; border-radius: 0.5rem; display: flex; align-items: center; padding: 0.5rem; }
 
-        /* [NEW] 주사위 비주얼 스타일 */
+        /* [수정] 주사위 기본 형태 */
         .dice-face {
-            background-color: white;
-            border-radius: 18%; /* 약간 둥근 정사각형 */
+            background-color: #f1f5f9; /* slate-100: 흰색보다 약간 어두움 */
+            border-radius: 22%; /* 조금 더 둥글게 */
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            /* 입체감을 위한 그림자 추가 */
+            box-shadow: 
+                inset 0 2px 3px rgba(255, 255, 255, 1), /* 상단 하이라이트 */
+                inset 0 -2px 5px rgba(0, 0, 0, 0.1),    /* 하단 음영 */
+                0 4px 6px -1px rgba(0, 0, 0, 0.2);      /* 외부 그림자 */
             transition: transform 0.1s;
+            overflow: hidden; /* 이펙트가 튀어나가지 않게 */
         }
         
-        /* 반들반들한 효과 (희귀 이상) */
+        /* [수정] 반들반들한 광택 효과 (강화됨) */
         .dice-glossy::after {
             content: "";
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            border-radius: 18%;
-            background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.1) 100%);
+            top: 0; left: 0; right: 0; bottom: 45%; /* 절반 정도만 덮음 */
+            border-radius: 22% 22% 40% 40% / 30%;   /* 둥근 유리 느낌 */
+            background: linear-gradient(
+                180deg, 
+                rgba(255,255,255,0.9) 0%, 
+                rgba(255,255,255,0.4) 50%, 
+                rgba(255,255,255,0) 100%
+            );
             pointer-events: none;
+            z-index: 10;
         }
 
-        /* 전설 펄스 효과 */
-        @keyframes pulse-legend {
-            0% { box-shadow: inset 0 0 0px var(--pulse-color, rgba(0,0,0,0)); border-color: var(--pulse-color); }
-            50% { box-shadow: inset 0 0 10px var(--pulse-color, rgba(0,0,0,0)); border-color: white; }
-            100% { box-shadow: inset 0 0 0px var(--pulse-color, rgba(0,0,0,0)); border-color: var(--pulse-color); }
+        /* [수정] 전설 이펙트 (강력한 펄스 + 회전광) */
+        @keyframes legend-glow {
+            0% { box-shadow: 0 0 5px var(--pulse-color), inset 0 0 10px var(--pulse-color); border-color: white; }
+            50% { box-shadow: 0 0 20px var(--pulse-color), inset 0 0 20px var(--pulse-color); border-color: var(--pulse-color); }
+            100% { box-shadow: 0 0 5px var(--pulse-color), inset 0 0 10px var(--pulse-color); border-color: white; }
         }
+        
+        /* 배경에서 은은하게 도는 빛 */
+        @keyframes legend-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         .dice-pulse {
-            animation: pulse-legend 2s infinite ease-in-out;
+            animation: legend-glow 2s infinite ease-in-out;
+            z-index: 5;
+        }
+        
+        /* 전설 등급 전용 배경 회전광 (선택사항) */
+        .dice-pulse::before {
+            content: "";
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background: conic-gradient(from 0deg, transparent 0%, var(--pulse-color) 20%, transparent 40%);
+            animation: legend-spin 3s linear infinite;
+            opacity: 0.3;
+            z-index: 0;
+        }
+        
+        /* 내용물(눈금)은 배경 빛 위에 떠야 함 */
+        .dice-content {
+            position: relative;
+            z-index: 2;
         }
     </style>
 </head>
@@ -188,25 +224,17 @@
 
         // --- [NEW] 주사위 렌더링 헬퍼 ---
         function getDiceVisualClasses(dice) {
-            // 1. 테두리 색상 (bg- -> border-)
             let borderColor = dice.color.replace('bg-', 'border-');
-            if(dice.color.includes('gradient')) {
-                // 그라데이션의 경우 기본 테두리색 지정 (Adapt 등)
-                borderColor = 'border-slate-300';
-            }
+            if(dice.color.includes('gradient')) borderColor = 'border-slate-300';
 
-            // 2. 효과 (희귀 이상 광택, 전설 펄스)
-            let effectClasses = "";
+            // [변경] 모든 주사위에 광택 적용
+            let effectClasses = "dice-glossy"; 
             let pulseStyle = "";
             
-            if (dice.rarity === 'Rare' || dice.rarity === 'Hero' || dice.rarity === 'Legend') {
-                effectClasses += " dice-glossy";
-            }
             if (dice.rarity === 'Legend') {
                 effectClasses += " dice-pulse";
-                // 전설 펄스 색상 (Typhoon = Teal)
-                if(dice.id === 'typhoon') pulseStyle = "--pulse-color: rgba(15, 118, 110, 0.7);"; // teal-700
-                else pulseStyle = "--pulse-color: rgba(255, 215, 0, 0.7);"; // default gold
+                if(dice.id === 'typhoon') pulseStyle = "--pulse-color: #0f766e;"; // teal-700 hex
+                else pulseStyle = "--pulse-color: #fbbf24;"; // amber-400 hex
             }
 
             return { borderColor, effectClasses, pulseStyle };
@@ -215,12 +243,9 @@
         function renderDiceIcon(dice, sizeClass="w-10 h-10") {
             const { borderColor, effectClasses, pulseStyle } = getDiceVisualClasses(dice);
             
-            // Adapt 같은 그라데이션 주사위는 dot에 그라데이션 적용
-            // 일반 주사위는 border에 색상 적용
-            
             return `
             <div class="dice-face ${sizeClass} border-2 ${borderColor} ${effectClasses}" style="${pulseStyle}">
-                <div class="w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm"></div>
+                <div class="dice-content w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm"></div>
             </div>
             `;
         }
