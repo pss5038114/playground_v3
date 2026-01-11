@@ -143,18 +143,22 @@ async def upgrade_dice(payload: dict = Body(...)):
         current_level = dice_row["class_level"]
         quantity = dice_row["quantity"]
         
+        # [수정] 최대 레벨 체크 (20레벨 이상이면 강화 불가)
+        if current_level >= 20:
+            raise HTTPException(400, "이미 최대 레벨입니다.")
+        
         # 비용 계산
         req_cards = 0
         req_gold = 0
         
         if current_level == 0:
-            # 해금 (Unlock)
+            # 해금
             req_cards = 1
             req_gold = 0
         else:
-            # 강화 (Upgrade)
+            # 강화
             req_cards = 5
-            req_gold = current_level * 1000 # 예: 1레벨->2레벨 비용 1000골드
+            req_gold = current_level * 1000
             
         if quantity < req_cards:
             raise HTTPException(400, "카드가 부족합니다.")
