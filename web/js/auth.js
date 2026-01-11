@@ -1,4 +1,4 @@
-const API = "https://api.pyosh.cloud/api/auth";
+const API = "/api/auth"; // 상대 경로로 변경하여 로컬/서버 환경 호환
 
 // 상태 변수 (중복 확인 통과 여부)
 let isIdChecked = false;
@@ -9,13 +9,17 @@ function resetCheck(type) {
     if(type === 'id') {
         isIdChecked = false;
         const btn = document.getElementById('btn-check-id');
-        btn.innerText = "중복확인";
-        btn.classList.remove('checked');
+        if(btn) {
+            btn.innerText = "중복확인";
+            btn.classList.remove('checked');
+        }
     } else if(type === 'nick') {
         isNickChecked = false;
         const btn = document.getElementById('btn-check-nick');
-        btn.innerText = "중복확인";
-        btn.classList.remove('checked');
+        if(btn) {
+            btn.innerText = "중복확인";
+            btn.classList.remove('checked');
+        }
     }
 }
 
@@ -71,21 +75,16 @@ async function handleSignup() {
     const birthdate = document.getElementById('sign-birth').value;
     const nickname = document.getElementById('sign-nick').value;
 
-    // 1. 유효성 검사
     if(!username || !password || !pwConfirm || !birthdate || !nickname) {
         return alert("모든 정보를 입력해주세요.");
     }
     
-    // 2. 비밀번호 일치 확인
     if(password !== pwConfirm) {
         return alert("비밀번호가 일치하지 않습니다.");
     }
 
-    // 3. 중복 확인 여부 체크
     if(!isIdChecked) return alert("아이디 중복 확인을 해주세요.");
     if(!isNickChecked) return alert("닉네임 중복 확인을 해주세요.");
-
-    // 4. 생일 형식 체크 (간단)
     if(birthdate.length !== 4) return alert("생일은 4자리 숫자(MMDD)로 입력해주세요.");
 
     const res = await fetch(`${API}/signup`, {
@@ -96,46 +95,62 @@ async function handleSignup() {
 
     if(res.ok) { 
         alert("가입 신청 완료!\n관리자 승인 후 이용 가능합니다."); 
-        location.href='login.html'; 
+        location.href='index.html'; 
     }
     else alert((await res.json()).detail);
 }
 
-// 로그인 요청 (기존 유지)
+// 로그인 요청
 async function handleLogin() {
     const username = document.getElementById('login-id').value;
     const password = document.getElementById('login-pw').value;
-    const res = await fetch(`${API}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if(res.ok) { 
-        sessionStorage.setItem('nickname', data.nickname); 
-        sessionStorage.setItem('username', data.username);
-        location.href='home.html'; 
+    
+    try {
+        const res = await fetch(`${API}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        
+        if(res.ok) { 
+            // dice_game.js와 통일하기 위해 localStorage 사용 및 access_token 저장
+            localStorage.setItem('access_token', data.access_token || data.username); 
+            localStorage.setItem('nickname', data.nickname); 
+            localStorage.setItem('username', data.username);
+            location.href='home.html'; 
+        } else {
+            alert(data.detail);
+        }
+    } catch(e) {
+        alert("로그인 중 오류가 발생했습니다.");
     }
-    else alert(data.detail);
 }
 
-// 비밀번호 초기화 요청 (생일 추가)
-async function handleReset() {
-    const username = document.getElementById('reset-id').value;
-    const birthdate = document.getElementById('reset-birth').value;
-    const password = document.getElementById('reset-pw').value;
-    
-    if(!username || !birthdate || !password) return alert("모든 정보를 입력해주세요.");
-
-    const res = await fetch(`${API}/reset-request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, birthdate })
-    });
-    
-    if(res.ok) { 
-        alert("비밀번호 변경 요청 완료!\n관리자 승인을 기다려주세요."); 
-        location.href='login.html'; 
+// 로그인 상태 체크 함수 (dice_game.js에서 호출)
+function checkAuth() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        alert("로그인이 필요합니다.");
+        location.href = 'index.html';
+        return false;
     }
-    else alert((await res.json()).detail);
+    return true;
 }
+
+// 유저 정보 가져오기 함수 (dice_game.js에서 호출)
+function getCurrentUser() {
+    return {
+        username: localStorage.getItem('username'),
+        nickname: localStorage.getItem('nickname')
+    };
+}
+
+// 전역 스코프에 할당하여 다른 JS 파일 및 HTML에서 접근 가능하게 함
+window.checkAuth = checkAuth;
+window.getCurrentUser = getCurrentUser;
+window.handleLogin = handleLogin;
+window.handleSignup = handleSignup;
+window.checkId = checkId;
+window.checkNick = checkNick;
+window.resetCheck = resetCheck;

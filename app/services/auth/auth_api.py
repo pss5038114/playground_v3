@@ -91,6 +91,7 @@ async def signup(user: AuthModel):
         return {"message": "성공"}
     finally: conn.close()
 
+# [수정된 login 함수]
 @router.post("/login")
 async def login(user: AuthModel):
     conn = get_db_connection()
@@ -105,7 +106,9 @@ async def login(user: AuthModel):
         elif row["status"] == "pending_reset": msg = "비밀번호 변경 승인 대기 중입니다."
         raise HTTPException(status_code=403, detail=msg)
     
+    # [중요] access_token을 포함하여 반환합니다.
     return {
+        "access_token": row["username"],  # 임시 토큰으로 username 사용
         "nickname": row["nickname"],
         "username": row["username"]
     }
