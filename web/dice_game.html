@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dice Defense - Playground V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/auth.js"></script>
+    </head>
+<body class="bg-gray-900 text-white h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-gray-800 p-4 flex justify-between items-center shadow-md z-10">
+        <h1 class="text-xl font-bold text-yellow-400 tracking-wider">🎲 Dice Defense</h1>
+        <div class="flex items-center space-x-3">
+            <span id="user-nickname" class="text-sm text-gray-300">Loading...</span>
+            <button onclick="GameApp.exitGame()" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-xs">
+                나가기
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden bg-gray-950">
+        
+        <section id="view-shop" class="game-view w-full h-full p-4 overflow-y-auto hidden">
+            <h2 class="text-2xl font-bold mb-4 text-green-400">상점</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h3 class="font-bold">일일 상자</h3>
+                    <p class="text-xs text-gray-400 mb-2">무료 보상</p>
+                    <button class="w-full bg-blue-600 py-2 rounded text-sm">받기</button>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 opacity-50">
+                    <h3 class="font-bold">전설 상자</h3>
+                    <p class="text-xs text-gray-400 mb-2">500 보석</p>
+                    <button class="w-full bg-yellow-600 py-2 rounded text-sm">구매</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-deck" class="game-view w-full h-full p-4 overflow-y-auto hidden">
+            <h2 class="text-2xl font-bold mb-4 text-purple-400">내 덱 & 주사위</h2>
+            <div class="flex justify-between mb-6 bg-gray-900 p-3 rounded-xl border border-gray-700">
+                <div class="w-12 h-12 bg-red-900 rounded border border-red-500 flex items-center justify-center text-xs">불</div>
+                <div class="w-12 h-12 bg-blue-900 rounded border border-blue-500 flex items-center justify-center text-xs">얼음</div>
+                <div class="w-12 h-12 bg-gray-700 rounded border border-dashed border-gray-500"></div>
+                <div class="w-12 h-12 bg-gray-700 rounded border border-dashed border-gray-500"></div>
+                <div class="w-12 h-12 bg-gray-700 rounded border border-dashed border-gray-500"></div>
+            </div>
+            
+            <h3 class="text-lg font-bold mb-2">보유 주사위 목록</h3>
+            <div class="grid grid-cols-4 gap-2">
+                <div class="aspect-square bg-gray-800 rounded hover:bg-gray-700 cursor-pointer border border-gray-600"></div>
+                <div class="aspect-square bg-gray-800 rounded hover:bg-gray-700 cursor-pointer border border-gray-600"></div>
+                <div class="aspect-square bg-gray-800 rounded hover:bg-gray-700 cursor-pointer border border-gray-600"></div>
+            </div>
+        </section>
+
+        <section id="view-play" class="game-view w-full h-full flex flex-col items-center justify-center relative">
+            <div class="absolute inset-0 opacity-20 bg-[url('/web/assets/bg_pattern.png')]"></div>
+            
+            <div class="z-10 text-center space-y-6">
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-600 w-64">
+                    <h2 class="text-xl font-bold mb-2 text-yellow-300">대전 모드 (PVP)</h2>
+                    <p class="text-sm text-gray-400 mb-4">트로피를 걸고 싸우세요!</p>
+                    <button id="btn-start-pvp" class="w-full bg-gradient-to-r from-yellow-600 to-red-600 py-3 rounded-full font-bold shadow-lg transform active:scale-95 transition">
+                        전투 시작
+                    </button>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-600 w-64">
+                    <h2 class="text-xl font-bold mb-2 text-blue-300">협동 모드 (Co-op)</h2>
+                    <p class="text-sm text-gray-400 mb-4">친구와 함께 막아내세요.</p>
+                    <button id="btn-start-coop" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 py-3 rounded-full font-bold shadow-lg transform active:scale-95 transition">
+                        빠른 시작
+                    </button>
+                </div>
+            </div>
+
+            <div id="game-canvas-container" class="absolute inset-0 bg-black hidden z-50 flex flex-col">
+                <div class="h-12 bg-gray-900 flex justify-between items-center px-4 text-xs">
+                    <span>Wave: <b id="game-wave" class="text-yellow-400">1</b></span>
+                    <span>SP: <b id="game-sp" class="text-blue-400">100</b></span>
+                    <span>Lives: <b id="game-lives" class="text-red-400">3</b></span>
+                </div>
+                <canvas id="gameCanvas" class="flex-1 w-full h-full bg-gray-800"></canvas>
+                <div class="h-24 bg-gray-900 border-t border-gray-700 flex items-center justify-center space-x-4">
+                    <button onclick="GameApp.spawnDice()" class="w-20 h-16 bg-blue-600 rounded-lg font-bold text-white shadow active:bg-blue-700">
+                        소환<br><span class="text-xs">10 SP</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-social" class="game-view w-full h-full p-4 overflow-y-auto hidden">
+            <h2 class="text-2xl font-bold mb-4 text-pink-400">소셜 & 이벤트</h2>
+            <div class="space-y-4">
+                <div class="bg-gray-800 p-4 rounded border border-gray-700">
+                    <h3 class="font-bold">친구 목록</h3>
+                    <p class="text-center text-gray-500 py-4">접속 중인 친구가 없습니다.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <nav class="bg-gray-800 h-16 flex justify-around items-center border-t border-gray-700 z-20">
+        <button onclick="GameApp.switchTab('shop')" class="nav-btn flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-white hover:bg-gray-700 transition" data-target="view-shop">
+            <span class="text-xl">🛒</span>
+            <span class="text-[10px] mt-1">상점</span>
+        </button>
+        <button onclick="GameApp.switchTab('deck')" class="nav-btn flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-white hover:bg-gray-700 transition" data-target="view-deck">
+            <span class="text-xl">🎴</span>
+            <span class="text-[10px] mt-1">덱</span>
+        </button>
+        <button onclick="GameApp.switchTab('play')" class="nav-btn flex flex-col items-center justify-center w-full h-full text-yellow-400 bg-gray-700 border-t-2 border-yellow-400" data-target="view-play">
+            <span class="text-2xl">⚔️</span>
+            <span class="text-[10px] mt-1 font-bold">전투</span>
+        </button>
+        <button onclick="GameApp.switchTab('social')" class="nav-btn flex flex-col items-center justify-center w-full h-full text-gray-400 hover:text-white hover:bg-gray-700 transition" data-target="view-social">
+            <span class="text-xl">👥</span>
+            <span class="text-[10px] mt-1">소셜</span>
+        </button>
+    </nav>
+
+    <script src="js/dice_game.js"></script>
+</body>
+</html>
