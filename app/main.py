@@ -14,11 +14,12 @@ from app.services.mail.mail_api import router as mail_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 서버 시작 시 DB 초기화 및 티커 실행
+    print("--------------------------------------------------")
+    print("✅ 서버가 정상적으로 재시작되었습니다! (버전 확인용)")
+    print("--------------------------------------------------")
     init_db()
     task = asyncio.create_task(ticker.start())
     yield
-    # 서버 종료 시 티커 중지
     task.cancel()
 
 app = FastAPI(title="Playground V3", lifespan=lifespan)
@@ -31,11 +32,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# [중요] API 라우터를 먼저 등록해야 405 에러가 발생하지 않습니다!
+# [디버깅용] 서버 생존 확인용 API
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "message": "Server is running!"}
+
+# -----------------------------------------------------------
+# [중요] API 라우터를 반드시 먼저 등록해야 합니다. (순서 엄수)
+# -----------------------------------------------------------
 app.include_router(auth_router, prefix="/api/auth")
 app.include_router(mail_router, prefix="/api/mail")
 app.include_router(dice_router, prefix="/api/dice")
 
-# [중요] 정적 파일(웹 화면) 마운트는 API 등록 후 가장 마지막에 해야 합니다.
+# -----------------------------------------------------------
+# [중요] 정적 파일(웹 화면) 마운트는 모든 API 등록이 끝난 '맨 마지막'에 합니다.
+# -----------------------------------------------------------
 if os.path.exists("web"):
     app.mount("/", StaticFiles(directory="web", html=True), name="web")

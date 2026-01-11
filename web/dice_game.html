@@ -19,13 +19,11 @@
 
         #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
         
-        /* 등급별 텍스트 컬러 */
         .text-Common { color: #94a3b8; }
         .text-Rare { color: #3b82f6; }
         .text-Hero { color: #a855f7; }
         .text-Legend { color: #eab308; }
         
-        /* 등급별 카드 배경 테두리 */
         .border-Common { border-color: #e2e8f0; }
         .border-Rare { border-color: #bfdbfe; }
         .border-Hero { border-color: #e9d5ff; }
@@ -54,7 +52,6 @@
     <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
         
         <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-6">
-            
             <div class="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="font-bold text-slate-800 text-lg">🎲 주사위 소환</h3>
@@ -113,7 +110,6 @@
                     <h4 class="text-xs font-bold text-slate-500">전체 주사위 목록</h4>
                     <button onclick="fetchDiceList()" class="text-[10px] text-blue-500"><i class="fas fa-sync-alt"></i> 새로고침</button>
                 </div>
-                
                 <div id="dice-list-container" class="space-y-3">
                     <div class="text-center py-10 text-slate-400 text-sm">로딩 중...</div>
                 </div>
@@ -183,7 +179,6 @@
         const API_DICE = "/api/dice";
         const myId = sessionStorage.getItem('username');
 
-        // 주사위 에셋 매핑 (이모지 및 색상)
         const DICE_ASSETS = {
             "fire": { icon: "🔥", color: "text-red-500" },
             "electric": { icon: "⚡", color: "text-yellow-500" },
@@ -196,10 +191,27 @@
             "adapt": { icon: "🎭", color: "text-pink-500" },
             "typhoon": { icon: "🌀", color: "text-indigo-500" }
         };
-
         const RARITY_MAP = { "Common": "일반", "Rare": "희귀", "Hero": "영웅", "Legend": "전설" };
 
-        // --- 탭 전환 로직 ---
+        // [디버깅] 초기화 및 헬스 체크
+        window.onload = async function() {
+            if(!myId) { 
+                alert("로그인이 필요합니다."); 
+                location.href='index.html'; 
+                return; 
+            }
+            
+            // 헬스 체크
+            try {
+                const health = await fetch('/api/health');
+                console.log("Health Check:", health.status, await health.json());
+            } catch(e) {
+                console.error("Health Check Failed:", e);
+            }
+
+            fetchMyResources();
+        };
+
         function switchTab(name) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.getElementById(`tab-${name}`).classList.add('active');
@@ -213,7 +225,6 @@
             if(name === 'deck') fetchDiceList();
         }
 
-        // --- 재화 관리 ---
         async function fetchMyResources() {
             if(!myId) return;
             try {
@@ -227,15 +238,34 @@
             } catch(e) {}
         }
 
+        // [수정] 디버깅 강화된 재화 추가 함수
         async function addResource(type, amount) {
-            const res = await fetch(`${API_AUTH}/add-resource`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: myId, type: type, amount: amount })
-            });
-            if(res.ok) { fetchMyResources(); alert(`지급 완료!`); }
+            try {
+                const url = `${API_AUTH}/add-resource`;
+                console.log(`Sending POST to ${url}`);
+                
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myId, type: type, amount: amount })
+                });
+
+                if(res.ok) {
+                    const data = await res.json();
+                    alert(`✅ 지급 완료! (현재: ${data.current_value})`);
+                    fetchMyResources(); 
+                } else {
+                    // 에러 발생 시 상세 내용 표시
+                    const errorText = await res.text();
+                    alert(`❌ 오류 발생 (${res.status}): ${errorText.substring(0, 100)}`);
+                    console.error("API Error:", res.status, errorText);
+                }
+            } catch(e) { 
+                alert("❌ 서버 통신 실패 (네트워크/CORB 이슈)");
+                console.error(e); 
+            }
         }
 
-        // --- 가챠 시스템 ---
         async function pullGacha(count) {
             if(!confirm(`티켓 ${count}장을 사용하여 소환하시겠습니까?`)) return;
             try {
@@ -243,13 +273,14 @@
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ username: myId, draw_count: count })
                 });
-                const data = await res.json();
                 
                 if(res.ok) {
-                    fetchMyResources(); // 재화 갱신
+                    const data = await res.json();
+                    fetchMyResources(); 
                     showGachaResults(data.results);
                 } else {
-                    alert(data.detail);
+                    const errorText = await res.text();
+                    alert(`❌ 가챠 실패 (${res.status}): ${errorText}`);
                 }
             } catch(e) { alert("서버 오류"); }
         }
@@ -259,12 +290,12 @@
             grid.innerHTML = "";
             results.forEach((item, index) => {
                 const asset = DICE_ASSETS[item.id] || { icon: "🎲", color: "text-slate-500" };
-                const delay = index * 0.1; // 순차적 애니메이션
+                const delay = index * 0.1;
                 
                 const el = document.createElement('div');
                 el.className = `bg-white rounded-xl p-3 flex flex-col items-center justify-center aspect-square shadow-lg border-2 border-${item.rarity} animate-fade-in`;
                 el.style.animationDelay = `${delay}s`;
-                el.style.opacity = '0'; // 애니메이션 시작 전 숨김
+                el.style.opacity = '0';
                 el.style.animation = `popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) ${delay}s forwards`;
                 
                 el.innerHTML = `
@@ -282,24 +313,26 @@
             document.getElementById('gacha-modal').classList.add('hidden');
         }
 
-        // --- 덱/인벤토리 ---
         async function fetchDiceList() {
             const container = document.getElementById('dice-list-container');
             try {
                 const res = await fetch(`${API_DICE}/list/${myId}`);
-                if(!res.ok) throw new Error();
+                if(!res.ok) throw new Error(await res.text());
                 const list = await res.json();
                 
+                if(list.length === 0) {
+                    container.innerHTML = `<div class="text-center text-slate-400 p-4">보유한 주사위가 없습니다.</div>`;
+                    return;
+                }
+
                 container.innerHTML = list.map(dice => {
                     const asset = DICE_ASSETS[dice.id] || { icon: "🎲", color: "text-slate-500" };
                     const isLocked = dice.level === 0;
                     
-                    // 상태별 버튼 및 게이지
                     let actionBtn = "";
                     let progressHtml = "";
                     
                     if (isLocked) {
-                        // 미해금 상태
                         if(dice.can_upgrade) {
                             actionBtn = `<button onclick="upgradeDice('${dice.id}')" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black w-24">잠금 해제</button>`;
                         } else {
@@ -307,7 +340,6 @@
                         }
                         progressHtml = `<div class="text-[10px] text-slate-400">필요 카드: ${dice.card_count}/${dice.req_card}</div>`;
                     } else {
-                        // 보유 상태
                         const progressPercent = Math.min(100, (dice.card_count / dice.req_card) * 100);
                         progressHtml = `
                             <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-1 relative">
@@ -344,7 +376,8 @@
                 }).join('');
                 
             } catch(e) {
-                container.innerHTML = `<div class="text-center text-red-400 p-4">로드 실패</div>`;
+                console.error(e);
+                container.innerHTML = `<div class="text-center text-red-400 p-4">로드 실패: ${e.message}</div>`;
             }
         }
 
@@ -356,22 +389,14 @@
                 });
                 const data = await res.json();
                 if(res.ok) {
-                    // alert(data.message); // 너무 자주 뜨면 귀찮으므로 생략 가능
                     fetchMyResources();
-                    fetchDiceList(); // 리스트 갱신
+                    fetchDiceList(); 
                 } else {
                     alert(data.detail);
                 }
             } catch(e) { alert("오류 발생"); }
         }
 
-        // --- 초기화 ---
-        window.onload = function() {
-            if(!myId) { location.href='index.html'; return; }
-            fetchMyResources();
-        };
-
-        // CSS 애니메이션 추가
         const style = document.createElement('style');
         style.innerHTML = `
             @keyframes popIn { 
@@ -381,8 +406,6 @@
         `;
         document.head.appendChild(style);
 
-        // --- 게임 로직 (웹소켓) ---
-        // (기존 코드 유지)
         let socket = null;
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -394,7 +417,7 @@
             document.getElementById('game-ui-overlay').style.display = 'flex';
             
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/api/dice/ws/game/${sessionId}`; // 경로 수정됨
+            const wsUrl = `${protocol}//${window.location.host}/api/dice/ws/game/${sessionId}`;
             
             socket = new WebSocket(wsUrl);
             socket.onopen = () => { console.log("Connected"); socket.send(JSON.stringify({ type: "JOIN", mode: mode })); };
