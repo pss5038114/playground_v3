@@ -14,16 +14,19 @@ from app.services.mail.mail_api import router as mail_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 서버 시작 시 DB 초기화 및 티커 실행
     print("--------------------------------------------------")
-    print("✅ 서버가 정상적으로 재시작되었습니다! (버전 확인용)")
+    print("🚀 Playground V3 백엔드 서버 시작")
     print("--------------------------------------------------")
     init_db()
     task = asyncio.create_task(ticker.start())
     yield
+    # 서버 종료 시 티커 중지
     task.cancel()
 
 app = FastAPI(title="Playground V3", lifespan=lifespan)
 
+# CORS 설정: Cloudflare Pages(프론트)에서 Tunnel(백엔드)로의 접근을 허용합니다.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,14 +41,14 @@ async def health_check():
     return {"status": "ok", "message": "Server is running!"}
 
 # -----------------------------------------------------------
-# [중요] API 라우터를 반드시 먼저 등록해야 합니다. (순서 엄수)
+# [중요] API 라우터 등록 (기존 모든 라우터 유지)
 # -----------------------------------------------------------
 app.include_router(auth_router, prefix="/api/auth")
 app.include_router(mail_router, prefix="/api/mail")
 app.include_router(dice_router, prefix="/api/dice")
 
 # -----------------------------------------------------------
-# [중요] 정적 파일(웹 화면) 마운트는 모든 API 등록이 끝난 '맨 마지막'에 합니다.
+# [중요] 정적 파일 마운트는 맨 마지막에 위치해야 합니다.
 # -----------------------------------------------------------
 if os.path.exists("web"):
     app.mount("/", StaticFiles(directory="web", html=True), name="web")

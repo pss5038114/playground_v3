@@ -1,3 +1,4 @@
+# app/services/auth/auth_api.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Any
@@ -66,19 +67,14 @@ async def signup(user: AuthModel):
     if not (4 <= len(user.username) <= 15): raise HTTPException(status_code=400, detail="아이디 길이 오류")
     if not (1 <= len(user.nickname) <= 15): raise HTTPException(status_code=400, detail="닉네임 길이 오류")
     if not re.match(r"^\d{4}$", user.birthdate): raise HTTPException(status_code=400, detail="생일 형식 오류")
-
     conn = get_db_connection()
     try:
         exist_id = conn.execute("SELECT id FROM users WHERE username = ?", (user.username,)).fetchone()
         if exist_id: raise HTTPException(status_code=400, detail="이미 존재하는 ID입니다.")
-        
         exist_nick = conn.execute("SELECT id FROM users WHERE nickname = ?", (user.nickname,)).fetchone()
         if exist_nick: raise HTTPException(status_code=400, detail="이미 존재하는 닉네임입니다.")
-
-        conn.execute(
-            "INSERT INTO users (username, password_hash, nickname, birthdate, status) VALUES (?, ?, ?, ?, 'pending_signup')",
-            (user.username, hash_password(user.password), user.nickname, user.birthdate)
-        )
+        conn.execute("INSERT INTO users (username, password_hash, nickname, birthdate, status) VALUES (?, ?, ?, ?, 'pending_signup')",
+                    (user.username, hash_password(user.password), user.nickname, user.birthdate))
         conn.commit()
         return {"message": "성공"}
     finally: conn.close()
@@ -88,7 +84,6 @@ async def login(user: AuthModel):
     conn = get_db_connection()
     row = conn.execute("SELECT * FROM users WHERE username = ?", (user.username,)).fetchone()
     conn.close()
-    
     if not row or not verify_password(user.password, row["password_hash"]):
         raise HTTPException(status_code=400, detail="ID/PW 불일치")
     if row["status"] != "active":
@@ -96,11 +91,7 @@ async def login(user: AuthModel):
         if row["status"] == "pending_deletion": msg = "탈퇴 처리 대기 중입니다."
         elif row["status"] == "pending_reset": msg = "비밀번호 변경 승인 대기 중입니다."
         raise HTTPException(status_code=403, detail=msg)
-    
-    return {
-        "nickname": row["nickname"],
-        "username": row["username"]
-    }
+    return {"nickname": row["nickname"], "username": row["username"]}
 
 @router.post("/reset-request")
 async def reset_request(user: AuthModel):
@@ -108,7 +99,6 @@ async def reset_request(user: AuthModel):
     try:
         row = conn.execute("SELECT * FROM users WHERE username = ? AND birthdate = ?", (user.username, user.birthdate)).fetchone()
         if not row: raise HTTPException(status_code=404, detail="정보 불일치")
-        
         conn.execute("UPDATE users SET status = 'pending_reset', pending_password_hash = ? WHERE username = ?",
                     (hash_password(user.password), user.username))
         conn.commit()
@@ -119,7 +109,6 @@ async def reset_request(user: AuthModel):
 @router.get("/profile/{username}")
 async def get_profile(username: str):
     conn = get_db_connection()
-    # [수정] 재화 정보 포함
     row = conn.execute("SELECT nickname, birthdate, profile_image, gems, gold, tickets FROM users WHERE username = ?", (username,)).fetchone()
     conn.close()
     if not row: raise HTTPException(status_code=404, detail="유저 없음")
@@ -130,16 +119,12 @@ async def update_profile(data: ProfileUpdateModel):
     conn = get_db_connection()
     try:
         if data.nickname:
-            if not (1 <= len(data.nickname) <= 15): 
-                raise HTTPException(status_code=400, detail="닉네임은 1~15자여야 합니다.")
+            if not (1 <= len(data.nickname) <= 15): raise HTTPException(status_code=400, detail="닉네임 길이 오류")
             exist = conn.execute("SELECT username FROM users WHERE nickname = ?", (data.nickname,)).fetchone()
-            if exist and exist['username'] != data.username:
-                raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
+            if exist and exist['username'] != data.username: raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
             conn.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
-
         if data.profile_image:
             conn.execute("UPDATE users SET profile_image = ? WHERE username = ?", (data.profile_image, data.username))
-
         conn.commit()
         return {"message": "업데이트 완료"}
     finally: conn.close()
@@ -150,32 +135,22 @@ async def add_resource(data: ResourceAddModel):
     conn = get_db_connection()
     try:
         col_map = {'gem': 'gems', 'gold': 'gold', 'ticket': 'tickets'}
-        if data.type not in col_map:
-            raise HTTPException(status_code=400, detail="잘못된 재화 타입")
-        
+        if data.type not in col_map: raise HTTPException(status_code=400, detail="잘못된 재화 타입")
         target_col = col_map[data.type]
         conn.execute(f"UPDATE users SET {target_col} = {target_col} + ? WHERE username = ?", (data.amount, data.username))
         conn.commit()
-        
         row = conn.execute(f"SELECT {target_col} FROM users WHERE username = ?", (data.username,)).fetchone()
         return {"message": "지급 완료", "current_value": row[0]}
-    finally:
-        conn.close()
+    finally: conn.close()
 
 @router.post("/change-password")
 async def change_password(data: PasswordChangeModel):
     conn = get_db_connection()
     try:
         user = conn.execute("SELECT * FROM users WHERE username = ?", (data.username,)).fetchone()
-        if not user or not verify_password(data.old_password, user["password_hash"]):
-            raise HTTPException(status_code=400, detail="현재 비밀번호 불일치")
-        if user["birthdate"] != data.birthdate:
-            raise HTTPException(status_code=400, detail="생일 불일치")
-
-        conn.execute(
-            "UPDATE users SET password_hash = ? WHERE username = ?",
-            (hash_password(data.new_password), data.username)
-        )
+        if not user or not verify_password(data.old_password, user["password_hash"]): raise HTTPException(status_code=400, detail="비밀번호 불일치")
+        if user["birthdate"] != data.birthdate: raise HTTPException(status_code=400, detail="생일 불일치")
+        conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(data.new_password), data.username))
         conn.commit()
         return {"message": "성공"}
     finally: conn.close()
@@ -213,22 +188,14 @@ async def approve_user(user_id: int, action: str, admin_key: str):
         row = conn.execute("SELECT status FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row: return {"message": "유저 없음"}
         status = row["status"]
-
         if action == "approve":
-            if status == "pending_signup":
-                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
-            elif status == "pending_reset":
-                conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
-            elif status == "pending_deletion":
-                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        else: # Reject
-            if status == "pending_signup":
-                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-            elif status == "pending_reset":
-                conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
-            elif status == "pending_deletion":
-                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,)) # 탈퇴 취소
-
+            if status == "pending_signup": conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
+            elif status == "pending_reset": conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
+            elif status == "pending_deletion": conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        else:
+            if status == "pending_signup": conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            elif status == "pending_reset": conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
+            elif status == "pending_deletion": conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
         conn.commit()
     finally: conn.close()
     return {"message": "완료"}

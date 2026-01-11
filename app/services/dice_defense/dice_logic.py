@@ -1,6 +1,6 @@
 # app/services/dice_defense/dice_logic.py
 import random
-# [수정] dice 폴더 안의 dice_data를 바라보도록 경로 변경
+# [수정] 폴더 구조에 맞춰 정확한 경로 설정
 from app.services.dice_defense.dice.dice_data import DICE_DATA, GACHA_PROBABILITY
 
 def execute_gacha(draw_count: int):
@@ -14,7 +14,7 @@ def execute_gacha(draw_count: int):
     
     results = []
     
-    # 확률 테이블 준비 (Key: Rarity, Weight: Probability)
+    # 확률 테이블 준비
     rarities = list(GACHA_PROBABILITY.keys())
     weights = list(GACHA_PROBABILITY.values())
     
