@@ -54,7 +54,8 @@ async def get_my_dice_list(username: str):
                 "rarity": info["rarity"],
                 "color": info["color"],
                 "desc": info["desc"],
-                "stats": info.get("stats", {}), # [추가] 스탯 데이터 포함
+                "symbol": info.get("symbol", "fa-dice-d6"),
+                "stats": info.get("stats", {}),
                 "class_level": 0,
                 "quantity": 0
             }

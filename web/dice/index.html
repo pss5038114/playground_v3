@@ -244,25 +244,22 @@
             const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
             const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
             
-            // [NEW] 배경 심볼 (기본값 fa-dice-d6)
+            // 데이터가 없으면 기본값
             const symbolIcon = dice.symbol || "fa-dice-d6";
             
-            // 심볼 크기 조정 (sizeClass에 따라 유동적으로 하면 좋지만, 일단 w-10기준 text-xl 정도)
-            // sizeClass가 "w-16 h-16"(팝업용)이면 아이콘도 커져야 하므로 % 단위를 쓰거나 클래스를 분기합니다.
-            // 여기서는 간편하게 flex 컨테이너 안에서 font-size를 상속받거나 rem 단위를 씁니다.
-            
-            // 배경 아이콘 스타일: 중앙 정렬, 연한 회색, 눈금보다 뒤에 위치(z-0)
+            // [수정] 배경 아이콘 크기 키움 (opacity-40 -> opacity-30 은은하게 조정)
+            // sizeClass가 커질 때(팝업 등) 아이콘도 커지도록 폰트 사이즈를 상속받게 하거나,
+            // 여기서는 간단히 w-12(48px) 기준 꽉 차 보이는 text-3xl(30px)을 적용합니다.
             const bgSymbolHtml = `
-                <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 text-slate-300 z-0">
-                    <i class="fas ${symbolIcon} text-[60%]"></i> 
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0">
+                    <i class="fas ${symbolIcon} text-3xl"></i> 
                 </div>
             `;
-            // text-[60%] : 부모 컨테이너 크기의 60% 크기로 폰트 사이즈 설정 (Tailwind JIT 필요, 안되면 text-2xl 등 고정값 사용)
-            // 만약 text-[60%]가 안 먹히면 style="font-size: 1.5rem;" 등으로 대체 가능.
 
             return `
-            <div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses} text-4xl" style="${customStyle}">
-                ${bgSymbolHtml} <div class="dice-content w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm z-10"></div>
+            <div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses}" style="${customStyle}">
+                ${bgSymbolHtml}
+                <div class="dice-content w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm z-10"></div>
             </div>
             `;
         }
@@ -326,8 +323,10 @@
             document.getElementById('popup-dice-rarity').innerText = dice.rarity;
             document.getElementById('popup-dice-class').innerText = dice.class_level > 0 ? `Lv.${dice.class_level}` : "미보유";
             
-            // [변경] 팝업 내 아이콘도 동일한 디자인 적용
-            document.getElementById('popup-dice-icon-container').innerHTML = renderDiceIcon(dice, "w-16 h-16 text-3xl"); // text-3xl은 제거해도 됨
+            let iconHtml = renderDiceIcon(dice, "w-16 h-16");
+            iconHtml = iconHtml.replace("text-3xl", "text-5xl"); // 팝업용 사이즈업
+            
+            document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
             // ... (업그레이드 로직 및 UI 갱신 코드는 이전과 동일) ...
             
