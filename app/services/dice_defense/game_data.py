@@ -104,7 +104,7 @@ DICE_DATA = {
     
     # [Legend]
     "typhoon": {
-        "name": "Typhoon", "rarity": "Legend", "color": "bg-teal-700", "symbol": "fa-tornado", "desc": "일정 시간 동안 변신하여 폭풍 공격을 합니다.",
+        "name": "Typhoon", "rarity": "Legend", "color": "bg-teal-700", "symbol": "fa-hurricane", "desc": "일정 시간 동안 변신하여 폭풍 공격을 합니다.",
         "stats": {
             "atk": {"base": 20, "c": 0, "p": 30},
             "speed": {"base": 0.6, "c": -0.02, "p": 0},
