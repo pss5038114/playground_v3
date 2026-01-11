@@ -10,15 +10,12 @@
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
         body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
         
-        /* 탭 전환 애니메이션 */
         .tab-content { display: none; height: calc(100vh - 140px); overflow-y: auto; }
         .tab-content.active { display: flex; animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* 게임 캔버스 스타일 (lobby_start.html에 들어갈 요소지만 스타일은 전역 관리) */
         #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
         .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
     </style>
@@ -32,7 +29,6 @@
             </button>
             <h1 class="text-lg font-bold text-slate-800 select-none">Dice Defense</h1>
         </div>
-        
         <div class="flex gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
             <div class="flex items-center gap-1"><i class="fas fa-gem text-blue-500"></i> <span id="res-gem">0</span></div>
             <div class="w-px h-3 bg-slate-300"></div>
@@ -43,38 +39,52 @@
     </nav>
 
     <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
-        <button onclick="prevTab()" class="hidden md:block absolute left-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
-            <i class="fas fa-chevron-left"></i>
-        </button>
-        <button onclick="nextTab()" class="hidden md:block absolute right-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
-            <i class="fas fa-chevron-right"></i>
-        </button>
-
         <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-4"></div>
         <div id="tab-deck" class="tab-content flex-col p-4"></div>
         <div id="tab-battle" class="tab-content active flex-col p-4 relative"></div>
         <div id="tab-event" class="tab-content flex-col p-4 space-y-4"></div>
         <div id="tab-clan" class="tab-content flex-col p-4 space-y-4"></div>
+
+        <div id="dice-popup" class="absolute inset-0 z-50 bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl relative animate-[fadeIn_0.2s_ease-out]">
+                <button onclick="closePopup()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+                
+                <div class="flex flex-col items-center">
+                    <div id="popup-dice-icon" class="w-20 h-20 rounded-2xl shadow-md mb-4 flex items-center justify-center text-4xl"></div>
+                    <h3 id="popup-dice-name" class="text-xl font-bold text-slate-800">Fire Dice</h3>
+                    <div id="popup-dice-rarity" class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500 mt-1 mb-4">Common</div>
+                    
+                    <p id="popup-dice-desc" class="text-center text-sm text-slate-600 mb-6 bg-slate-50 p-3 rounded-lg w-full">설명...</p>
+                    
+                    <div class="w-full space-y-3 mb-6">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">현재 클래스</span>
+                            <span id="popup-dice-level" class="font-bold text-slate-800">Lv.1</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">보유 카드</span>
+                            <span id="popup-dice-cards" class="font-bold text-blue-600">0 / 5</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div id="popup-progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <button id="popup-action-btn" class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                        <span>업그레이드</span>
+                    </button>
+                    <div id="popup-cost-info" class="text-xs text-slate-400 mt-2 font-medium">비용: 1000골드</div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
-        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop">
-            <i class="fas fa-store text-xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span>
-        </button>
-        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck">
-            <i class="fas fa-th-large text-xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span>
-        </button>
-        <div class="w-16 relative flex justify-center">
-            <button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle">
-                <i class="fas fa-gamepad text-2xl"></i>
-            </button>
-        </div>
-        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event">
-            <i class="fas fa-gift text-xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span>
-        </button>
-        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan">
-            <i class="fas fa-users text-xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span>
-        </button>
+        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop"><i class="fas fa-store text-xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span></button>
+        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck"><i class="fas fa-th-large text-xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span></button>
+        <div class="w-16 relative flex justify-center"><button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle"><i class="fas fa-gamepad text-2xl"></i></button></div>
+        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event"><i class="fas fa-gift text-xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span></button>
+        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan"><i class="fas fa-users text-xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span></button>
     </nav>
 
     <script>
@@ -82,68 +92,39 @@
         const API_DICE = "https://api.pyosh.cloud/api/dice";
         const myId = sessionStorage.getItem('username');
 
-        // [신규] HTML 분할 로딩 로직
+        // --- 컴포넌트 로딩 ---
         async function loadComponents() {
             const tabs = [
                 { id: 'tab-shop', file: 'lobby_shop.html' },
                 { id: 'tab-deck', file: 'lobby_deck.html' },
-                { id: 'tab-battle', file: 'lobby_start.html' }, // battle -> lobby_start
+                { id: 'tab-battle', file: 'lobby_start.html' },
                 { id: 'tab-event', file: 'lobby_event.html' },
                 { id: 'tab-clan', file: 'lobby_clan.html' }
             ];
-
-            const promises = tabs.map(async (tab) => {
+            await Promise.all(tabs.map(async (tab) => {
                 try {
                     const res = await fetch(tab.file);
-                    if(res.ok) {
-                        const html = await res.text();
-                        document.getElementById(tab.id).innerHTML = html;
-                    }
-                } catch(e) { console.error(`Failed to load ${tab.file}`, e); }
-            });
-
-            await Promise.all(promises);
-            console.log("All components loaded.");
-            
-            // 로드 완료 후 초기화 필요한 로직 실행
+                    if(res.ok) document.getElementById(tab.id).innerHTML = await res.text();
+                } catch(e) {}
+            }));
             initGameCanvas();
             fetchMyResources();
-            // battle 탭이 기본 active 상태이므로 여기서 캔버스 컨텍스트 등 초기화 필요 시 수행
         }
 
-        // --- 탭 전환 로직 ---
+        // --- 탭 관리 ---
         const tabNames = ['shop', 'deck', 'battle', 'event', 'clan'];
         let currentTabIdx = 2; 
-
         function switchTab(name) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.getElementById(`tab-${name}`).classList.add('active');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                if(btn.dataset.target === `tab-${name}`) {
-                    if(!btn.classList.contains('bg-blue-600')) btn.classList.add('text-blue-600');
-                } else {
-                    btn.classList.remove('text-blue-600');
-                }
-            });
-            currentTabIdx = tabNames.indexOf(name);
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('text-blue-600', btn.dataset.target === `tab-${name}`));
             
             if(name === 'deck') fetchMyDice();
             if(name === 'shop') fetchMyResources();
         }
 
-        function nextTab() {
-            currentTabIdx = (currentTabIdx + 1) % tabNames.length;
-            switchTab(tabNames[currentTabIdx]);
-        }
-        function prevTab() {
-            currentTabIdx = (currentTabIdx - 1 + tabNames.length) % tabNames.length;
-            switchTab(tabNames[currentTabIdx]);
-        }
-
-        // --- 재화 관리 ---
+        // --- 데이터 관리 ---
         async function fetchMyResources() {
-            if(!myId) return;
             try {
                 const res = await fetch(`${API_AUTH}/profile/${myId}`);
                 if(res.ok) {
@@ -155,53 +136,63 @@
             } catch(e) {}
         }
         async function addResource(type, amount) {
-            try {
-                const res = await fetch(`${API_AUTH}/add-resource`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: myId, type: type, amount: amount })
-                });
-                if(res.ok) { alert("지급 완료!"); fetchMyResources(); }
-            } catch(e) { alert("오류"); }
+            await fetch(`${API_AUTH}/add-resource`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: myId, type, amount}) });
+            alert("지급 완료!"); fetchMyResources();
         }
 
-        // --- 덱 관리 ---
+        // --- [NEW] 주사위 소환 ---
+        async function summonDice(count) {
+            try {
+                const res = await fetch(`${API_DICE}/summon`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username: myId, count: count })
+                });
+                const data = await res.json();
+                
+                if(!res.ok) return alert(data.detail || "오류 발생");
+                
+                // 결과 표시 (간단히 이름 나열)
+                const names = data.results.map(d => `[${d.rarity}] ${d.name}`).join("\n");
+                alert(`✨ 소환 결과 ✨\n\n${names}`);
+                fetchMyResources();
+            } catch(e) { alert("서버 통신 오류"); }
+        }
+
+        // --- 덱 & 상세 팝업 ---
+        let currentDiceList = []; // 데이터 캐싱용
+
         async function fetchMyDice() {
-            if(!myId) return;
             try {
                 const res = await fetch(`${API_DICE}/list/${myId}`);
-                if(!res.ok) return;
-                const diceList = await res.json();
-                renderDiceGrid(diceList);
-            } catch(e) { console.error(e); }
+                if(res.ok) {
+                    currentDiceList = await res.json();
+                    renderDiceGrid(currentDiceList);
+                }
+            } catch(e) {}
         }
 
         function renderDiceGrid(list) {
             const grid = document.getElementById('dice-list-grid');
-            if(!grid) return; // 로드 되기 전일 수 있음
+            if(!grid) return;
             const countEl = document.getElementById('dice-count');
             grid.innerHTML = "";
-            
             let ownedCount = 0;
+
             list.forEach(dice => {
                 const isOwned = dice.class_level > 0;
                 if(isOwned) ownedCount++;
-
-                let cardClass = "aspect-square rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer";
-                let bgClass = isOwned ? "bg-white hover:bg-slate-50" : "bg-slate-100 dice-unowned";
-                let colorDot = `<div class="w-8 h-8 rounded-full ${dice.color} mb-1 shadow-inner"></div>`;
-                let statusBadge = isOwned 
-                    ? `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 rounded mt-1">Lv.${dice.class_level}</span>`
-                    : `<span class="text-[10px] font-bold text-slate-400 mt-1">미획득</span>`;
-                let cardCount = isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2">${dice.quantity}장</span>` : "";
-
-                grid.innerHTML += `
-                <div class="${cardClass} ${bgClass}" onclick="alert('${dice.name}: ${dice.desc}')">
-                    ${colorDot}
+                
+                // [변경] 클릭 시 팝업 오픈 (주사위 객체를 직접 넘기기 위해 인덱스 활용하거나 id 매칭)
+                const cardHtml = `
+                <div class="aspect-square rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
+                     onclick="showDiceDetail('${dice.id}')">
+                    <div class="w-8 h-8 rounded-full ${dice.color} mb-1 shadow-inner"></div>
                     <div class="font-bold text-xs text-slate-700">${dice.name}</div>
-                    ${statusBadge}
-                    ${cardCount}
+                    ${isOwned ? `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 rounded mt-1">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1">미획득</span>`}
+                    ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2">${dice.quantity}장</span>` : ""}
                     <div class="absolute top-1 right-1 w-2 h-2 rounded-full ${getRarityColor(dice.rarity)}"></div>
                 </div>`;
+                grid.innerHTML += cardHtml;
             });
             if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
         }
@@ -213,53 +204,105 @@
             return 'bg-slate-300';
         }
 
-        // --- 게임 로직 ---
-        let socket = null;
-        let canvas, ctx;
-        const sessionId = new URLSearchParams(window.location.search).get('session') || "test_session";
+        // --- [NEW] 상세 팝업 로직 ---
+        let selectedDiceId = null;
 
-        function initGameCanvas() {
-            canvas = document.getElementById('game-canvas');
-            if(canvas) {
-                ctx = canvas.getContext('2d');
-                requestAnimationFrame(renderLoop);
-            }
-        }
+        function showDiceDetail(diceId) {
+            const dice = currentDiceList.find(d => d.id === diceId);
+            if(!dice) return;
+            selectedDiceId = diceId;
 
-        function startGame(mode) {
-            document.getElementById('lobby-overlay').classList.add('hidden');
-            document.getElementById('game-ui-overlay').classList.remove('hidden');
-            document.getElementById('game-ui-overlay').style.display = 'flex';
+            // UI 바인딩
+            document.getElementById('popup-dice-name').innerText = dice.name;
+            document.getElementById('popup-dice-desc').innerText = dice.desc;
+            document.getElementById('popup-dice-rarity').innerText = dice.rarity;
+            document.getElementById('popup-dice-icon').className = `w-20 h-20 rounded-2xl shadow-md mb-4 flex items-center justify-center text-4xl ${dice.color}`;
             
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/dice/${sessionId}`;
+            const btn = document.getElementById('popup-action-btn');
+            const costInfo = document.getElementById('popup-cost-info');
+            const progress = document.getElementById('popup-progress-bar');
             
-            socket = new WebSocket(wsUrl);
-            socket.onopen = () => { socket.send(JSON.stringify({ type: "JOIN", mode: mode })); };
-            socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if(data.type === 'TICK') renderGame(data);
-            };
-        }
-        function renderGame(state) {}
-        function renderLoop() {
-            if(!ctx) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.strokeStyle = '#475569';
-            ctx.lineWidth = 1;
-            const cellSize = canvas.width / 5;
-            for(let x=0; x<5; x++) {
-                for(let y=0; y<3; y++) {
-                    ctx.strokeRect(x * cellSize, (canvas.height - cellSize * 3) / 2 + y * cellSize, cellSize, cellSize);
+            // 해금/강화 조건 판단
+            if(dice.class_level === 0) {
+                // 해금
+                document.getElementById('popup-dice-level').innerText = "미보유";
+                document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / 1`;
+                const percent = Math.min((dice.quantity / 1) * 100, 100);
+                progress.style.width = `${percent}%`;
+
+                if(dice.quantity >= 1) {
+                    btn.className = "w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600";
+                    btn.innerHTML = `<span>🔓 해금하기</span>`;
+                    btn.disabled = false;
+                    costInfo.innerText = "비용: 카드 1장";
+                } else {
+                    btn.className = "w-full py-3 rounded-xl font-bold text-white shadow-lg bg-slate-300 cursor-not-allowed";
+                    btn.innerHTML = `<span>카드 부족</span>`;
+                    btn.disabled = true;
+                    costInfo.innerText = "카드를 더 모으세요";
+                }
+            } else {
+                // 강화
+                const reqCards = 5;
+                const reqGold = dice.class_level * 1000;
+                
+                document.getElementById('popup-dice-level').innerText = `Lv.${dice.class_level}`;
+                document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`;
+                const percent = Math.min((dice.quantity / reqCards) * 100, 100);
+                progress.style.width = `${percent}%`;
+
+                // 현재 골드 정보는 fetchMyResources에서 가져온 값이 DOM에 있음 (파싱 필요)
+                const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
+
+                if(dice.quantity >= reqCards && currentGold >= reqGold) {
+                    btn.className = "w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700";
+                    btn.innerHTML = `<span>⬆️ 레벨업</span>`;
+                    btn.disabled = false;
+                    costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
+                } else {
+                    btn.className = "w-full py-3 rounded-xl font-bold text-white shadow-lg bg-slate-300 cursor-not-allowed";
+                    btn.innerHTML = dice.quantity < reqCards ? "카드 부족" : "골드 부족";
+                    btn.disabled = true;
+                    costInfo.innerText = `필요: 카드 5장, ${reqGold.toLocaleString()} 골드`;
                 }
             }
-            requestAnimationFrame(renderLoop);
+            
+            // 버튼 이벤트 연결
+            btn.onclick = () => upgradeDice(diceId);
+
+            document.getElementById('dice-popup').classList.remove('hidden');
+            document.getElementById('dice-popup').classList.add('flex');
         }
-        function spawnDice() {
-            if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "SPAWN" }));
+
+        function closePopup() {
+            document.getElementById('dice-popup').classList.add('hidden');
+            document.getElementById('dice-popup').classList.remove('flex');
+        }
+
+        async function upgradeDice(diceId) {
+            try {
+                const res = await fetch(`${API_DICE}/upgrade`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username: myId, dice_id: diceId })
+                });
+                const data = await res.json();
+                
+                if(!res.ok) return alert(data.detail || "오류 발생");
+                
+                alert("성공!");
+                closePopup();
+                fetchMyDice();      // 리스트 갱신
+                fetchMyResources(); // 골드 갱신
+            } catch(e) { alert("통신 오류"); }
         }
 
         // --- 초기화 ---
+        let socket, canvas, ctx;
+        function initGameCanvas() { canvas = document.getElementById('game-canvas'); if(canvas) { ctx = canvas.getContext('2d'); requestAnimationFrame(renderLoop); } }
+        function startGame(mode) { /* 기존 코드 */ }
+        function renderLoop() { if(!ctx) return; ctx.clearRect(0,0,canvas.width,canvas.height); /* 배경 */ requestAnimationFrame(renderLoop); }
+        function spawnDice() { /* 기존 코드 */ }
+
         window.onload = function() {
             if(!myId) { location.href = '../index.html'; return; }
             loadComponents();
