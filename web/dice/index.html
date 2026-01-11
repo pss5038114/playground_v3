@@ -53,39 +53,29 @@
             z-index: 10;
         }
 
-        /* [수정] 전설 이펙트 (강력한 펄스 + 회전광) */
-        @keyframes legend-glow {
-            0% { box-shadow: 0 0 5px var(--pulse-color), inset 0 0 10px var(--pulse-color); border-color: white; }
-            50% { box-shadow: 0 0 20px var(--pulse-color), inset 0 0 20px var(--pulse-color); border-color: var(--pulse-color); }
-            100% { box-shadow: 0 0 5px var(--pulse-color), inset 0 0 10px var(--pulse-color); border-color: white; }
-        }
-        
-        /* 배경에서 은은하게 도는 빛 */
-        @keyframes legend-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .dice-pulse {
-            animation: legend-glow 2s infinite ease-in-out;
-            z-index: 5;
-        }
-        
-        /* 전설 등급 전용 배경 회전광 (선택사항) */
-        .dice-pulse::before {
-            content: "";
-            position: absolute;
-            top: -50%; left: -50%; width: 200%; height: 200%;
-            background: conic-gradient(from 0deg, transparent 0%, var(--pulse-color) 20%, transparent 40%);
-            animation: legend-spin 3s linear infinite;
-            opacity: 0.3;
-            z-index: 0;
-        }
-        
-        /* 내용물(눈금)은 배경 빛 위에 떠야 함 */
-        .dice-content {
-            position: relative;
-            z-index: 2;
+        /* [NEW] 전설 전용 스타일 (고급형) */
+        .dice-legend-style {
+            /* 1. 외곽선: 1px 실선 (JS에서 border-color 지정됨) */
+            border-width: 1px;
+            border-style: solid;
+            
+            /* 2. 복합 그림자 (순서 중요: 위에서부터 적용) */
+            box-shadow: 
+                /* (1) 가운데 얇은 선: 흰색 + 대표색의 90% 투명도 (약간의 틴트) */
+                inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+                
+                /* (2) 내부 선: 대표색 (변수로 처리) */
+                inset 0 0 0 2px var(--dice-color),
+                
+                /* (3) 기존 입체감 유지 (Highlight & Shadow) */
+                inset 0 2px 4px rgba(255, 255, 255, 0.8),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.05),
+                
+                /* (4) 외부 글로우: 작고 은은하게 */
+                0 0 6px -1px var(--dice-color),
+                
+                /* (5) 바닥 그림자 */
+                0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
         }
     </style>
 </head>
@@ -224,32 +214,44 @@
 
         // --- [NEW] 주사위 렌더링 헬퍼 ---
         function getDiceVisualClasses(dice) {
+            // 기본 보더 색상 (일반/희귀/영웅용)
             let borderColor = dice.color.replace('bg-', 'border-');
             if(dice.color.includes('gradient')) borderColor = 'border-slate-300';
 
-            // [변경] 모든 주사위에 광택 적용
+            // 효과 클래스
             let effectClasses = "dice-glossy"; 
-            let pulseStyle = "";
+            let customStyle = "";
             
+            // [전설 전용 처리]
             if (dice.rarity === 'Legend') {
-                effectClasses += " dice-pulse";
-                if(dice.id === 'typhoon') pulseStyle = "--pulse-color: #0f766e;"; // teal-700 hex
-                else pulseStyle = "--pulse-color: #fbbf24;"; // amber-400 hex
+                effectClasses += " dice-legend-style";
+                
+                // 전설 주사위 대표색 추출 (Typhoon = Teal-700)
+                let hexColor = "#0f766e"; // Default Teal
+                if(dice.id === 'typhoon') hexColor = "#0f766e"; 
+                
+                // CSS 변수로 주입 (box-shadow에서 사용)
+                customStyle = `--dice-color: ${hexColor}; border-color: ${hexColor};`;
+                
+                // 전설은 별도의 border class를 쓰지 않고 customStyle로 덮어씀
+                borderColor = ""; 
             }
 
-            return { borderColor, effectClasses, pulseStyle };
+            return { borderColor, effectClasses, customStyle };
         }
 
         function renderDiceIcon(dice, sizeClass="w-10 h-10") {
-            const { borderColor, effectClasses, pulseStyle } = getDiceVisualClasses(dice);
+            const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
             
+            // 전설일 경우 border-2 클래스를 제거하여 1px로 만듦 (dice-legend-style에서 제어)
+            const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
+
             return `
-            <div class="dice-face ${sizeClass} border-2 ${borderColor} ${effectClasses}" style="${pulseStyle}">
+            <div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses}" style="${customStyle}">
                 <div class="dice-content w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm"></div>
             </div>
             `;
         }
-
 
         // --- 덱 & 상세 팝업 ---
         let currentDiceList = []; 
