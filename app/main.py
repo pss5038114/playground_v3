@@ -18,12 +18,11 @@ async def lifespan(app: FastAPI):
     init_db()
     task = asyncio.create_task(ticker.start())
     yield
-    # 서버 종료 시 티커 중지 (선택 사항)
+    # 서버 종료 시 티커 중지
     task.cancel()
 
 app = FastAPI(title="Playground V3", lifespan=lifespan)
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,13 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# [중요] API 라우터 등록 
-# 정적 파일 마운트("/")보다 먼저 등록해야 API 요청이 정상적으로 처리됩니다.
+# [중요] API 라우터를 먼저 등록해야 405 에러가 발생하지 않습니다!
 app.include_router(auth_router, prefix="/api/auth")
 app.include_router(mail_router, prefix="/api/mail")
 app.include_router(dice_router, prefix="/api/dice")
 
-# [중요] 정적 파일 마운트 (가장 마지막에 배치)
-# "/" 경로가 다른 API 경로를 가로채지 않도록 맨 끝에 둡니다.
+# [중요] 정적 파일(웹 화면) 마운트는 API 등록 후 가장 마지막에 해야 합니다.
 if os.path.exists("web"):
     app.mount("/", StaticFiles(directory="web", html=True), name="web")
