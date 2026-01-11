@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from app.core.auth_logic import hash_password, verify_password
@@ -6,6 +6,18 @@ from app.core.database import get_db_connection
 import re
 
 router = APIRouter()
+
+async def get_current_user_token(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != 'bearer':
+            raise HTTPException(status_code=401, detail="잘못된 인증 방식입니다.")
+        # 현재는 간단한 인증을 위해 token(username)을 반환합니다.
+        return {"user_id": token, "username": token}
+    except Exception:
+        raise HTTPException(status_code=401, detail="인증 형식이 잘못되었습니다.")
 
 # [보안 설정]
 ADMIN_SECRET_KEY = "your_secret_key"
