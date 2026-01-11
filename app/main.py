@@ -1,3 +1,4 @@
+# app/main.py (수정됨)
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -6,12 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.global_ticker import ticker
 from app.core.database import init_db
 from app.services.auth.auth_api import router as auth_router
-from app.services.dice_defense.dice_api import router as dice_router
-from app.services.mail.mail_api import router as mail_router  # [추가]
+from app.services.dice_defense.dice_api import router as dice_router # API + WS
+from app.services.mail.mail_api import router as mail_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db() # 서버 시작 시 DB 체크
+    init_db()
     task = asyncio.create_task(ticker.start())
     yield
     task.cancel()
@@ -27,5 +28,5 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/auth")
-app.include_router(dice_router, prefix="/ws/dice")
-app.include_router(mail_router, prefix="/api/mail") # [추가]
+app.include_router(mail_router, prefix="/api/mail")
+app.include_router(dice_router, prefix="/api/dice")
