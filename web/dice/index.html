@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dice Defense - Playground V3</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet"/>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
         body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
@@ -244,15 +244,13 @@
             const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
             const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
             
-            // 데이터가 없으면 기본값
-            const symbolIcon = dice.symbol || "fa-dice-d6";
+            // [수정] 기본값도 Remix Icon으로 변경
+            const symbolIcon = dice.symbol || "ri-dice-fill";
             
-            // [수정] 배경 아이콘 크기 키움 (opacity-40 -> opacity-30 은은하게 조정)
-            // sizeClass가 커질 때(팝업 등) 아이콘도 커지도록 폰트 사이즈를 상속받게 하거나,
-            // 여기서는 간단히 w-12(48px) 기준 꽉 차 보이는 text-3xl(30px)을 적용합니다.
+            // [수정] fas 클래스 제거 -> symbolIcon 변수 안에 'ri-...' 클래스가 포함될 예정
             const bgSymbolHtml = `
                 <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0">
-                    <i class="fas ${symbolIcon} text-3xl"></i> 
+                    <i class="${symbolIcon} text-4xl"></i> 
                 </div>
             `;
 
@@ -324,7 +322,7 @@
             document.getElementById('popup-dice-class').innerText = dice.class_level > 0 ? `Lv.${dice.class_level}` : "미보유";
             
             let iconHtml = renderDiceIcon(dice, "w-16 h-16");
-            iconHtml = iconHtml.replace("text-3xl", "text-5xl"); // 팝업용 사이즈업
+            iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
             
             document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
