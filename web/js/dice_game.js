@@ -1,38 +1,44 @@
 /**
- * Dice Defense Core UI Logic
+ * Dice Defense Core UI Logic (Playground V3)
  */
 const GameApp = {
     currentSessionId: null,
     inventoryData: {},
     diceBook: {},
 
-    // 등급별 UI 설정
+    // 등급별 UI 설정 (색상 요구사항 반영)
     rarityUI: {
-        "Common": { border: "#ef4444", label: "일반" },
-        "Rare": { border: "#facc15", label: "희귀" },
-        "Epic": { border: "#a855f7", label: "영웅" },
-        "Legendary": { border: "#2dd4bf", label: "전설" }
+        "Common": { border: "#ef4444", label: "일반" }, // 불, 바람
+        "Rare": { border: "#facc15", label: "희귀" },   // 빛
+        "Epic": { border: "#a855f7", label: "영웅" },   // 적응
+        "Legendary": { border: "#00a86b", label: "전설" } // 태풍 (Jade)
     },
 
+    // 초기화 함수
     init: async () => {
-        if (!checkAuth()) return;
-        const user = getCurrentUser();
-        document.getElementById('user-nickname').innerText = user.nickname;
+        console.log("GameApp Initializing...");
+        
+        // auth.js 함수 존재 확인 (ReferenceError 방지)
+        if (typeof checkAuth === 'function') {
+            if (!checkAuth()) return;
+        } else {
+            console.error("Critical: checkAuth is not defined. Ensure auth.js is loaded.");
+        }
+        
+        if (typeof getCurrentUser === 'function') {
+            const user = getCurrentUser();
+            if (user) document.getElementById('user-nickname').innerText = user.nickname;
+        }
 
-        // 이벤트 리스너
-        document.getElementById('btn-start-pvp').addEventListener('click', () => GameApp.startGame('pvp'));
-        document.getElementById('btn-start-coop').addEventListener('click', () => GameApp.startGame('coop'));
-
-        // 초기 인벤토리 로드
+        // 초기 인벤토리 및 티켓 정보 로드
         await GameApp.loadInventory();
 
-        // 이탈 감지
+        // 페이지 이탈 감지
         window.addEventListener('beforeunload', (e) => {
             if (GameApp.currentSessionId) GameApp.sendExitSignal();
         });
     },
 
-    // 탭 전환
     switchTab: (tabName) => {
         document.querySelectorAll('.game-view').forEach(el => el.classList.add('hidden'));
         document.getElementById(`view-${tabName}`).classList.remove('hidden');
@@ -48,7 +54,6 @@ const GameApp = {
         });
     },
 
-    // 데이터 로드
     loadInventory: async () => {
         const token = localStorage.getItem('access_token');
         try {
@@ -60,20 +65,26 @@ const GameApp = {
             GameApp.inventoryData = data.inventory;
             GameApp.diceBook = data.dice_book;
             
-            document.getElementById('shop-ticket-count').innerText = data.tickets;
+            // 티켓 카운트 갱신
+            document.getElementById('shop-ticket-count').innerText = data.tickets || 0;
+            
+            // 인벤토리 렌더링
             GameApp.renderDiceGrid();
         } catch (e) {
-            console.error("Inven Load Error:", e);
+            console.error("Inventory Fetch Error:", e);
         }
     },
 
-    // 인벤토리 그리드 렌더링 (5열)
+    // 인벤토리 렌더링 (보유/미보유 섹션 구분)
     renderDiceGrid: () => {
-        const grid = document.getElementById('dice-grid');
-        grid.innerHTML = '';
+        const ownedGrid = document.getElementById('owned-dice-grid');
+        const unownedGrid = document.getElementById('unowned-dice-grid');
+        ownedGrid.innerHTML = '';
+        unownedGrid.innerHTML = '';
         
         let ownedCount = 0;
         const bookKeys = Object.keys(GameApp.diceBook);
+        const reqCards = 5; // 업그레이드 필요 카드수 (고정)
 
         bookKeys.forEach(id => {
             const info = GameApp.diceBook[id];
@@ -81,52 +92,54 @@ const GameApp = {
             const isOwned = inv.level > 0;
             if (isOwned) ownedCount++;
 
-            const reqCards = 5; // 테스트용 고정값
             const progress = Math.min((inv.cards / reqCards) * 100, 100);
             
             const card = document.createElement('div');
-            card.className = `game-card p-4 flex flex-col items-center cursor-pointer transition-all ${!isOwned ? 'opacity-40 grayscale' : 'hover:scale-105 hover:bg-slate-800'}`;
+            card.className = `game-card p-4 flex flex-col items-center cursor-pointer transition-all hover:scale-105`;
             
-            // 전설 등급 특수 효과
+            // 전설 등급 은은한 흰색 광채
             if (isOwned && info.rarity === 'Legendary') card.classList.add('rarity-legendary');
 
-            // 주사위 외형 (배경 흰색, 테두리 대표색)
-            let diceInner = `<span style="color: ${info.color}; font-size: 2.5rem;">🎲</span>`;
-            if (id === 'adapt') diceInner = `<span class="rainbow-text" style="font-size: 2.5rem;">🎲</span>`;
+            // 주사위 아이콘 (흰색 배경 고정)
+            let diceIconStyle = `border: 4px solid ${GameApp.rarityUI[info.rarity].border};`;
+            let diceInner = `<span style="color: ${info.color}; font-size: 2.2rem;">🎲</span>`;
+            
+            // 적응 주사위 무지개 텍스트 특수 처리
+            if (id === 'adapt') {
+                diceInner = `<span class="rainbow-text" style="font-size: 2.2rem;">🎲</span>`;
+            }
 
             card.innerHTML = `
-                <div class="w-20 h-20 rounded-2xl mb-3 flex items-center justify-center dice-bg border-4" 
-                     style="border-color: ${GameApp.rarityUI[info.rarity].border}">
+                <div class="w-16 h-16 rounded-xl mb-3 flex items-center justify-center dice-bg border-4 shadow-sm" style="${diceIconStyle}">
                     ${diceInner}
                 </div>
-                <div class="text-[11px] font-black mb-1 truncate w-full text-center">${info.name.toUpperCase()}</div>
+                <div class="text-[10px] font-black mb-1 text-center truncate w-full">${info.name.toUpperCase()}</div>
                 <div class="text-[10px] text-yellow-500 mb-2 font-black italic">CL.${inv.level}</div>
                 
                 ${(!isOwned && inv.cards > 0) ? 
                     `<button onclick="event.stopPropagation(); GameApp.acquireDice('${id}')" 
-                             class="w-full bg-green-600 hover:bg-green-500 text-[10px] py-1.5 rounded-lg font-black animate-pulse shadow-lg shadow-green-900/40">습득하기</button>` :
-                    `<div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden mt-auto border border-slate-800">
+                             class="w-full bg-green-600 hover:bg-green-500 text-[9px] py-1.5 rounded font-black animate-pulse">습득하기</button>` :
+                    `<div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-auto border border-slate-800">
                         <div class="bg-green-500 h-full transition-all duration-500" style="width: ${progress}%"></div>
                     </div>
                     <div class="text-[9px] mt-1 text-slate-500 font-mono">${inv.cards} / ${reqCards}</div>`
                 }
             `;
 
-            // 보유 중일 때만 팝업 허용
             if (isOwned) {
                 card.onclick = () => GameApp.openUpgradeModal(id, info, inv);
+                ownedGrid.appendChild(card);
+            } else {
+                unownedGrid.appendChild(card);
             }
-            grid.appendChild(card);
         });
 
         document.getElementById('inventory-count').innerText = `${ownedCount}/${bookKeys.length}`;
     },
 
-    // 가챠 실행
+    // 가챠 뽑기
     openBox: async (count) => {
         const token = localStorage.getItem('access_token');
-        if (!confirm(`${count === 10 ? '11' : '1'}개의 주사위 카드를 뽑으시겠습니까?`)) return;
-
         try {
             const res = await fetch(`/api/game/gacha?count=${count}`, {
                 method: 'POST',
@@ -135,19 +148,33 @@ const GameApp = {
 
             if (res.ok) {
                 const data = await res.json();
-                // 심플 결과창 (추후 화려한 연출 추가 가능)
-                alert(`[뽑기 결과]\n${data.results.map(id => GameApp.diceBook[id].name).join(', ')} 를 획득했습니다!`);
+                // 결과 이름 매핑
+                const names = data.results.map(id => GameApp.diceBook[id].name);
+                alert(`[획득 결과]\n${names.join('\n')}`);
                 await GameApp.loadInventory();
             } else {
                 const err = await res.json();
-                alert(err.detail);
+                alert(err.detail || "티켓이 부족합니다.");
             }
-        } catch (e) { alert("통신 오류가 발생했습니다."); }
+        } catch (e) { alert("통신 실패"); }
     },
 
-    // 업그레이드 모달
+    // 티켓 추가 디버그 버튼
+    addTestTickets: async () => {
+        const token = localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/game/add-test-tickets', { 
+                method: 'POST', 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            if (res.ok) {
+                await GameApp.loadInventory(); // 즉시 갱신
+            }
+        } catch (e) { console.error(e); }
+    },
+
+    // 모달 제어
     openUpgradeModal: (id, info, inv) => {
-        GameApp.selectedDiceId = id;
         const modal = document.getElementById('upgrade-modal');
         modal.classList.remove('hidden');
         
@@ -169,7 +196,6 @@ const GameApp = {
 
     closeModal: () => document.getElementById('upgrade-modal').classList.add('hidden'),
 
-    // 클래스 업그레이드 요청
     upgradeDice: async (id) => {
         const token = localStorage.getItem('access_token');
         const res = await fetch('/api/game/upgrade', {
@@ -183,7 +209,6 @@ const GameApp = {
         }
     },
 
-    // 미습득 주사위 활성화 (CL.0 -> CL.1)
     acquireDice: async (id) => {
         const token = localStorage.getItem('access_token');
         await fetch('/api/game/acquire', {
@@ -194,46 +219,26 @@ const GameApp = {
         await GameApp.loadInventory();
     },
 
-    // 티켓 추가 테스트
-    addTestTickets: async () => {
-        const token = localStorage.getItem('access_token');
-        await fetch('/api/game/add-test-tickets', { 
-            method: 'POST', 
-            headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        await GameApp.loadInventory();
-    },
-
-    // --- 기본 게임 세션 관리 ---
+    // 게임 세션 관련 (기존 코드 유지)
     startGame: async (mode) => {
         const token = localStorage.getItem('access_token');
-        const response = await fetch('/api/game/start', {
+        const res = await fetch('/api/game/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ mode: mode })
         });
-        if (response.ok) {
-            const data = await response.json();
+        if (res.ok) {
+            const data = await res.json();
             GameApp.currentSessionId = data.session_id;
             document.getElementById('game-canvas-container').classList.remove('hidden');
         }
     },
 
     stopGameUI: () => {
-        if(confirm("항복하시겠습니까? 세션이 종료됩니다.")) {
+        if(confirm("항복하시겠습니까?")) {
             GameApp.sendExitSignal();
             document.getElementById('game-canvas-container').classList.add('hidden');
         }
-    },
-
-    spawnDice: async () => {
-        if (!GameApp.currentSessionId) return;
-        const token = localStorage.getItem('access_token');
-        await fetch('/api/game/action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ session_id: GameApp.currentSessionId, action_type: 'spawn' })
-        });
     },
 
     exitGame: () => {
@@ -256,4 +261,5 @@ const GameApp = {
     }
 };
 
+// 스크립트 로드 완료 시 초기화 실행
 window.addEventListener('DOMContentLoaded', GameApp.init);
