@@ -54,6 +54,7 @@ async def get_my_dice_list(username: str):
                 "rarity": info["rarity"],
                 "color": info["color"],
                 "desc": info["desc"],
+                "stats": info.get("stats", {}), # [추가] 스탯 데이터 포함
                 "class_level": 0,
                 "quantity": 0
             }
@@ -62,7 +63,6 @@ async def get_my_dice_list(username: str):
                 dice_data["class_level"] = owned_map[dice_id]["class_level"]
                 dice_data["quantity"] = owned_map[dice_id]["quantity"]
             else:
-                # 미소유 일반(Common) 주사위 자동 지급
                 if info["rarity"] == "Common":
                     dice_data["class_level"] = 1
                     updates_needed.append((user_id, dice_id, 1, 0))
@@ -73,7 +73,6 @@ async def get_my_dice_list(username: str):
             conn.executemany("INSERT INTO user_dice (user_id, dice_id, class_level, quantity) VALUES (?, ?, ?, ?)", updates_needed)
             conn.commit()
 
-        # 정렬: 등급(높은순) -> 이름
         result.sort(key=lambda x: (RARITY_ORDER.get(x["rarity"], 0), x["id"]), reverse=True)
         return result
     finally:
