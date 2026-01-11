@@ -1,4 +1,5 @@
-const API = "/api/auth"; // 상대 경로로 변경하여 로컬/서버 환경 호환
+// 상대 경로를 사용하여 로컬 및 서버 배포 환경 모두에서 작동하도록 함
+const API = "/api/auth";
 
 // 상태 변수 (중복 확인 통과 여부)
 let isIdChecked = false;
@@ -27,11 +28,9 @@ function resetCheck(type) {
 async function checkId() {
     const id = document.getElementById('sign-id').value;
     if(!id) return alert("아이디를 입력해주세요.");
-    
     try {
         const res = await fetch(`${API}/check-id/${id}`);
         const data = await res.json();
-        
         if(data.available) {
             alert(data.message);
             isIdChecked = true;
@@ -49,11 +48,9 @@ async function checkId() {
 async function checkNick() {
     const nick = document.getElementById('sign-nick').value;
     if(!nick) return alert("닉네임을 입력해주세요.");
-    
     try {
         const res = await fetch(`${API}/check-nick/${nick}`);
         const data = await res.json();
-        
         if(data.available) {
             alert(data.message);
             isNickChecked = true;
@@ -78,26 +75,24 @@ async function handleSignup() {
     if(!username || !password || !pwConfirm || !birthdate || !nickname) {
         return alert("모든 정보를 입력해주세요.");
     }
-    
     if(password !== pwConfirm) {
         return alert("비밀번호가 일치하지 않습니다.");
     }
-
     if(!isIdChecked) return alert("아이디 중복 확인을 해주세요.");
     if(!isNickChecked) return alert("닉네임 중복 확인을 해주세요.");
     if(birthdate.length !== 4) return alert("생일은 4자리 숫자(MMDD)로 입력해주세요.");
 
-    const res = await fetch(`${API}/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, nickname, birthdate })
-    });
-
-    if(res.ok) { 
-        alert("가입 신청 완료!\n관리자 승인 후 이용 가능합니다."); 
-        location.href='index.html'; 
-    }
-    else alert((await res.json()).detail);
+    try {
+        const res = await fetch(`${API}/signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, nickname, birthdate })
+        });
+        if(res.ok) { 
+            alert("가입 신청 완료!\n관리자 승인 후 이용 가능합니다."); 
+            location.href='index.html'; 
+        } else alert((await res.json()).detail);
+    } catch(e) { alert("회원가입 요청 중 오류가 발생했습니다."); }
 }
 
 // 로그인 요청
@@ -114,20 +109,41 @@ async function handleLogin() {
         const data = await res.json();
         
         if(res.ok) { 
-            // dice_game.js와 통일하기 위해 localStorage 사용 및 access_token 저장
-            localStorage.setItem('access_token', data.access_token || data.username); 
+            // dice_game.js와 통일하기 위해 localStorage를 사용합니다.
+            localStorage.setItem('access_token', data.access_token); 
             localStorage.setItem('nickname', data.nickname); 
             localStorage.setItem('username', data.username);
             location.href='home.html'; 
         } else {
-            alert(data.detail);
+            alert(data.detail || "로그인 실패");
         }
     } catch(e) {
-        alert("로그인 중 오류가 발생했습니다.");
+        console.error(e);
+        alert("로그인 중 서버와 통신할 수 없습니다.");
     }
 }
 
-// 로그인 상태 체크 함수 (dice_game.js에서 호출)
+// 비밀번호 초기화 요청
+async function handleReset() {
+    const username = document.getElementById('reset-id').value;
+    const birthdate = document.getElementById('reset-birth').value;
+    const password = document.getElementById('reset-pw').value;
+    if(!username || !birthdate || !password) return alert("모든 정보를 입력해주세요.");
+
+    try {
+        const res = await fetch(`${API}/reset-request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, birthdate })
+        });
+        if(res.ok) { 
+            alert("비밀번호 변경 요청 완료!\n관리자 승인을 기다려주세요."); 
+            location.href='index.html'; 
+        } else alert((await res.json()).detail);
+    } catch(e) { alert("요청 중 오류 발생"); }
+}
+
+// [필수] dice_game.js가 사용하는 인증 체크 함수
 function checkAuth() {
     const token = localStorage.getItem('access_token');
     if (!token) {
@@ -138,7 +154,7 @@ function checkAuth() {
     return true;
 }
 
-// 유저 정보 가져오기 함수 (dice_game.js에서 호출)
+// [필수] 유저 정보를 반환하는 함수
 function getCurrentUser() {
     return {
         username: localStorage.getItem('username'),
@@ -146,11 +162,12 @@ function getCurrentUser() {
     };
 }
 
-// 전역 스코프에 할당하여 다른 JS 파일 및 HTML에서 접근 가능하게 함
+// 모든 함수를 전역(window) 객체에 할당하여 HTML 및 다른 JS에서 접근 가능하게 합니다.
 window.checkAuth = checkAuth;
 window.getCurrentUser = getCurrentUser;
 window.handleLogin = handleLogin;
 window.handleSignup = handleSignup;
+window.handleReset = handleReset;
 window.checkId = checkId;
 window.checkNick = checkNick;
 window.resetCheck = resetCheck;

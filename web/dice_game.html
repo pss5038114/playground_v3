@@ -15,13 +15,10 @@
         
         /* 등급별 특수 효과 */
         .rarity-legendary { box-shadow: 0 0 15px rgba(255, 255, 255, 0.6); }
-        .rainbow-border {
-            border-image: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet) 1;
-        }
         .rainbow-text {
             background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
             -webkit-background-clip: text;
-            background-clip: text; /* 표준 속성 추가로 노란 줄 해결 */
+            background-clip: text; /* 표준 속성 추가로 에디터 경고 해결 */
             -webkit-text-fill-color: transparent;
         }
 
@@ -124,11 +121,9 @@
                 <h3 class="text-lg font-bold mb-6 text-slate-400 flex justify-between">
                     보유 주사위 <span id="inventory-count" class="text-xs font-normal">0/0</span>
                 </h3>
-                
                 <div id="owned-dice-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"></div>
 
                 <div class="inventory-divider"><span>미보유 주사위</span></div>
-
                 <div id="unowned-dice-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 opacity-60"></div>
             </section>
 

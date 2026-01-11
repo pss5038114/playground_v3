@@ -7,6 +7,7 @@ import re
 
 router = APIRouter()
 
+# [추가] 공통 인증 의존성 함수
 async def get_current_user_token(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
@@ -14,7 +15,7 @@ async def get_current_user_token(authorization: Optional[str] = Header(None)):
         scheme, token = authorization.split()
         if scheme.lower() != 'bearer':
             raise HTTPException(status_code=401, detail="잘못된 인증 방식입니다.")
-        # 현재는 간단한 인증을 위해 token(username)을 반환합니다.
+        # 보안을 위해 실제 환경에서는 JWT를 사용해야 하나, 현재는 username을 토큰으로 사용합니다.
         return {"user_id": token, "username": token}
     except Exception:
         raise HTTPException(status_code=401, detail="인증 형식이 잘못되었습니다.")
@@ -35,7 +36,6 @@ class DBUpdateModel(BaseModel):
     column_name: str
     new_value: Any
 
-# [수정] 모든 필드를 Optional로 변경하여 부분 업데이트 지원
 class ProfileUpdateModel(BaseModel):
     username: str
     nickname: Optional[str] = None
@@ -91,7 +91,6 @@ async def signup(user: AuthModel):
         return {"message": "성공"}
     finally: conn.close()
 
-# [수정된 login 함수]
 @router.post("/login")
 async def login(user: AuthModel):
     conn = get_db_connection()
@@ -106,9 +105,9 @@ async def login(user: AuthModel):
         elif row["status"] == "pending_reset": msg = "비밀번호 변경 승인 대기 중입니다."
         raise HTTPException(status_code=403, detail=msg)
     
-    # [중요] access_token을 포함하여 반환합니다.
+    # [수정] dice_game.js에서 요구하는 access_token을 포함합니다.
     return {
-        "access_token": row["username"],  # 임시 토큰으로 username 사용
+        "access_token": row["username"],
         "nickname": row["nickname"],
         "username": row["username"]
     }
@@ -126,7 +125,7 @@ async def reset_request(user: AuthModel):
         return {"message": "성공"}
     finally: conn.close()
 
-# --- [마이페이지 API] ---
+# --- [마이페이지 및 관리자 API (기존 유지)] ---
 @router.get("/profile/{username}")
 async def get_profile(username: str):
     conn = get_db_connection()
@@ -135,27 +134,19 @@ async def get_profile(username: str):
     if not row: raise HTTPException(status_code=404, detail="유저 없음")
     return dict(row)
 
-# [수정] 부분 업데이트 로직 적용
 @router.post("/update-profile")
 async def update_profile(data: ProfileUpdateModel):
     conn = get_db_connection()
     try:
-        # 1. 닉네임 변경 요청이 있는 경우
         if data.nickname:
             if not (1 <= len(data.nickname) <= 15): 
                 raise HTTPException(status_code=400, detail="닉네임은 1~15자여야 합니다.")
-            
-            # 중복 체크 (내 닉네임 제외)
             exist = conn.execute("SELECT username FROM users WHERE nickname = ?", (data.nickname,)).fetchone()
             if exist and exist['username'] != data.username:
                 raise HTTPException(status_code=400, detail="이미 사용 중인 닉네임입니다.")
-            
             conn.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
-
-        # 2. 프로필 이미지 변경 요청이 있는 경우
         if data.profile_image:
             conn.execute("UPDATE users SET profile_image = ? WHERE username = ?", (data.profile_image, data.username))
-
         conn.commit()
         return {"message": "업데이트 완료"}
     finally: conn.close()
@@ -169,11 +160,7 @@ async def change_password(data: PasswordChangeModel):
             raise HTTPException(status_code=400, detail="현재 비밀번호 불일치")
         if user["birthdate"] != data.birthdate:
             raise HTTPException(status_code=400, detail="생일 불일치")
-
-        conn.execute(
-            "UPDATE users SET password_hash = ? WHERE username = ?",
-            (hash_password(data.new_password), data.username)
-        )
+        conn.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hash_password(data.new_password), data.username))
         conn.commit()
         return {"message": "성공"}
     finally: conn.close()
@@ -186,7 +173,6 @@ async def request_withdraw(user: AuthModel):
     conn.close()
     return {"message": "탈퇴 요청 접수"}
 
-# --- [관리자 API] ---
 @router.get("/admin/pending")
 async def get_pending_requests(admin_key: str):
     if admin_key != ADMIN_SECRET_KEY: raise HTTPException(status_code=401)
@@ -211,7 +197,6 @@ async def approve_user(user_id: int, action: str, admin_key: str):
         row = conn.execute("SELECT status FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row: return {"message": "유저 없음"}
         status = row["status"]
-
         if action == "approve":
             if status == "pending_signup":
                 conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,))
@@ -219,19 +204,17 @@ async def approve_user(user_id: int, action: str, admin_key: str):
                 conn.execute("UPDATE users SET password_hash = pending_password_hash, pending_password_hash = NULL, status = 'active' WHERE id = ?", (user_id,))
             elif status == "pending_deletion":
                 conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        else: # Reject
+        else:
             if status == "pending_signup":
                 conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             elif status == "pending_reset":
                 conn.execute("UPDATE users SET status = 'active', pending_password_hash = NULL WHERE id = ?", (user_id,))
             elif status == "pending_deletion":
-                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,)) # 탈퇴 취소
-
+                conn.execute("UPDATE users SET status = 'active' WHERE id = ?", (user_id,)) 
         conn.commit()
     finally: conn.close()
     return {"message": "완료"}
 
-# --- [DB 브라우저 API] (기존 유지) ---
 @router.get("/admin/db/tables")
 async def get_tables(admin_key: str, db_key: str):
     if admin_key != ADMIN_SECRET_KEY or db_key != DB_MASTER_KEY: raise HTTPException(status_code=401)
