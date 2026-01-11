@@ -13,13 +13,15 @@
         /* 탭 전환 애니메이션 */
         .tab-content { display: none; height: calc(100vh - 140px); overflow-y: auto; }
         .tab-content.active { display: flex; animation: fadeIn 0.3s ease-out; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
         #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        
+        /* 미소유 주사위 스타일 */
+        .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
     </style>
 </head>
 <body class="bg-slate-100 h-screen flex flex-col">
@@ -59,16 +61,12 @@
                 <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center border border-slate-100">
                     <div class="text-4xl mb-2">💎</div>
                     <div class="font-bold text-slate-700 text-sm">보석 500개</div>
-                    <button onclick="addResource('gem', 500)" class="mt-3 bg-blue-100 text-blue-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-blue-200 active:scale-95 transition-transform">
-                        받기
-                    </button>
+                    <button onclick="addResource('gem', 500)" class="mt-3 bg-blue-100 text-blue-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-blue-200 active:scale-95 transition-transform">받기</button>
                 </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center border border-slate-100">
                     <div class="text-4xl mb-2">💰</div>
                     <div class="font-bold text-slate-700 text-sm">골드 1000개</div>
-                    <button onclick="addResource('gold', 1000)" class="mt-3 bg-yellow-100 text-yellow-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-yellow-200 active:scale-95 transition-transform">
-                        받기
-                    </button>
+                    <button onclick="addResource('gold', 1000)" class="mt-3 bg-yellow-100 text-yellow-600 text-xs font-bold px-4 py-2 rounded-lg w-full hover:bg-yellow-200 active:scale-95 transition-transform">받기</button>
                 </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center border border-slate-100 col-span-2">
                     <div class="flex items-center gap-4">
@@ -77,9 +75,7 @@
                             <div class="font-bold text-slate-700 text-sm">뽑기 티켓 10장</div>
                             <div class="text-xs text-slate-400">주사위를 소환할 수 있습니다.</div>
                         </div>
-                        <button onclick="addResource('ticket', 10)" class="bg-purple-100 text-purple-600 text-xs font-bold px-6 py-3 rounded-lg hover:bg-purple-200 active:scale-95 transition-transform">
-                            받기
-                        </button>
+                        <button onclick="addResource('ticket', 10)" class="bg-purple-100 text-purple-600 text-xs font-bold px-6 py-3 rounded-lg hover:bg-purple-200 active:scale-95 transition-transform">받기</button>
                     </div>
                 </div>
             </div>
@@ -89,27 +85,24 @@
             <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-4">
                 <h3 class="font-bold text-slate-700 mb-3 flex justify-between">
                     <span>현재 장착 덱</span>
-                    <span class="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded">평균 Lv.4</span>
+                    <span class="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded">평균 Lv.1</span>
                 </h3>
-                <div class="flex justify-between gap-2">
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🔥</div>
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🧊</div>
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">⚡</div>
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🌪️</div>
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center text-2xl cursor-pointer hover:border-blue-400">🛡️</div>
+                <div class="flex justify-between gap-2" id="equipped-deck">
+                    <div class="w-14 h-14 bg-slate-50 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-300"><i class="fas fa-plus"></i></div>
+                    <div class="w-14 h-14 bg-slate-50 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-300"><i class="fas fa-plus"></i></div>
+                    <div class="w-14 h-14 bg-slate-50 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-300"><i class="fas fa-plus"></i></div>
+                    <div class="w-14 h-14 bg-slate-50 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-300"><i class="fas fa-plus"></i></div>
+                    <div class="w-14 h-14 bg-slate-50 rounded-lg border-2 border-slate-200 flex items-center justify-center text-slate-300"><i class="fas fa-plus"></i></div>
                 </div>
             </div>
+            
             <div class="flex-1 overflow-y-auto pb-20">
-                <h4 class="text-xs font-bold text-slate-400 mb-2 px-1">보유 주사위 목록</h4>
-                <div class="grid grid-cols-4 gap-2">
-                    <div class="aspect-square bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
-                        <span class="text-2xl">🔥</span>
-                        <span class="text-[10px] text-slate-500 mt-1 font-bold">Lv.7</span>
-                    </div>
-                    <div class="aspect-square bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 opacity-50">
-                        <span class="text-2xl">❓</span>
-                        <span class="text-[10px] text-slate-400 mt-1">미획득</span>
-                    </div>
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <h4 class="text-xs font-bold text-slate-400">전체 주사위 목록</h4>
+                    <span id="dice-count" class="text-[10px] text-slate-400">0/10</span>
+                </div>
+                <div id="dice-list-grid" class="grid grid-cols-4 gap-2">
+                    <div class="col-span-4 text-center py-10 text-slate-400 text-sm">불러오는 중...</div>
                 </div>
             </div>
         </div>
@@ -128,25 +121,19 @@
                         </button>
                     </div>
                 </div>
-
                 <canvas id="game-canvas" class="w-full h-full block" width="360" height="640"></canvas>
-                
                 <div id="lobby-overlay" class="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center z-20">
                     <div class="text-6xl mb-4 animate-bounce">🎲</div>
                     <h2 class="text-2xl font-extrabold text-slate-800 mb-1">DICE DEFENSE</h2>
                     <p class="text-slate-400 text-sm mb-8">최고의 덱으로 적을 막아내세요!</p>
-                    <button onclick="startGame('pve')" class="w-48 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 transition-all mb-3 text-lg">
-                        <i class="fas fa-play mr-2"></i> 게임 시작
-                    </button>
-                    <button onclick="startGame('coop')" class="w-48 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-200 transition-all text-sm">
-                        <i class="fas fa-user-friends mr-2"></i> 협동 모드
-                    </button>
+                    <button onclick="startGame('pve')" class="w-48 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 transition-all mb-3 text-lg"><i class="fas fa-play mr-2"></i> 게임 시작</button>
+                    <button onclick="startGame('coop')" class="w-48 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-200 transition-all text-sm"><i class="fas fa-user-friends mr-2"></i> 협동 모드</button>
                 </div>
             </div>
         </div>
 
         <div id="tab-event" class="tab-content flex-col p-4 space-y-4">
-            <div class="bg-gradient-to-r from-pink-500 to-rose-500 text-white p-5 rounded-2xl shadow-lg">
+             <div class="bg-gradient-to-r from-pink-500 to-rose-500 text-white p-5 rounded-2xl shadow-lg">
                 <h3 class="font-bold text-lg"><i class="fas fa-gift mr-2"></i>시즌 패스</h3>
                 <p class="text-xs text-pink-100 mt-1">미션을 완료하고 전설 보상을 획득하세요!</p>
                 <div class="w-full bg-black/20 h-2 rounded-full mt-3 overflow-hidden">
@@ -154,7 +141,6 @@
                 </div>
                 <div class="text-[10px] text-right mt-1">Lv.3 (30%)</div>
             </div>
-            
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <h4 class="font-bold text-slate-700 mb-3 text-sm flex items-center gap-2">
                     <i class="fas fa-bullhorn text-red-500"></i> 진행 중인 이벤트
@@ -166,7 +152,6 @@
                             <div class="text-xs font-bold text-slate-700">오픈 기념 출석체크</div>
                             <div class="text-[10px] text-slate-400">매일매일 보석 지급!</div>
                         </div>
-                        <i class="fas fa-chevron-right text-slate-300 text-xs"></i>
                     </div>
                 </div>
             </div>
@@ -174,32 +159,11 @@
 
         <div id="tab-clan" class="tab-content flex-col p-4 space-y-4">
             <div class="bg-indigo-600 text-white p-6 rounded-2xl shadow-lg text-center">
-                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl"><i class="fas fa-shield-alt"></i></div>
                 <h3 class="font-bold text-lg">클랜 가입하기</h3>
-                <p class="text-xs text-indigo-200 mt-2 mb-4">
-                    마음이 맞는 동료들을 모아<br>함께 성장하고 보상을 획득하세요.
-                </p>
-                <div class="flex gap-2 justify-center">
-                    <button class="bg-white text-indigo-600 text-xs font-bold px-4 py-2 rounded-lg hover:bg-indigo-50">클랜 찾기</button>
-                    <button class="bg-indigo-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-indigo-900">클랜 생성</button>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                <h4 class="font-bold text-slate-700 mb-3 text-sm">추천 클랜</h4>
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-xs">🐉</div>
-                            <div>
-                                <div class="text-xs font-bold">드래곤기사단</div>
-                                <div class="text-[10px] text-slate-400">45/50명</div>
-                            </div>
-                        </div>
-                        <button class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold">가입</button>
-                    </div>
+                <div class="flex gap-2 justify-center mt-4">
+                    <button class="bg-white text-indigo-600 text-xs font-bold px-4 py-2 rounded-lg">클랜 찾기</button>
+                    <button class="bg-indigo-800 text-white text-xs font-bold px-4 py-2 rounded-lg">클랜 생성</button>
                 </div>
             </div>
         </div>
@@ -207,12 +171,10 @@
 
     <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
         <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop">
-            <i class="fas fa-store text-xl mb-0.5"></i>
-            <span class="text-[10px] font-bold">상점</span>
+            <i class="fas fa-store text-xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span>
         </button>
         <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck">
-            <i class="fas fa-th-large text-xl mb-0.5"></i>
-            <span class="text-[10px] font-bold">덱</span>
+            <i class="fas fa-th-large text-xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span>
         </button>
         <div class="w-16 relative flex justify-center">
             <button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle">
@@ -220,22 +182,21 @@
             </button>
         </div>
         <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event">
-            <i class="fas fa-gift text-xl mb-0.5"></i>
-            <span class="text-[10px] font-bold">이벤트</span>
+            <i class="fas fa-gift text-xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span>
         </button>
         <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan">
-            <i class="fas fa-users text-xl mb-0.5"></i>
-            <span class="text-[10px] font-bold">클랜</span>
+            <i class="fas fa-users text-xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span>
         </button>
     </nav>
 
     <script>
         const API_AUTH = "https://api.pyosh.cloud/api/auth";
+        const API_DICE = "https://api.pyosh.cloud/api/dice";
         const myId = sessionStorage.getItem('username');
 
         // --- 탭 전환 로직 ---
         const tabs = ['shop', 'deck', 'battle', 'event', 'clan'];
-        let currentTabIdx = 2; // Default: Battle
+        let currentTabIdx = 2; 
 
         function switchTab(name) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -249,6 +210,10 @@
                 }
             });
             currentTabIdx = tabs.indexOf(name);
+            
+            // 탭별 데이터 리로드
+            if(name === 'deck') fetchMyDice();
+            if(name === 'shop') fetchMyResources();
         }
 
         function nextTab() {
@@ -260,56 +225,92 @@
             switchTab(tabs[currentTabIdx]);
         }
 
-        // --- 재화 관리 로직 ---
+        // --- 재화 관리 ---
         async function fetchMyResources() {
             if(!myId) return;
             try {
                 const res = await fetch(`${API_AUTH}/profile/${myId}`);
                 if(res.ok) {
                     const data = await res.json();
-                    updateResourceUI(data.gems, data.gold, data.tickets);
+                    document.getElementById('res-gem').innerText = data.gems.toLocaleString();
+                    document.getElementById('res-gold').innerText = data.gold.toLocaleString();
+                    document.getElementById('res-ticket').innerText = data.tickets.toLocaleString();
                 }
+            } catch(e) {}
+        }
+        async function addResource(type, amount) {
+            try {
+                const res = await fetch(`${API_AUTH}/add-resource`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myId, type: type, amount: amount })
+                });
+                if(res.ok) { alert("지급 완료!"); fetchMyResources(); }
+            } catch(e) { alert("오류"); }
+        }
+
+        // --- [신규] 주사위 목록 불러오기 ---
+        async function fetchMyDice() {
+            if(!myId) return;
+            try {
+                const res = await fetch(`${API_DICE}/list/${myId}`);
+                if(!res.ok) return;
+                const diceList = await res.json();
+                renderDiceGrid(diceList);
             } catch(e) { console.error(e); }
         }
 
-        function updateResourceUI(gems, gold, tickets) {
-            // 숫자가 변경될 때 부드럽게 올라가는 애니메이션 적용 가능하나, 여기선 즉시 반영
-            document.getElementById('res-gem').innerText = gems.toLocaleString();
-            document.getElementById('res-gold').innerText = gold.toLocaleString();
-            document.getElementById('res-ticket').innerText = tickets.toLocaleString();
+        function renderDiceGrid(list) {
+            const grid = document.getElementById('dice-list-grid');
+            const countEl = document.getElementById('dice-count');
+            grid.innerHTML = "";
+            
+            let ownedCount = 0;
+            list.forEach(dice => {
+                const isOwned = dice.class_level > 0;
+                if(isOwned) ownedCount++;
+
+                // 카드 스타일 정의
+                let cardClass = "aspect-square rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer";
+                let bgClass = isOwned ? "bg-white hover:bg-slate-50" : "bg-slate-100 dice-unowned";
+                
+                // 배경색 (보유 시에만 색상 표시, 미보유는 흑백)
+                let colorDot = `<div class="w-8 h-8 rounded-full ${dice.color} mb-1 shadow-inner"></div>`;
+                
+                // 레벨 뱃지 / 미보유 텍스트
+                let statusBadge = isOwned 
+                    ? `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 rounded mt-1">Lv.${dice.class_level}</span>`
+                    : `<span class="text-[10px] font-bold text-slate-400 mt-1">미획득</span>`;
+
+                // 보유량 (게이지바 등 추후 구현)
+                let cardCount = isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2">${dice.quantity}장</span>` : "";
+
+                grid.innerHTML += `
+                <div class="${cardClass} ${bgClass}" onclick="alert('${dice.name}: ${dice.desc}')">
+                    ${colorDot}
+                    <div class="font-bold text-xs text-slate-700">${dice.name}</div>
+                    ${statusBadge}
+                    ${cardCount}
+                    <div class="absolute top-1 right-1 w-2 h-2 rounded-full ${getRarityColor(dice.rarity)}"></div>
+                </div>`;
+            });
+            countEl.innerText = `${ownedCount}/${list.length}`;
         }
 
-        async function addResource(type, amount) {
-            if(!myId) return alert("로그인이 필요합니다.");
-            try {
-                const res = await fetch(`${API_AUTH}/add-resource`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: myId, type: type, amount: amount })
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    alert(`지급되었습니다! (현재: ${data.current_value})`);
-                    fetchMyResources(); // UI 갱신
-                } else {
-                    alert("오류 발생");
-                }
-            } catch(e) { alert("서버 통신 오류"); }
+        function getRarityColor(rarity) {
+            if(rarity === 'Legend') return 'bg-purple-500';
+            if(rarity === 'Hero') return 'bg-red-400';
+            if(rarity === 'Rare') return 'bg-blue-400';
+            return 'bg-slate-300';
         }
 
         // --- 초기화 ---
         window.onload = function() {
-            if(!myId) {
-                alert("잘못된 접근입니다.");
-                location.href = 'index.html';
-                return;
-            }
-            fetchMyResources(); // 시작 시 재화 정보 불러오기
-            // 주기적으로 재화 갱신 (선택사항)
-            // setInterval(fetchMyResources, 10000); 
+            if(!myId) { location.href = 'index.html'; return; }
+            fetchMyResources();
+            // Deck 탭이 처음 보여질 때 로드
         };
 
-        // --- 게임 로직 (웹소켓 연결) ---
+        // --- 게임 웹소켓 (기존 유지) ---
         let socket = null;
         const canvas = document.getElementById('game-canvas');
         const ctx = canvas.getContext('2d');
@@ -324,26 +325,14 @@
             const wsUrl = `${protocol}//${window.location.host}/ws/dice/${sessionId}`;
             
             socket = new WebSocket(wsUrl);
-            
-            socket.onopen = () => {
-                console.log("Connected to Game Server");
-                socket.send(JSON.stringify({ type: "JOIN", mode: mode }));
-            };
-            
+            socket.onopen = () => { socket.send(JSON.stringify({ type: "JOIN", mode: mode })); };
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if(data.type === 'TICK') {
-                    renderGame(data);
-                }
+                if(data.type === 'TICK') renderGame(data);
             };
-
             requestAnimationFrame(renderLoop);
         }
-
-        function renderGame(state) {
-            // 서버 상태 렌더링 예정
-        }
-
+        function renderGame(state) {}
         function renderLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.strokeStyle = '#475569';
@@ -356,13 +345,8 @@
             }
             requestAnimationFrame(renderLoop);
         }
-
         function spawnDice() {
-            if(socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "SPAWN" }));
-            } else {
-                alert("주사위 소환! (서버 연결 필요)");
-            }
+            if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "SPAWN" }));
         }
     </script>
 </body>

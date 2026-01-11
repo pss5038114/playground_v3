@@ -47,44 +47,44 @@ def init_db():
         )
     """)
 
-    # --- 마이그레이션 로직 ---
-    
-    # 1) users 테이블 컬럼 확인
+    # 3. [신규] 유저 주사위 테이블
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_dice (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            dice_id TEXT,
+            class_level INTEGER DEFAULT 0,
+            quantity INTEGER DEFAULT 0,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # --- 마이그레이션 로직 (기존 users, messages 테이블 컬럼 체크) ---
     cursor.execute("PRAGMA table_info(users)")
     user_columns = [row['name'] for row in cursor.fetchall()]
-
     user_required = {
         "status": "TEXT DEFAULT 'pending_signup'",
         "pending_password_hash": "TEXT DEFAULT NULL",
         "birthdate": "TEXT DEFAULT NULL",
         "profile_image": "TEXT DEFAULT NULL",
-        "gems": "INTEGER DEFAULT 0",      # [신규] 보석
-        "gold": "INTEGER DEFAULT 0",      # [신규] 골드
-        "tickets": "INTEGER DEFAULT 0"    # [신규] 뽑기 티켓
+        "gems": "INTEGER DEFAULT 0",
+        "gold": "INTEGER DEFAULT 0",
+        "tickets": "INTEGER DEFAULT 0"
     }
-
     for col_name, col_def in user_required.items():
         if col_name not in user_columns:
             try:
                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
-                print(f"✅ DB 마이그레이션: users 테이블 '{col_name}' 추가 완료")
             except Exception as e:
                 print(f"❌ DB 마이그레이션 오류 (users): {e}")
 
-    # 2) messages 테이블 컬럼 확인
     cursor.execute("PRAGMA table_info(messages)")
     msg_columns = [row['name'] for row in cursor.fetchall()]
-    
-    msg_required = {
-        "scheduled_at": "TIMESTAMP DEFAULT NULL",
-        "batch_id": "TEXT DEFAULT NULL"
-    }
-
+    msg_required = { "scheduled_at": "TIMESTAMP DEFAULT NULL", "batch_id": "TEXT DEFAULT NULL" }
     for col_name, col_def in msg_required.items():
         if col_name not in msg_columns:
             try:
                 cursor.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
-                print(f"✅ DB 마이그레이션: messages 테이블 '{col_name}' 추가 완료")
             except Exception as e:
                 print(f"❌ DB 마이그레이션 오류 (messages): {e}")
 
