@@ -281,9 +281,10 @@
             if(res.ok) { alert("정리되었습니다."); fetchMails(); }
         }
 
+        // web/home.html 내부의 startDiceGame 함수
         function startDiceGame() {
             const sessionId = "room_" + Math.random().toString(36).substr(2, 9);
-            location.href = `dice_game.html?session=${sessionId}`;
+            location.href = `dice/index.html?session=${sessionId}`;
         }
 
         function handleLogout() {

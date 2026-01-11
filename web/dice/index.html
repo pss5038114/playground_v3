@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dice Defense - Playground V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
+        
+        /* 탭 전환 애니메이션 */
+        .tab-content { display: none; height: calc(100vh - 140px); overflow-y: auto; }
+        .tab-content.active { display: flex; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 게임 캔버스 스타일 (lobby_start.html에 들어갈 요소지만 스타일은 전역 관리) */
+        #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+        .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex flex-col">
+
+    <nav class="flex-none h-16 bg-white flex justify-between items-center px-4 shadow-sm z-50">
+        <div class="flex items-center gap-3">
+            <button onclick="location.href='../home.html'" class="text-slate-500 hover:text-blue-600 transition-colors">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </button>
+            <h1 class="text-lg font-bold text-slate-800 select-none">Dice Defense</h1>
+        </div>
+        
+        <div class="flex gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
+            <div class="flex items-center gap-1"><i class="fas fa-gem text-blue-500"></i> <span id="res-gem">0</span></div>
+            <div class="w-px h-3 bg-slate-300"></div>
+            <div class="flex items-center gap-1"><i class="fas fa-coins text-yellow-500"></i> <span id="res-gold">0</span></div>
+            <div class="w-px h-3 bg-slate-300"></div>
+            <div class="flex items-center gap-1"><i class="fas fa-ticket-alt text-purple-500"></i> <span id="res-ticket">0</span></div>
+        </div>
+    </nav>
+
+    <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
+        <button onclick="prevTab()" class="hidden md:block absolute left-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <button onclick="nextTab()" class="hidden md:block absolute right-2 top-1/2 -translate-y-1/2 z-40 w-10 h-10 bg-white/80 rounded-full shadow-lg text-slate-500 hover:text-blue-600 hover:scale-110 transition-all">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-4"></div>
+        <div id="tab-deck" class="tab-content flex-col p-4"></div>
+        <div id="tab-battle" class="tab-content active flex-col p-4 relative"></div>
+        <div id="tab-event" class="tab-content flex-col p-4 space-y-4"></div>
+        <div id="tab-clan" class="tab-content flex-col p-4 space-y-4"></div>
+    </main>
+
+    <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50">
+        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop">
+            <i class="fas fa-store text-xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span>
+        </button>
+        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck">
+            <i class="fas fa-th-large text-xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span>
+        </button>
+        <div class="w-16 relative flex justify-center">
+            <button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle">
+                <i class="fas fa-gamepad text-2xl"></i>
+            </button>
+        </div>
+        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event">
+            <i class="fas fa-gift text-xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span>
+        </button>
+        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan">
+            <i class="fas fa-users text-xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span>
+        </button>
+    </nav>
+
+    <script>
+        const API_AUTH = "https://api.pyosh.cloud/api/auth";
+        const API_DICE = "https://api.pyosh.cloud/api/dice";
+        const myId = sessionStorage.getItem('username');
+
+        // [신규] HTML 분할 로딩 로직
+        async function loadComponents() {
+            const tabs = [
+                { id: 'tab-shop', file: 'lobby_shop.html' },
+                { id: 'tab-deck', file: 'lobby_deck.html' },
+                { id: 'tab-battle', file: 'lobby_start.html' }, // battle -> lobby_start
+                { id: 'tab-event', file: 'lobby_event.html' },
+                { id: 'tab-clan', file: 'lobby_clan.html' }
+            ];
+
+            const promises = tabs.map(async (tab) => {
+                try {
+                    const res = await fetch(tab.file);
+                    if(res.ok) {
+                        const html = await res.text();
+                        document.getElementById(tab.id).innerHTML = html;
+                    }
+                } catch(e) { console.error(`Failed to load ${tab.file}`, e); }
+            });
+
+            await Promise.all(promises);
+            console.log("All components loaded.");
+            
+            // 로드 완료 후 초기화 필요한 로직 실행
+            initGameCanvas();
+            fetchMyResources();
+            // battle 탭이 기본 active 상태이므로 여기서 캔버스 컨텍스트 등 초기화 필요 시 수행
+        }
+
+        // --- 탭 전환 로직 ---
+        const tabNames = ['shop', 'deck', 'battle', 'event', 'clan'];
+        let currentTabIdx = 2; 
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${name}`).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.dataset.target === `tab-${name}`) {
+                    if(!btn.classList.contains('bg-blue-600')) btn.classList.add('text-blue-600');
+                } else {
+                    btn.classList.remove('text-blue-600');
+                }
+            });
+            currentTabIdx = tabNames.indexOf(name);
+            
+            if(name === 'deck') fetchMyDice();
+            if(name === 'shop') fetchMyResources();
+        }
+
+        function nextTab() {
+            currentTabIdx = (currentTabIdx + 1) % tabNames.length;
+            switchTab(tabNames[currentTabIdx]);
+        }
+        function prevTab() {
+            currentTabIdx = (currentTabIdx - 1 + tabNames.length) % tabNames.length;
+            switchTab(tabNames[currentTabIdx]);
+        }
+
+        // --- 재화 관리 ---
+        async function fetchMyResources() {
+            if(!myId) return;
+            try {
+                const res = await fetch(`${API_AUTH}/profile/${myId}`);
+                if(res.ok) {
+                    const data = await res.json();
+                    document.getElementById('res-gem').innerText = data.gems.toLocaleString();
+                    document.getElementById('res-gold').innerText = data.gold.toLocaleString();
+                    document.getElementById('res-ticket').innerText = data.tickets.toLocaleString();
+                }
+            } catch(e) {}
+        }
+        async function addResource(type, amount) {
+            try {
+                const res = await fetch(`${API_AUTH}/add-resource`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: myId, type: type, amount: amount })
+                });
+                if(res.ok) { alert("지급 완료!"); fetchMyResources(); }
+            } catch(e) { alert("오류"); }
+        }
+
+        // --- 덱 관리 ---
+        async function fetchMyDice() {
+            if(!myId) return;
+            try {
+                const res = await fetch(`${API_DICE}/list/${myId}`);
+                if(!res.ok) return;
+                const diceList = await res.json();
+                renderDiceGrid(diceList);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderDiceGrid(list) {
+            const grid = document.getElementById('dice-list-grid');
+            if(!grid) return; // 로드 되기 전일 수 있음
+            const countEl = document.getElementById('dice-count');
+            grid.innerHTML = "";
+            
+            let ownedCount = 0;
+            list.forEach(dice => {
+                const isOwned = dice.class_level > 0;
+                if(isOwned) ownedCount++;
+
+                let cardClass = "aspect-square rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer";
+                let bgClass = isOwned ? "bg-white hover:bg-slate-50" : "bg-slate-100 dice-unowned";
+                let colorDot = `<div class="w-8 h-8 rounded-full ${dice.color} mb-1 shadow-inner"></div>`;
+                let statusBadge = isOwned 
+                    ? `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 rounded mt-1">Lv.${dice.class_level}</span>`
+                    : `<span class="text-[10px] font-bold text-slate-400 mt-1">미획득</span>`;
+                let cardCount = isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2">${dice.quantity}장</span>` : "";
+
+                grid.innerHTML += `
+                <div class="${cardClass} ${bgClass}" onclick="alert('${dice.name}: ${dice.desc}')">
+                    ${colorDot}
+                    <div class="font-bold text-xs text-slate-700">${dice.name}</div>
+                    ${statusBadge}
+                    ${cardCount}
+                    <div class="absolute top-1 right-1 w-2 h-2 rounded-full ${getRarityColor(dice.rarity)}"></div>
+                </div>`;
+            });
+            if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
+        }
+
+        function getRarityColor(rarity) {
+            if(rarity === 'Legend') return 'bg-purple-500';
+            if(rarity === 'Hero') return 'bg-red-400';
+            if(rarity === 'Rare') return 'bg-blue-400';
+            return 'bg-slate-300';
+        }
+
+        // --- 게임 로직 ---
+        let socket = null;
+        let canvas, ctx;
+        const sessionId = new URLSearchParams(window.location.search).get('session') || "test_session";
+
+        function initGameCanvas() {
+            canvas = document.getElementById('game-canvas');
+            if(canvas) {
+                ctx = canvas.getContext('2d');
+                requestAnimationFrame(renderLoop);
+            }
+        }
+
+        function startGame(mode) {
+            document.getElementById('lobby-overlay').classList.add('hidden');
+            document.getElementById('game-ui-overlay').classList.remove('hidden');
+            document.getElementById('game-ui-overlay').style.display = 'flex';
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/dice/${sessionId}`;
+            
+            socket = new WebSocket(wsUrl);
+            socket.onopen = () => { socket.send(JSON.stringify({ type: "JOIN", mode: mode })); };
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if(data.type === 'TICK') renderGame(data);
+            };
+        }
+        function renderGame(state) {}
+        function renderLoop() {
+            if(!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1;
+            const cellSize = canvas.width / 5;
+            for(let x=0; x<5; x++) {
+                for(let y=0; y<3; y++) {
+                    ctx.strokeRect(x * cellSize, (canvas.height - cellSize * 3) / 2 + y * cellSize, cellSize, cellSize);
+                }
+            }
+            requestAnimationFrame(renderLoop);
+        }
+        function spawnDice() {
+            if(socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "SPAWN" }));
+        }
+
+        // --- 초기화 ---
+        window.onload = function() {
+            if(!myId) { location.href = '../index.html'; return; }
+            loadComponents();
+        };
+    </script>
+</body>
+</html>
