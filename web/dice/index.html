@@ -18,9 +18,39 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
         .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
-
-        /* 팝업 스타일 */
         .stat-box { position: relative; height: 3.5rem; background-color: #f1f5f9; border-radius: 0.5rem; display: flex; align-items: center; padding: 0.5rem; }
+
+        /* [NEW] 주사위 비주얼 스타일 */
+        .dice-face {
+            background-color: white;
+            border-radius: 18%; /* 약간 둥근 정사각형 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        
+        /* 반들반들한 효과 (희귀 이상) */
+        .dice-glossy::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 18%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.1) 100%);
+            pointer-events: none;
+        }
+
+        /* 전설 펄스 효과 */
+        @keyframes pulse-legend {
+            0% { box-shadow: inset 0 0 0px var(--pulse-color, rgba(0,0,0,0)); border-color: var(--pulse-color); }
+            50% { box-shadow: inset 0 0 10px var(--pulse-color, rgba(0,0,0,0)); border-color: white; }
+            100% { box-shadow: inset 0 0 0px var(--pulse-color, rgba(0,0,0,0)); border-color: var(--pulse-color); }
+        }
+        .dice-pulse {
+            animation: pulse-legend 2s infinite ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-slate-100 h-screen flex flex-col">
@@ -42,7 +72,6 @@
     </nav>
 
     <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
-        
         <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-4"></div>
         <div id="tab-deck" class="tab-content flex-col p-4"></div>
         <div id="tab-battle" class="tab-content active flex-col p-4 relative"></div>
@@ -54,7 +83,7 @@
                 <button onclick="closePopup()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"><i class="fas fa-times text-xl"></i></button>
                 
                 <div class="flex items-center gap-4 mb-4">
-                    <div id="popup-dice-icon" class="w-16 h-16 rounded-2xl shadow-md flex items-center justify-center text-3xl shrink-0"></div>
+                    <div id="popup-dice-icon-container" class="shrink-0"></div>
                     <div>
                         <h3 id="popup-dice-name" class="text-xl font-bold text-slate-800">Dice Name</h3>
                         <div class="flex gap-2 mt-1">
@@ -65,17 +94,11 @@
                 </div>
 
                 <p id="popup-dice-desc" class="text-xs text-slate-500 mb-4 bg-slate-50 p-2 rounded-lg">설명...</p>
-                
-                <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-4">
-                    </div>
+                <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-4"></div>
 
                 <div class="flex gap-2 mb-4">
-                    <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                        클래스 업 정보
-                    </button>
-                    <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                        파워 업 정보
-                    </button>
+                    <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">클래스 업 정보</button>
+                    <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">파워 업 정보</button>
                 </div>
 
                 <div class="mt-auto pt-4 border-t border-slate-100">
@@ -86,10 +109,7 @@
                     <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mb-4">
                         <div id="popup-progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-500"></div>
                     </div>
-
-                    <button id="popup-action-btn" class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
-                        <span>업그레이드</span>
-                    </button>
+                    <button id="popup-action-btn" class="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2"><span>업그레이드</span></button>
                     <div id="popup-cost-info" class="text-xs text-slate-400 mt-2 text-center font-medium">비용: 1000골드</div>
                 </div>
             </div>
@@ -105,11 +125,12 @@
     </nav>
 
     <script>
+        // ... (이전과 동일한 상수 및 함수: loadComponents, switchTab, resource, summon ...)
+
         const API_AUTH = "https://api.pyosh.cloud/api/auth";
         const API_DICE = "https://api.pyosh.cloud/api/dice";
         const myId = sessionStorage.getItem('username');
 
-        // --- 컴포넌트 로딩 ---
         async function loadComponents() {
             const tabs = [
                 { id: 'tab-shop', file: 'lobby_shop.html' },
@@ -128,7 +149,7 @@
             fetchMyResources();
         }
 
-        // --- 탭 관리 ---
+        // ... (탭, 재화, 소환 로직 생략 - 이전과 동일) ...
         const tabNames = ['shop', 'deck', 'battle', 'event', 'clan'];
         let currentTabIdx = 2; 
         function switchTab(name) {
@@ -138,8 +159,6 @@
             if(name === 'deck') fetchMyDice();
             if(name === 'shop') fetchMyResources();
         }
-
-        // --- 데이터 관리 ---
         async function fetchMyResources() {
             try {
                 const res = await fetch(`${API_AUTH}/profile/${myId}`);
@@ -155,7 +174,6 @@
             await fetch(`${API_AUTH}/add-resource`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: myId, type, amount}) });
             alert("지급 완료!"); fetchMyResources();
         }
-
         async function summonDice(count) {
             try {
                 const res = await fetch(`${API_DICE}/summon`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: myId, count: count }) });
@@ -167,10 +185,51 @@
             } catch(e) { alert("서버 통신 오류"); }
         }
 
+
+        // --- [NEW] 주사위 렌더링 헬퍼 ---
+        function getDiceVisualClasses(dice) {
+            // 1. 테두리 색상 (bg- -> border-)
+            let borderColor = dice.color.replace('bg-', 'border-');
+            if(dice.color.includes('gradient')) {
+                // 그라데이션의 경우 기본 테두리색 지정 (Adapt 등)
+                borderColor = 'border-slate-300';
+            }
+
+            // 2. 효과 (희귀 이상 광택, 전설 펄스)
+            let effectClasses = "";
+            let pulseStyle = "";
+            
+            if (dice.rarity === 'Rare' || dice.rarity === 'Hero' || dice.rarity === 'Legend') {
+                effectClasses += " dice-glossy";
+            }
+            if (dice.rarity === 'Legend') {
+                effectClasses += " dice-pulse";
+                // 전설 펄스 색상 (Typhoon = Teal)
+                if(dice.id === 'typhoon') pulseStyle = "--pulse-color: rgba(15, 118, 110, 0.7);"; // teal-700
+                else pulseStyle = "--pulse-color: rgba(255, 215, 0, 0.7);"; // default gold
+            }
+
+            return { borderColor, effectClasses, pulseStyle };
+        }
+
+        function renderDiceIcon(dice, sizeClass="w-10 h-10") {
+            const { borderColor, effectClasses, pulseStyle } = getDiceVisualClasses(dice);
+            
+            // Adapt 같은 그라데이션 주사위는 dot에 그라데이션 적용
+            // 일반 주사위는 border에 색상 적용
+            
+            return `
+            <div class="dice-face ${sizeClass} border-2 ${borderColor} ${effectClasses}" style="${pulseStyle}">
+                <div class="w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm"></div>
+            </div>
+            `;
+        }
+
+
         // --- 덱 & 상세 팝업 ---
         let currentDiceList = []; 
         let currentSelectedDice = null;
-        let currentViewMode = null; // 'class' or 'power' or null
+        let currentViewMode = null;
 
         async function fetchMyDice() {
             try {
@@ -192,10 +251,16 @@
             list.forEach(dice => {
                 const isOwned = dice.class_level > 0;
                 if(isOwned) ownedCount++;
+                
+                // [변경] 주사위 아이콘 렌더링 함수 사용
+                const iconHtml = renderDiceIcon(dice, "w-12 h-12");
+
                 const cardHtml = `
                 <div class="aspect-square rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
                      onclick="showDiceDetail('${dice.id}')">
-                    <div class="w-8 h-8 rounded-full ${dice.color} mb-1 shadow-inner"></div>
+                    
+                    <div class="mb-1">${iconHtml}</div>
+                    
                     <div class="font-bold text-xs text-slate-700">${dice.name}</div>
                     ${isOwned ? `<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 rounded mt-1">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1">미획득</span>`}
                     ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2">${dice.quantity}장</span>` : ""}
@@ -210,28 +275,29 @@
             if(rarity === 'Legend') return 'bg-purple-500'; if(rarity === 'Hero') return 'bg-red-400'; if(rarity === 'Rare') return 'bg-blue-400'; return 'bg-slate-300';
         }
 
-        // [핵심] 상세 팝업 로직
         function showDiceDetail(diceId) {
             const dice = currentDiceList.find(d => d.id === diceId);
             if(!dice) return;
             currentSelectedDice = dice;
             
-            // 기본 UI 바인딩
             document.getElementById('popup-dice-name').innerText = dice.name;
             document.getElementById('popup-dice-desc').innerText = dice.desc;
             document.getElementById('popup-dice-rarity').innerText = dice.rarity;
             document.getElementById('popup-dice-class').innerText = dice.class_level > 0 ? `Lv.${dice.class_level}` : "미보유";
-            document.getElementById('popup-dice-icon').className = `w-16 h-16 rounded-2xl shadow-md flex items-center justify-center text-3xl shrink-0 ${dice.color}`;
+            
+            // [변경] 팝업 내 아이콘도 동일한 디자인 적용
+            document.getElementById('popup-dice-icon-container').innerHTML = renderDiceIcon(dice, "w-16 h-16 text-3xl"); // text-3xl은 제거해도 됨
+
+            // ... (업그레이드 로직 및 UI 갱신 코드는 이전과 동일) ...
             
             const btn = document.getElementById('popup-action-btn');
             const costInfo = document.getElementById('popup-cost-info');
             const progress = document.getElementById('popup-progress-bar');
             
-            // 업그레이드 가능 여부 판단
             let canUpgrade = false;
             let reqCards = 0, reqGold = 0;
 
-            if(dice.class_level === 0) { // 해금
+            if(dice.class_level === 0) { 
                 reqCards = 1;
                 document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`;
                 progress.style.width = `${Math.min((dice.quantity/reqCards)*100, 100)}%`;
@@ -246,12 +312,11 @@
                     btn.innerHTML = `<span>카드 부족</span>`;
                     costInfo.innerText = "카드를 더 모으세요";
                 }
-            } else { // 강화
+            } else { 
                 reqCards = 5;
                 reqGold = dice.class_level * 1000;
                 document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`;
                 progress.style.width = `${Math.min((dice.quantity/reqCards)*100, 100)}%`;
-                
                 const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
                 
                 if(dice.quantity >= reqCards && currentGold >= reqGold) {
@@ -268,18 +333,16 @@
             btn.onclick = canUpgrade ? () => upgradeDice(diceId) : null;
             btn.disabled = !canUpgrade;
 
-            // 뷰 모드 설정: 업그레이드 가능하면 기본적으로 'class' 모드 활성화 (버튼 숨김 처리 등은 toggleViewMode에서)
             currentViewMode = canUpgrade && dice.class_level > 0 ? 'class' : null; 
-            
-            // UI 초기화 (버튼 표시 여부 등)
             updateStatsView();
 
             document.getElementById('dice-popup').classList.remove('hidden');
             document.getElementById('dice-popup').classList.add('flex');
         }
 
+        // ... (나머지 헬퍼 함수들: toggleViewMode, updateStatsView, addStatBox, closePopup, upgradeDice, init 등 이전과 동일) ...
+        
         function toggleViewMode(mode) {
-            // 현재 모드와 같으면 해제(null), 아니면 설정
             currentViewMode = (currentViewMode === mode) ? null : mode;
             updateStatsView();
         }
@@ -288,30 +351,24 @@
             if(!currentSelectedDice) return;
             const dice = currentSelectedDice;
             const stats = dice.stats;
-            const level = Math.max(1, dice.class_level); // 미보유여도 1렙 기준 보여줌
+            const level = Math.max(1, dice.class_level);
             const grid = document.getElementById('popup-stats-grid');
             grid.innerHTML = "";
 
-            // 1. 공격력
             addStatBox(grid, "공격력", "fa-sword", stats.atk, level);
-            // 2. 공속
             addStatBox(grid, "공격속도", "fa-stopwatch", stats.speed, level, "s");
-            // 3. 타겟
             addStatBoxStatic(grid, "타겟", "fa-crosshairs", stats.target);
             
-            // 4~6. 특수 능력 (최대 3개)
             if(stats.specials) {
                 stats.specials.forEach(sp => {
                     addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format);
                 });
             }
-            // 빈 칸 채우기 (총 6칸 맞추기 위해)
             const filled = 3 + (stats.specials ? stats.specials.length : 0);
             for(let i=filled; i<6; i++) {
                  grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`;
             }
 
-            // 버튼 스타일 업데이트
             const btnClass = document.getElementById('btn-view-class');
             const btnPower = document.getElementById('btn-view-power');
             
@@ -320,7 +377,6 @@
         }
 
         function addStatBox(grid, name, iconClass, statData, level, unitSuffix="", formatStr="{}") {
-            // 데이터가 "-"인 경우
             if(statData === "-" || !statData.base) {
                 grid.innerHTML += `
                 <div class="stat-box justify-between">
@@ -332,23 +388,16 @@
                 </div>`;
                 return;
             }
-
-            // 계산
             const baseVal = statData.base;
             const cInc = statData.c || 0;
             const pInc = statData.p || 0;
-            
-            // 현재 수치 (Level 기반)
             let currentVal = baseVal + (level - 1) * cInc;
-            
-            // 부동소수점 보정 (소수점 2자리)
             currentVal = parseFloat(currentVal.toFixed(2));
             
             let displayVal = currentVal;
             let diffHtml = "";
 
             if (currentViewMode === 'class' && cInc !== 0) {
-                const nextVal = parseFloat((currentVal + cInc).toFixed(2));
                 const sign = cInc > 0 ? "+" : "";
                 diffHtml = `<span class="text-[10px] text-green-600 ml-1">(${sign}${cInc})</span>`;
             } else if (currentViewMode === 'power' && pInc !== 0) {
@@ -356,8 +405,6 @@
                  diffHtml = `<span class="text-[10px] text-orange-500 ml-1">(${sign}${pInc})</span>`;
             }
 
-            // 포맷팅 (단위 등)
-            // formatStr가 "{}%" 형태라면 값 뒤에 % 붙임
             let finalStr = formatStr.replace("{}", displayVal);
             if(unitSuffix && !formatStr.includes(unitSuffix)) finalStr += unitSuffix;
 
@@ -405,12 +452,11 @@
             } catch(e) { alert("통신 오류"); }
         }
 
-        // --- 초기화 ---
         let socket, canvas, ctx;
         function initGameCanvas() { canvas = document.getElementById('game-canvas'); if(canvas) { ctx = canvas.getContext('2d'); requestAnimationFrame(renderLoop); } }
-        function startGame(mode) { /* ... */ }
+        function startGame(mode) { /*...*/ }
         function renderLoop() { if(!ctx) return; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle='#475569'; ctx.lineWidth=1; const s=canvas.width/5; for(let x=0;x<5;x++)for(let y=0;y<3;y++)ctx.strokeRect(x*s,(canvas.height-s*3)/2+y*s,s,s); requestAnimationFrame(renderLoop); }
-        function spawnDice() { /* ... */ }
+        function spawnDice() { /*...*/ }
 
         window.onload = function() {
             if(!myId) { location.href = '../index.html'; return; }
