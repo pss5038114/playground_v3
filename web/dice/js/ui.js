@@ -37,19 +37,14 @@ async function handleSummon(count) {
     if (!data) return;
 
     if (count === 1) {
-        // 백엔드에서 이제 color 등 상세 정보를 줌
         const resultDice = data.results[0];
-        
-        // 신규 여부 체크 (기존 리스트 참조)
         let isNew = true;
         if (currentDiceList.length > 0) {
             const existing = currentDiceList.find(d => d.id === resultDice.id);
             if (existing && existing.class_level > 0) isNew = false;
         }
-        
         playSingleSummonAnimation(resultDice, isNew);
     } else {
-        // 10+1 소환
         const names = data.results.map(x=>`[${x.rarity}] ${x.name}`).join("\n");
         alert(`✨ 소환 결과 (10+1) ✨\n\n${names}`);
         fetchMyResources();
@@ -70,9 +65,11 @@ function playSingleSummonAnimation(diceData, isNew) {
     textArea.classList.remove('text-reveal');
     tapArea.classList.add('hidden');
     
+    // 컨테이너 초기화
     container.innerHTML = '';
-    container.classList.remove('dice-slide-up'); 
-    
+    container.className = "relative w-32 h-32 transition-transform duration-500 cursor-default flex items-center justify-center pointer-events-auto"; 
+    container.onclick = null; // 이전 핸들러 제거
+
     // 등급별 설정
     const rarityConfig = {
         'Common': { color: '#94a3b8', icon: 'ri-focus-line', tailwind: 'text-slate-400' },
@@ -84,6 +81,8 @@ function playSingleSummonAnimation(diceData, isNew) {
     
     // 1. 미확인 주사위 생성 (하강)
     const hiddenDice = document.createElement('div');
+    // [수정] pointer-events-none을 줘서 클릭이 컨테이너로 통과되게 하거나, auto로 줘서 직접 받게 함.
+    // 여기서는 컨테이너가 이벤트를 받을 것이므로 자식은 비주얼 역할만 해도 됨.
     hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
     hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
     hiddenDice.innerHTML = `<i class="${config.icon} text-6xl text-white opacity-50"></i>`;
@@ -92,10 +91,12 @@ function playSingleSummonAnimation(diceData, isNew) {
 
     // 2. 착지 후 대기 상태 (0.6초 후)
     setTimeout(() => {
+        // 흰색 플래시
         const flash = document.createElement('div');
-        flash.className = 'impact-flash';
+        flash.className = 'impact-flash'; // css에서 pointer-events: none 확인됨
         container.appendChild(flash);
         
+        // 스타일 변경
         hiddenDice.style.backgroundColor = 'white';
         hiddenDice.style.border = `4px solid ${config.color}`;
         hiddenDice.style.setProperty('--glow-color', config.color);
@@ -104,7 +105,14 @@ function playSingleSummonAnimation(diceData, isNew) {
         
         hiddenDice.innerHTML = `<i class="${config.icon} text-7xl ${config.tailwind}"></i>`;
         
-        hiddenDice.onclick = () => revealDice(hiddenDice, diceData, isNew, config);
+        // [중요] 컨테이너를 '클릭 가능' 상태로 변경하고 핸들러 부착
+        container.style.cursor = 'pointer';
+        container.classList.add('cursor-pointer');
+        
+        // [핵심] 클릭 이벤트를 주사위가 아닌 컨테이너에 부착 (확실한 클릭 보장)
+        container.onclick = function() {
+            revealDice(hiddenDice, diceData, isNew, config);
+        };
         
     }, 600);
 }
@@ -112,8 +120,9 @@ function playSingleSummonAnimation(diceData, isNew) {
 function revealDice(element, diceData, isNew, config) {
     const container = document.getElementById('summon-dice-container');
 
-    // 1. 클릭 이벤트 제거 및 대기 효과 중지
-    element.onclick = null;
+    // 1. 클릭 이벤트 제거 및 상태 초기화
+    container.onclick = null;
+    container.style.cursor = 'default';
     element.classList.remove('summon-waiting');
     
     // 2. 파동 효과
@@ -131,15 +140,15 @@ function revealDice(element, diceData, isNew, config) {
     const newDiceEl = tempDiv.firstElementChild;
     
     newDiceEl.classList.add('relative', 'z-10'); 
-    // diceData.color가 bg-xxx 형태이므로 hex값 추론이 어렵다면 config.color(등급색) 사용
-    newDiceEl.style.boxShadow = `0 0 30px ${config.color}80`; 
+    const glowColor = diceData.color && diceData.color.includes('gradient') ? '#ffffff' : config.color;
+    newDiceEl.style.boxShadow = `0 0 30px ${glowColor}80`; 
     
     container.replaceChild(newDiceEl, element);
     
     // NEW 뱃지
     if(isNew) {
         const badge = document.createElement('div');
-        badge.className = 'absolute -top-4 -right-4 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded-full shadow-lg border-2 border-white new-badge-pop z-20';
+        badge.className = 'absolute -top-4 -right-4 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded-full shadow-lg border-2 border-white new-badge-pop z-20 pointer-events-none';
         badge.innerText = "NEW!";
         container.appendChild(badge);
     }
@@ -152,15 +161,20 @@ function revealDice(element, diceData, isNew, config) {
         const diceName = document.getElementById('summon-dice-name');
         const tapArea = document.getElementById('summon-tap-area');
         
-        diceName.innerText = diceData.name;
-        // 이름 색상을 등급색으로 설정
-        diceName.style.color = config.color; 
+        if(diceName) {
+            diceName.innerText = diceData.name;
+            diceName.style.color = config.color; 
+        }
         
-        textArea.classList.remove('hidden');
-        textArea.classList.add('text-reveal');
+        if(textArea) {
+            textArea.classList.remove('hidden');
+            textArea.classList.add('text-reveal');
+        }
         
-        tapArea.classList.remove('hidden');
-        tapArea.onclick = closeSummonOverlay;
+        if(tapArea) {
+            tapArea.classList.remove('hidden');
+            tapArea.onclick = closeSummonOverlay;
+        }
         
     }, 600);
 }
@@ -170,12 +184,16 @@ function closeSummonOverlay() {
     overlay.classList.remove('flex');
     overlay.classList.add('hidden');
     
+    // 닫을 때 컨테이너 초기화 (다음 소환을 위해)
+    const container = document.getElementById('summon-dice-container');
+    container.classList.remove('dice-slide-up');
+    
     fetchMyResources();
     fetchMyDice();
 }
 
 // -----------------------------------------------------------
-// [덱 및 팝업 로직]
+// [덱 및 팝업 로직] (기존 유지)
 // -----------------------------------------------------------
 
 function renderDiceGrid(list) {
@@ -237,7 +255,6 @@ function showDiceDetail(diceId) {
     iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
-    // 파티클 초기화
     const iconContainer = document.getElementById('popup-dice-icon-container');
     const existingParticles = iconContainer.querySelector('.firefly-container');
     if(existingParticles) existingParticles.remove();
@@ -254,19 +271,15 @@ function showDiceDetail(diceId) {
     currentViewMode = null;
 
     if (dice.class_level >= 20) {
-        // [MAX LEVEL]
         document.getElementById('popup-dice-cards').innerText = "MAX";
         progress.style.width = "100%";
         progress.className = "h-full w-full bg-slate-300";
-        
         btn.innerHTML = `<span>MAX LEVEL</span>`;
         costInfo.innerText = "최고 레벨에 도달했습니다.";
         btnColorClass = "bg-slate-400 cursor-not-allowed";
         canUpgrade = false;
     } 
     else {
-        // [해금 또는 강화]
-        // next_cost가 없을 경우를 대비해 기본값 처리 (방어코드)
         const reqCards = dice.next_cost ? dice.next_cost.cards : 9999;
         const reqGold = dice.next_cost ? dice.next_cost.gold : 9999;
         
@@ -278,7 +291,6 @@ function showDiceDetail(diceId) {
         const hasEnoughGold = currentGold >= reqGold;
 
         if (dice.class_level === 0) {
-            // [해금]
             progColorClass = "bg-green-500";
             if (hasEnoughCards && hasEnoughGold) {
                 canUpgrade = true;
@@ -291,14 +303,11 @@ function showDiceDetail(diceId) {
                 btnColorClass = "bg-slate-300 cursor-not-allowed";
             }
         } else {
-            // [강화]
             if (hasEnoughCards && hasEnoughGold) {
                 canUpgrade = true;
-                currentViewMode = 'class'; // 미리보기
-                
+                currentViewMode = 'class'; 
                 btn.innerHTML = `<span>⬆️ 레벨업</span>`;
                 costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
-                
                 btnColorClass = "bg-green-600 hover:bg-green-700"; 
                 progColorClass = "bg-green-500";
             } else {
