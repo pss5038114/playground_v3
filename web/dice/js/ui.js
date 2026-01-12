@@ -17,7 +17,7 @@ async function loadComponents() {
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     
-    // [중요] 앱 로드 시점에 내 주사위 목록 한 번 가져오기 (초기화)
+    // [중요] 앱 로드 시 내 덱 정보 갱신 (New 뱃지 오류 방지)
     if(typeof fetchMyDice === 'function') fetchMyDice();
 }
 
@@ -32,11 +32,52 @@ function switchTab(name) {
 }
 
 // -----------------------------------------------------------
-// [소환 및 애니메이션 로직]
+// [공통 헬퍼 함수]
+// -----------------------------------------------------------
+
+function closeSummonOverlay() {
+    const overlay = document.getElementById('summon-overlay');
+    overlay.classList.remove('flex');
+    overlay.classList.add('hidden');
+    
+    // 11회 소환용 닫기 영역 초기화 (z-index 복구)
+    const tapArea = document.getElementById('summon-tap-area');
+    if(tapArea) {
+        tapArea.classList.add('hidden');
+        tapArea.style.zIndex = "0"; 
+        tapArea.onclick = null;
+    }
+
+    // 1회 소환용 컨테이너 초기화
+    const container = document.getElementById('summon-dice-container');
+    if(container) container.classList.remove('dice-slide-up');
+    
+    fetchMyResources();
+    fetchMyDice();
+}
+
+function getRarityConfig(rarity) {
+    const map = {
+        'Common': { color: '#94a3b8', icon: 'ri-focus-line', tailwind: 'text-slate-400' },
+        'Rare':   { color: '#3b82f6', icon: 'ri-shield-line', tailwind: 'text-blue-500' },
+        'Hero':   { color: '#a855f7', icon: 'ri-sword-line', tailwind: 'text-purple-500' },
+        'Legend': { color: '#facc15', icon: 'ri-vip-crown-line', tailwind: 'text-yellow-400' }
+    };
+    return map[rarity] || map['Common'];
+}
+
+function checkIsNew(diceId) {
+    if (!currentDiceList || currentDiceList.length === 0) return true;
+    const existing = currentDiceList.find(d => d.id === diceId);
+    return !existing || existing.class_level === 0;
+}
+
+// -----------------------------------------------------------
+// [소환 메인 로직]
 // -----------------------------------------------------------
 
 async function handleSummon(count) {
-    // [수정] 소환 전 현재 보유 목록이 비어있다면(로그인 직후 등) 최신화 수행
+    // [버그 수정] 소환 전 보유 목록이 비어있다면 최신화 (모두 NEW 뜨는 문제 방지)
     if (!currentDiceList || currentDiceList.length === 0) {
         await fetchMyDice();
     }
@@ -49,7 +90,6 @@ async function handleSummon(count) {
         const resultDice = data.results[0];
         let isNew = checkIsNew(resultDice.id);
         
-        // 래퍼 전환
         document.getElementById('single-summon-wrapper').classList.remove('hidden');
         document.getElementById('single-summon-wrapper').classList.add('flex');
         document.getElementById('multi-summon-wrapper').classList.add('hidden');
@@ -63,24 +103,12 @@ async function handleSummon(count) {
         document.getElementById('multi-summon-wrapper').classList.remove('hidden');
         document.getElementById('multi-summon-wrapper').classList.add('flex');
         
-        // 11회 소환 애니메이션 시작 전에 New 여부 미리 계산해서 넘겨줄 수도 있지만,
-        // playMultiSummonAnimation 내부에서 checkIsNew를 호출하므로 괜찮음.
         playMultiSummonAnimation(data.results);
     }
 }
 
-function checkIsNew(diceId) {
-    // currentDiceList가 비어있으면 모든게 New로 뜨는 문제 방지를 위해 handleSummon에서 fetchMyDice 호출함.
-    // 그래도 비어있다면 진짜 데이터가 없는 것이므로 true.
-    if (!currentDiceList || currentDiceList.length === 0) return true;
-    
-    const existing = currentDiceList.find(d => d.id === diceId);
-    // 내 목록에 없거나, 있어도 레벨이 0이면 New
-    return !existing || existing.class_level === 0;
-}
-
 // ==========================================
-// [1회 소환 로직]
+// [1회 소환 애니메이션]
 // ==========================================
 function playSingleSummonAnimation(diceData, isNew) {
     const overlay = document.getElementById('summon-overlay');
@@ -88,6 +116,7 @@ function playSingleSummonAnimation(diceData, isNew) {
     const textArea = document.getElementById('summon-text-area');
     const tapArea = document.getElementById('summon-tap-area');
     
+    // 초기화
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
     textArea.classList.add('hidden');
@@ -98,15 +127,16 @@ function playSingleSummonAnimation(diceData, isNew) {
     container.className = "relative w-32 h-32 transition-transform duration-500 cursor-default flex items-center justify-center pointer-events-auto"; 
     container.onclick = null;
 
-    // 등급별 설정
     const rarityConfig = getRarityConfig(diceData.rarity);
     
+    // 1. 하강
     const hiddenDice = document.createElement('div');
     hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
     hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
     hiddenDice.innerHTML = `<i class="${rarityConfig.icon} text-6xl text-white opacity-50"></i>`;
     container.appendChild(hiddenDice);
 
+    // 2. 대기
     setTimeout(() => {
         const flash = document.createElement('div');
         flash.className = 'impact-flash'; 
@@ -131,11 +161,13 @@ function revealDice(element, diceData, isNew, config) {
     container.style.cursor = 'default';
     element.classList.remove('summon-waiting');
     
+    // 파동
     const ripple = document.createElement('div');
     ripple.className = 'ripple-effect';
     ripple.style.setProperty('--glow-color', config.color);
     container.appendChild(ripple);
     
+    // 주사위 교체
     let realIconHtml = renderDiceIcon(diceData, "w-32 h-32");
     realIconHtml = realIconHtml.replace("text-4xl", "text-8xl"); 
     const tempDiv = document.createElement('div');
@@ -143,7 +175,6 @@ function revealDice(element, diceData, isNew, config) {
     const newDiceEl = tempDiv.firstElementChild;
     newDiceEl.classList.add('relative', 'z-10'); 
     
-    // color가 bg-xxx 형태이므로 hex값 추론이 어렵다면 config.color(등급색) 사용 또는 기본값
     const glowColor = diceData.color && diceData.color.includes('gradient') ? '#ffffff' : config.color;
     newDiceEl.style.boxShadow = `0 0 30px ${glowColor}80`; 
     
@@ -156,6 +187,7 @@ function revealDice(element, diceData, isNew, config) {
         container.appendChild(badge);
     }
 
+    // 결과 표시
     setTimeout(() => {
         container.classList.add('dice-slide-up');
         const textArea = document.getElementById('summon-text-area');
@@ -168,13 +200,14 @@ function revealDice(element, diceData, isNew, config) {
         textArea.classList.add('text-reveal');
         
         tapArea.classList.remove('hidden');
+        tapArea.style.zIndex = "50"; // 맨 앞으로
         tapArea.onclick = closeSummonOverlay;
     }, 600);
 }
 
 
 // ==========================================
-// [11회 소환 로직]
+// [11회 소환 애니메이션]
 // ==========================================
 
 function playMultiSummonAnimation(results) {
@@ -207,15 +240,13 @@ function playMultiSummonAnimation(results) {
             const isNew = checkIsNew(dice.id);
             const rarityConfig = getRarityConfig(dice.rarity);
             
-            // 주사위 래퍼
             const wrapper = document.createElement('div');
             wrapper.className = "relative flex flex-col items-center group";
             
-            // 주사위 박스 (w-20 h-20)
             const box = document.createElement('div');
             box.className = "relative w-20 h-20 bg-transparent flex items-center justify-center cursor-default"; 
             
-            // 1. 흰색 테두리
+            // 1. 테두리
             const outline = document.createElement('div');
             outline.className = "outline-box";
             const globalIndex = (rowIndex === 0 ? 0 : (rowIndex === 1 ? 4 : 7)) + colIndex;
@@ -232,10 +263,9 @@ function playMultiSummonAnimation(results) {
             
             const appearDelay = 0.6 + (rowIndex * 0.3) + (colIndex * 0.05);
             hiddenDice.style.animation = `pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards ${appearDelay}s, breathe-glow 2s infinite ease-in-out ${appearDelay + 0.4}s`;
-            
             box.appendChild(hiddenDice);
             
-            // [수정] 이름 레이블 위치 조정 (-bottom-6 -> -bottom-4)
+            // [수정] 이름 위치 조정 (-bottom-4)
             const nameLabel = document.createElement('div');
             nameLabel.className = "absolute -bottom-4 text-[10px] font-bold text-white text-center opacity-0 w-24 truncate pointer-events-none";
             nameLabel.innerText = dice.name;
@@ -328,26 +358,19 @@ function checkAllRevealed(diceElements) {
         const continueMsg = document.getElementById('summon-continue-msg');
         const tapArea = document.getElementById('summon-tap-area');
 
-        skipBtn.classList.add('hidden');
-        continueMsg.classList.remove('hidden');
+        if(skipBtn) skipBtn.classList.add('hidden');
+        if(continueMsg) continueMsg.classList.remove('hidden');
         
-        tapArea.classList.remove('hidden');
-        tapArea.onclick = closeSummonOverlay;
+        if(tapArea) {
+            tapArea.classList.remove('hidden');
+            tapArea.style.zIndex = "50"; // [중요] 완료 시 최상위로 올려서 클릭 감지
+            tapArea.onclick = closeSummonOverlay;
+        }
     }
 }
 
-function getRarityConfig(rarity) {
-    const map = {
-        'Common': { color: '#94a3b8', icon: 'ri-focus-line', tailwind: 'text-slate-400' },
-        'Rare':   { color: '#3b82f6', icon: 'ri-shield-line', tailwind: 'text-blue-500' },
-        'Hero':   { color: '#a855f7', icon: 'ri-sword-line', tailwind: 'text-purple-500' },
-        'Legend': { color: '#facc15', icon: 'ri-vip-crown-line', tailwind: 'text-yellow-400' }
-    };
-    return map[rarity] || map['Common'];
-}
-
 // -----------------------------------------------------------
-// [덱 및 팝업 로직] (기존과 동일)
+// [덱 및 팝업 로직] (기존 유지)
 // -----------------------------------------------------------
 
 function renderDiceGrid(list) {
@@ -428,7 +451,6 @@ function showDiceDetail(diceId) {
         document.getElementById('popup-dice-cards').innerText = "MAX";
         progress.style.width = "100%";
         progress.className = "h-full w-full bg-slate-300";
-        
         btn.innerHTML = `<span>MAX LEVEL</span>`;
         costInfo.innerText = "최고 레벨에 도달했습니다.";
         btnColorClass = "bg-slate-400 cursor-not-allowed";
