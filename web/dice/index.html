@@ -75,6 +75,20 @@
                 </div>
             </div>
         </div>
+
+        <div id="summon-overlay" class="absolute inset-0 z-[60] hidden flex-col items-center justify-center">
+            <div id="summon-tap-area" class="absolute inset-0 z-0 hidden"></div>
+            
+            <div class="relative z-10 flex flex-col items-center justify-center w-full h-full">
+                <div id="summon-dice-container" class="relative w-32 h-32 transition-all duration-300 cursor-pointer">
+                    </div>
+                
+                <div id="summon-text-area" class="mt-12 text-center hidden">
+                    <h2 id="summon-dice-name" class="text-3xl font-extrabold text-white drop-shadow-lg mb-2">Name</h2>
+                    <div class="text-slate-400 text-sm animate-pulse">화면을 터치하여 계속</div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50"

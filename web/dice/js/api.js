@@ -19,13 +19,27 @@ async function addResource(type, amount) {
 
 async function summonDice(count) {
     try {
-        const res = await fetch(`${API_DICE}/summon`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:myId,count:count})});
+        const res = await fetch(`${API_DICE}/summon`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: myId, count: count})
+        });
         const data = await res.json();
-        if(!res.ok) return alert(data.detail||"오류");
-        const names = data.results.map(x=>`[${x.rarity}] ${x.name}`).join("\n");
-        alert(`✨ 소환 결과 ✨\n\n${names}`);
-        fetchMyResources();
-    } catch(e) { alert("오류"); }
+        
+        if(!res.ok) {
+            alert(data.detail || "오류");
+            return null; // 실패 시 null 반환
+        }
+        
+        // 성공 시 데이터 반환 (UI에서 처리하도록)
+        // fetchMyResources는 연출 종료 후 호출하는 것이 자연스러우므로 여기서 호출하지 않거나,
+        // 백그라운드 갱신을 위해 둠. (UI.js에서 흐름 제어 추천)
+        return data; 
+        
+    } catch(e) { 
+        alert("서버 통신 오류");
+        return null;
+    }
 }
 
 async function fetchMyDice() {
