@@ -1,7 +1,7 @@
 # app/services/dice_defense/dice_rest_api.py
 from fastapi import APIRouter, HTTPException, Body
 from app.core.database import get_db_connection
-from app.services.dice_defense.game_data import DICE_DATA, RARITY_ORDER
+from app.services.dice_defense.game_data import DICE_DATA, RARITY_ORDER, UPGRADE_RULES
 import random
 
 router = APIRouter()
@@ -54,19 +54,34 @@ async def get_my_dice_list(username: str):
                 "rarity": info["rarity"],
                 "color": info["color"],
                 "desc": info["desc"],
-                "symbol": info.get("symbol", "fa-dice-d6"),
+                "symbol": info.get("symbol", "ri-dice-fill"),
                 "stats": info.get("stats", {}),
                 "class_level": 0,
-                "quantity": 0
+                "quantity": 0,
+                "next_cost": None # [NEW] 다음 강화 비용 정보
             }
 
             if dice_id in owned_map:
                 dice_data["class_level"] = owned_map[dice_id]["class_level"]
                 dice_data["quantity"] = owned_map[dice_id]["quantity"]
             else:
+                # 미소유 Common 자동 지급 (class 1)
                 if info["rarity"] == "Common":
                     dice_data["class_level"] = 1
                     updates_needed.append((user_id, dice_id, 1, 0))
+
+            # [NEW] 다음 레벨업 비용 계산하여 주입
+            curr_lv = dice_data["class_level"]
+            if curr_lv < 20: # Max 레벨(20) 미만일 때만 비용 존재
+                rarity = info["rarity"]
+                # 0레벨이면 인덱스 0 (해금비용), 1레벨이면 인덱스 1 (1->2비용)
+                req_gold = UPGRADE_RULES["gold"][curr_lv]
+                req_cards = UPGRADE_RULES["cards"][rarity][curr_lv]
+                
+                dice_data["next_cost"] = {
+                    "gold": req_gold,
+                    "cards": req_cards
+                }
 
             result.append(dice_data)
 
@@ -143,22 +158,16 @@ async def upgrade_dice(payload: dict = Body(...)):
         current_level = dice_row["class_level"]
         quantity = dice_row["quantity"]
         
-        # [수정] 최대 레벨 체크 (20레벨 이상이면 강화 불가)
         if current_level >= 20:
             raise HTTPException(400, "이미 최대 레벨입니다.")
         
-        # 비용 계산
-        req_cards = 0
-        req_gold = 0
+        # [수정] UPGRADE_RULES 테이블 참조하여 비용 검증
+        dice_info = DICE_DATA.get(dice_id)
+        if not dice_info: raise HTTPException(400, "잘못된 주사위 ID")
         
-        if current_level == 0:
-            # 해금
-            req_cards = 1
-            req_gold = 0
-        else:
-            # 강화
-            req_cards = 5
-            req_gold = current_level * 1000
+        rarity = dice_info["rarity"]
+        req_gold = UPGRADE_RULES["gold"][current_level]
+        req_cards = UPGRADE_RULES["cards"][rarity][current_level]
             
         if quantity < req_cards:
             raise HTTPException(400, "카드가 부족합니다.")
