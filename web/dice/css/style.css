@@ -126,21 +126,3 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); }
 }
 .new-badge-pop { animation: pop-badge 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-/* 위로 올라가는 모션 */
-@keyframes move-up-center {
-    from { transform: translateY(0); }
-    to { transform: translateY(-50px); } /* 텍스트 공간 확보를 위해 위로 */
-}
-.summon-move-up {
-    animation: move-up-center 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* 등장 페이드인 (아이콘 교체 시 사용) */
-@keyframes fade-in-scale {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
-}
-.reveal-appear {
-    animation: fade-in-scale 0.4s ease-out forwards;
-}

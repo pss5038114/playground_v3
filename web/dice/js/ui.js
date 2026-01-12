@@ -278,12 +278,9 @@ function playSingleSummonAnimation(diceData, isNew) {
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
     textArea.classList.add('hidden');
-    textArea.classList.remove('text-reveal'); // 애니메이션 클래스 제거
+    textArea.classList.remove('text-reveal'); // 애니메이션 재실행 위해 제거
     tapArea.classList.add('hidden');
-    
-    // 컨테이너 위치/스타일 초기화
     container.innerHTML = '';
-    container.className = "relative w-32 h-32 transition-all duration-300 cursor-pointer"; // 기본 클래스
     
     // 등급별 설정
     const rarityConfig = {
@@ -294,71 +291,59 @@ function playSingleSummonAnimation(diceData, isNew) {
     };
     const config = rarityConfig[diceData.rarity] || rarityConfig['Common'];
     
-    // -- [단계 1] 미확인 주사위 하강 --
+    // 1. 하강 (미확인 상태)
     const hiddenDice = document.createElement('div');
-    hiddenDice.id = "summon-dice-card"; // ID 부여 (조작 용이성)
-    hiddenDice.className = `w-full h-full bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop`;
+    hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop cursor-pointer`;
     hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
-    
-    // 초기 아이콘 (물음표 대신 등급 심볼 희미하게)
     hiddenDice.innerHTML = `<i class="${config.icon} text-6xl text-white opacity-50"></i>`;
     container.appendChild(hiddenDice);
 
-    // -- [단계 2] 착지 후 등급 색상 점등 (0.6초 후) --
+    // 2. 착지 후 대기 (0.6초 후)
     setTimeout(() => {
-        // 흰색 플래시
         const flash = document.createElement('div');
         flash.className = 'impact-flash';
-        hiddenDice.appendChild(flash); // 내부에 추가
+        container.appendChild(flash);
         
-        // 스타일 변경 (등급 확인 상태)
         hiddenDice.style.backgroundColor = 'white';
         hiddenDice.style.border = `4px solid ${config.color}`;
         hiddenDice.style.setProperty('--glow-color', config.color);
         hiddenDice.classList.remove('summon-drop');
-        hiddenDice.classList.add('summon-waiting'); // 숨쉬는 효과
+        hiddenDice.classList.add('summon-waiting');
         
-        // 아이콘 변경 (진하게)
         hiddenDice.innerHTML = `<i class="${config.icon} text-7xl ${config.tailwind}"></i>`;
-        hiddenDice.appendChild(flash); // 플래시 다시 추가 (innerHTML 덮어씀 방지용 혹은 순서 조정)
         
-        // 클릭 이벤트 바인딩
-        container.onclick = () => revealDice(container, hiddenDice, diceData, isNew, config);
+        // 클릭 시 공개 이벤트
+        hiddenDice.onclick = () => revealDice(hiddenDice, diceData, isNew, config);
         
     }, 600);
 }
 
-function revealDice(container, diceElement, diceData, isNew, config) {
-    // 1. 중복 클릭 방지 & 대기 모션 제거
-    container.onclick = null;
-    diceElement.classList.remove('summon-waiting');
+function revealDice(element, diceData, isNew, config) {
+    element.onclick = null; // 중복 클릭 방지
+    element.classList.remove('summon-waiting');
     
-    // 2. 파동 효과 (Ripple) 생성
+    // 3. 파동 및 공개
     const ripple = document.createElement('div');
     ripple.className = 'ripple-effect';
     ripple.style.setProperty('--glow-color', config.color);
-    diceElement.appendChild(ripple);
+    element.appendChild(ripple);
     
-    // 3. 내용물 교체 (등급 아이콘 -> 실제 주사위 아이콘)
-    // 기존 renderDiceIcon은 테두리까지 포함한 div를 리턴하므로, 내부 내용만 가져오거나 스타일을 덮어써야 함.
-    // 여기서는 renderDiceIcon 결과물을 통째로 넣되, 기존 등급 테두리(diceElement)를 대체하는 방식이 깔끔함.
+    // 실제 아이콘 렌더링 (크기 키워서)
+    let realIconHtml = renderDiceIcon(diceData, "w-32 h-32");
+    realIconHtml = realIconHtml.replace("text-4xl", "text-8xl");
     
-    // 실제 주사위 HTML 생성
-    let realDiceHtml = renderDiceIcon(diceData, "w-full h-full");
-    // 텍스트 크기 등 미세 조정 (문자열 치환)
-    realDiceHtml = realDiceHtml.replace("text-4xl", "text-8xl");
-    
-    // [중요] 깜빡임 방지를 위해 0.1초 뒤(파동 시작 직후) 교체
+    // 0.1초 후 교체 (파동 시작 시점)
     setTimeout(() => {
-        // diceElement(껍데기)의 내용을 실제 주사위로 부드럽게 교체
-        container.innerHTML = realDiceHtml;
+        const container = document.getElementById('summon-dice-container');
+        container.innerHTML = realIconHtml; // 내용 교체
         
-        // 새로 생긴 주사위 요소 선택
-        const newDice = container.firstElementChild;
-        if(newDice) {
-            newDice.classList.add('reveal-appear'); // 등장 애니메이션
+        // 교체된 요소 스타일링
+        const newDiceFace = container.querySelector('.dice-face');
+        if(newDiceFace) {
+            newDiceFace.style.boxShadow = `0 0 30px ${config.color}80`;
+            newDiceFace.classList.add('animate-bounce');
+            setTimeout(() => newDiceFace.classList.remove('animate-bounce'), 500);
             
-            // NEW 뱃지
             if(isNew) {
                 const badge = document.createElement('div');
                 badge.className = 'absolute -top-4 -right-4 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded-full shadow-lg border-2 border-white new-badge-pop z-20';
@@ -366,30 +351,25 @@ function revealDice(container, diceElement, diceData, isNew, config) {
                 container.appendChild(badge);
             }
         }
-
-        // 4. [시퀀스] 주사위 위로 이동 & 텍스트 등장 (교체 후 0.5초 뒤)
+        
+        // 4. 텍스트 표시 (0.5초 후)
         setTimeout(() => {
-            // 주사위 위로 이동
-            container.classList.add('summon-move-up');
-            
-            // 텍스트 등장
             const textArea = document.getElementById('summon-text-area');
             const diceName = document.getElementById('summon-dice-name');
             const tapArea = document.getElementById('summon-tap-area');
             
             diceName.innerText = diceData.name;
-            diceName.style.color = config.color; // 이름 색상을 등급색으로
+            diceName.style.color = config.color;
             
             textArea.classList.remove('hidden');
-            textArea.classList.add('text-reveal'); // 아래에서 위로 페이드인
+            textArea.classList.add('text-reveal');
             
-            // 닫기 활성화
-            tapArea.classList.remove('hidden');
+            tapArea.classList.remove('hidden'); // 전체 화면 터치 활성화
             tapArea.onclick = closeSummonOverlay;
             
-        }, 600); // 파동 및 교체 연출이 어느정도 보인 후 이동
+        }, 500);
         
-    }, 100); // 파동 시작과 거의 동시에 내용물 교체
+    }, 100);
 }
 
 function closeSummonOverlay() {
@@ -397,7 +377,6 @@ function closeSummonOverlay() {
     overlay.classList.add('hidden');
     overlay.classList.remove('flex');
     
-    // 리소스 및 덱 갱신
     fetchMyResources();
     fetchMyDice();
 }
