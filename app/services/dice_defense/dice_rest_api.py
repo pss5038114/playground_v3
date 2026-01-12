@@ -16,7 +16,6 @@ RARITY_WEIGHTS = [
 
 def pick_one_dice():
     """확률에 따라 주사위 하나를 랜덤하게 선택합니다."""
-    # 1. 등급 결정
     r = random.random()
     cumulative = 0.0
     selected_rarity = "Common"
@@ -26,9 +25,8 @@ def pick_one_dice():
             selected_rarity = rarity
             break
     
-    # 2. 해당 등급 내 주사위 선택
     candidates = [did for did, info in DICE_DATA.items() if info["rarity"] == selected_rarity]
-    if not candidates: # Fallback
+    if not candidates: 
         candidates = list(DICE_DATA.keys())
     
     return random.choice(candidates)
@@ -53,28 +51,26 @@ async def get_my_dice_list(username: str):
                 "name": info["name"],
                 "rarity": info["rarity"],
                 "color": info["color"],
-                "desc": info["desc"],
                 "symbol": info.get("symbol", "ri-dice-fill"),
+                "desc": info["desc"],
                 "stats": info.get("stats", {}),
                 "class_level": 0,
                 "quantity": 0,
-                "next_cost": None # [NEW] 다음 강화 비용 정보
+                "next_cost": None
             }
 
             if dice_id in owned_map:
                 dice_data["class_level"] = owned_map[dice_id]["class_level"]
                 dice_data["quantity"] = owned_map[dice_id]["quantity"]
             else:
-                # 미소유 Common 자동 지급 (class 1)
                 if info["rarity"] == "Common":
                     dice_data["class_level"] = 1
                     updates_needed.append((user_id, dice_id, 1, 0))
 
-            # [NEW] 다음 레벨업 비용 계산하여 주입
+            # 다음 레벨업 비용 계산
             curr_lv = dice_data["class_level"]
-            if curr_lv < 20: # Max 레벨(20) 미만일 때만 비용 존재
+            if curr_lv < 20: 
                 rarity = info["rarity"]
-                # 0레벨이면 인덱스 0 (해금비용), 1레벨이면 인덱스 1 (1->2비용)
                 req_gold = UPGRADE_RULES["gold"][curr_lv]
                 req_cards = UPGRADE_RULES["cards"][rarity][curr_lv]
                 
@@ -97,11 +93,10 @@ async def get_my_dice_list(username: str):
 @router.post("/summon")
 async def summon_dice(payload: dict = Body(...)):
     username = payload.get("username")
-    count = payload.get("count", 1) # 1 or 10
+    count = payload.get("count", 1) 
     
     conn = get_db_connection()
     try:
-        # 1. 유저 및 티켓 확인
         user = conn.execute("SELECT id, tickets FROM users WHERE username = ?", (username,)).fetchone()
         if not user: raise HTTPException(404, "User not found")
         
@@ -109,20 +104,16 @@ async def summon_dice(payload: dict = Body(...)):
         if user["tickets"] < ticket_cost:
              raise HTTPException(400, "티켓이 부족합니다.")
              
-        # 2. 티켓 소모
         conn.execute("UPDATE users SET tickets = tickets - ? WHERE id = ?", (ticket_cost, user["id"]))
         
-        # 3. 가챠 실행 (10회 소환 시 11개 지급)
         real_count = 11 if count == 10 else 1
-        results = [pick_one_dice() for _ in range(real_count)]
+        results_ids = [pick_one_dice() for _ in range(real_count)]
         
-        # 4. 결과 집계 및 DB 반영 (UPSERT 로직 구현)
         result_summary = {} 
-        for did in results:
+        for did in results_ids:
             result_summary[did] = result_summary.get(did, 0) + 1
             
         for did, qty in result_summary.items():
-            # 기존 레코드 확인
             row = conn.execute("SELECT id FROM user_dice WHERE user_id = ? AND dice_id = ?", (user["id"], did)).fetchone()
             if row:
                 conn.execute("UPDATE user_dice SET quantity = quantity + ? WHERE id = ?", (qty, row["id"]))
@@ -131,9 +122,21 @@ async def summon_dice(payload: dict = Body(...)):
                 
         conn.commit()
         
-        # 결과 반환 (연출용 데이터)
+        # [수정] 반환 데이터에 상세 정보 포함 (color, symbol 등)
+        response_results = []
+        for did in results_ids:
+            info = DICE_DATA[did]
+            response_results.append({
+                "id": did,
+                "name": info["name"],
+                "rarity": info["rarity"],
+                "color": info["color"], # 중요: 이것 때문에 에러가 났음
+                "symbol": info.get("symbol", "ri-dice-fill"),
+                "desc": info["desc"]
+            })
+
         return {
-            "results": [{"id": did, "name": DICE_DATA[did]["name"], "rarity": DICE_DATA[did]["rarity"]} for did in results],
+            "results": response_results,
             "remaining_tickets": user["tickets"] - ticket_cost
         }
     except Exception as e:
@@ -161,7 +164,6 @@ async def upgrade_dice(payload: dict = Body(...)):
         if current_level >= 20:
             raise HTTPException(400, "이미 최대 레벨입니다.")
         
-        # [수정] UPGRADE_RULES 테이블 참조하여 비용 검증
         dice_info = DICE_DATA.get(dice_id)
         if not dice_info: raise HTTPException(400, "잘못된 주사위 ID")
         
@@ -174,7 +176,6 @@ async def upgrade_dice(payload: dict = Body(...)):
         if user["gold"] < req_gold:
              raise HTTPException(400, "골드가 부족합니다.")
              
-        # 실행
         conn.execute("UPDATE user_dice SET quantity = quantity - ?, class_level = class_level + 1 WHERE id = ?", (req_cards, dice_row["id"]))
         conn.execute("UPDATE users SET gold = gold - ? WHERE id = ?", (req_gold, user["id"]))
         conn.commit()

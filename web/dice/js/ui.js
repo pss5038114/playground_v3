@@ -14,36 +14,10 @@ async function loadComponents() {
             if(r.ok) document.getElementById(t.id).innerHTML=await r.text();
         }catch(e){}
     }));
-    // 컴포넌트 로드 후 초기화
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
 }
 
-// [소환 핸들러]
-async function handleSummon(count) {
-    const data = await summonDice(count);
-    if (!data) return;
-
-    if (count === 1) {
-        const resultDice = data.results[0];
-        // 신규 획득 여부는 서버에서 has_new 필드로 주면 좋지만, 여기선 로컬 판단
-        // (주의: fetchMyDice로 최신 리스트가 동기화되어 있어야 정확함)
-        const existing = currentDiceList.find(d => d.id === resultDice.id);
-        const isNew = existing ? (existing.class_level === 0) : true;
-        
-        // 정보 매핑 (리스트에 없으면 resultDice 기본 정보 사용)
-        const fullData = currentDiceList.find(d => d.id === resultDice.id) || resultDice;
-        
-        playSingleSummonAnimation(fullData, isNew);
-    } else {
-        const names = data.results.map(x=>`[${x.rarity}] ${x.name}`).join("\n");
-        alert(`✨ 소환 결과 (10+1) ✨\n\n${names}`);
-        fetchMyResources();
-        fetchMyDice();
-    }
-}
-
-// 탭 전환
 const tabNames = ['shop','deck','battle','event','clan'];
 function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
@@ -54,12 +28,159 @@ function switchTab(name) {
     if(name==='shop') fetchMyResources();
 }
 
-// 덱 그리드 렌더링
+// -----------------------------------------------------------
+// [소환 및 애니메이션 로직]
+// -----------------------------------------------------------
+
+async function handleSummon(count) {
+    const data = await summonDice(count);
+    if (!data) return;
+
+    if (count === 1) {
+        // 백엔드에서 이제 color 등 상세 정보를 줌
+        const resultDice = data.results[0];
+        
+        // 신규 여부 체크 (기존 리스트 참조)
+        let isNew = true;
+        if (currentDiceList.length > 0) {
+            const existing = currentDiceList.find(d => d.id === resultDice.id);
+            if (existing && existing.class_level > 0) isNew = false;
+        }
+        
+        playSingleSummonAnimation(resultDice, isNew);
+    } else {
+        // 10+1 소환
+        const names = data.results.map(x=>`[${x.rarity}] ${x.name}`).join("\n");
+        alert(`✨ 소환 결과 (10+1) ✨\n\n${names}`);
+        fetchMyResources();
+        fetchMyDice();
+    }
+}
+
+function playSingleSummonAnimation(diceData, isNew) {
+    const overlay = document.getElementById('summon-overlay');
+    const container = document.getElementById('summon-dice-container');
+    const textArea = document.getElementById('summon-text-area');
+    const tapArea = document.getElementById('summon-tap-area');
+    
+    // 초기화
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    textArea.classList.add('hidden');
+    textArea.classList.remove('text-reveal');
+    tapArea.classList.add('hidden');
+    
+    container.innerHTML = '';
+    container.classList.remove('dice-slide-up'); 
+    
+    // 등급별 설정
+    const rarityConfig = {
+        'Common': { color: '#94a3b8', icon: 'ri-focus-line', tailwind: 'text-slate-400' },
+        'Rare':   { color: '#3b82f6', icon: 'ri-shield-line', tailwind: 'text-blue-500' },
+        'Hero':   { color: '#a855f7', icon: 'ri-sword-line', tailwind: 'text-purple-500' },
+        'Legend': { color: '#facc15', icon: 'ri-vip-crown-line', tailwind: 'text-yellow-400' }
+    };
+    const config = rarityConfig[diceData.rarity] || rarityConfig['Common'];
+    
+    // 1. 미확인 주사위 생성 (하강)
+    const hiddenDice = document.createElement('div');
+    hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
+    hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
+    hiddenDice.innerHTML = `<i class="${config.icon} text-6xl text-white opacity-50"></i>`;
+    
+    container.appendChild(hiddenDice);
+
+    // 2. 착지 후 대기 상태 (0.6초 후)
+    setTimeout(() => {
+        const flash = document.createElement('div');
+        flash.className = 'impact-flash';
+        container.appendChild(flash);
+        
+        hiddenDice.style.backgroundColor = 'white';
+        hiddenDice.style.border = `4px solid ${config.color}`;
+        hiddenDice.style.setProperty('--glow-color', config.color);
+        hiddenDice.classList.remove('summon-drop');
+        hiddenDice.classList.add('summon-waiting');
+        
+        hiddenDice.innerHTML = `<i class="${config.icon} text-7xl ${config.tailwind}"></i>`;
+        
+        hiddenDice.onclick = () => revealDice(hiddenDice, diceData, isNew, config);
+        
+    }, 600);
+}
+
+function revealDice(element, diceData, isNew, config) {
+    const container = document.getElementById('summon-dice-container');
+
+    // 1. 클릭 이벤트 제거 및 대기 효과 중지
+    element.onclick = null;
+    element.classList.remove('summon-waiting');
+    
+    // 2. 파동 효과
+    const ripple = document.createElement('div');
+    ripple.className = 'ripple-effect';
+    ripple.style.setProperty('--glow-color', config.color);
+    container.appendChild(ripple);
+    
+    // 3. 주사위 실체화 (즉시 교체)
+    let realIconHtml = renderDiceIcon(diceData, "w-32 h-32");
+    realIconHtml = realIconHtml.replace("text-4xl", "text-8xl"); 
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = realIconHtml;
+    const newDiceEl = tempDiv.firstElementChild;
+    
+    newDiceEl.classList.add('relative', 'z-10'); 
+    // diceData.color가 bg-xxx 형태이므로 hex값 추론이 어렵다면 config.color(등급색) 사용
+    newDiceEl.style.boxShadow = `0 0 30px ${config.color}80`; 
+    
+    container.replaceChild(newDiceEl, element);
+    
+    // NEW 뱃지
+    if(isNew) {
+        const badge = document.createElement('div');
+        badge.className = 'absolute -top-4 -right-4 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded-full shadow-lg border-2 border-white new-badge-pop z-20';
+        badge.innerText = "NEW!";
+        container.appendChild(badge);
+    }
+
+    // 4. [시퀀스] 파동 끝난 후 위로 이동 + 텍스트 등장 (0.6초 후)
+    setTimeout(() => {
+        container.classList.add('dice-slide-up');
+
+        const textArea = document.getElementById('summon-text-area');
+        const diceName = document.getElementById('summon-dice-name');
+        const tapArea = document.getElementById('summon-tap-area');
+        
+        diceName.innerText = diceData.name;
+        // 이름 색상을 등급색으로 설정
+        diceName.style.color = config.color; 
+        
+        textArea.classList.remove('hidden');
+        textArea.classList.add('text-reveal');
+        
+        tapArea.classList.remove('hidden');
+        tapArea.onclick = closeSummonOverlay;
+        
+    }, 600);
+}
+
+function closeSummonOverlay() {
+    const overlay = document.getElementById('summon-overlay');
+    overlay.classList.remove('flex');
+    overlay.classList.add('hidden');
+    
+    fetchMyResources();
+    fetchMyDice();
+}
+
+// -----------------------------------------------------------
+// [덱 및 팝업 로직]
+// -----------------------------------------------------------
+
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
-    
-    // 콤마 제거 후 정수 변환
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
 
     list.forEach(dice => {
@@ -67,17 +188,13 @@ function renderDiceGrid(list) {
         if(isOwned) ownedCount++;
         
         let isUpgradeable = false;
-        
-        // [수정] 서버에서 준 next_cost 정보 활용
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
-            // 0레벨(해금)은 그리드에서 초록테두리 안 보여주는게 일반적이나, 원하시면 || dice.class_level === 0 추가
             if (dice.class_level > 0 && dice.quantity >= cards && currentGold >= gold) {
                 isUpgradeable = true;
             }
         }
 
-        // ... (이하 아이콘, 테두리 등 렌더링 로직 기존 유지) ...
         const iconHtml = renderDiceIcon(dice, "w-12 h-12");
         const rarityBgIcon = getRarityBgIcon(dice.rarity);
         const rarityDotColor = getRarityDotColor(dice.rarity);
@@ -108,11 +225,9 @@ function renderDiceGrid(list) {
     if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
 }
 
-// 상세 팝업
 function showDiceDetail(diceId) {
     const dice = currentDiceList.find(d => d.id === diceId); if(!dice) return; currentSelectedDice = dice;
     
-    // 기본 정보 바인딩
     document.getElementById('popup-dice-name').innerText = dice.name;
     document.getElementById('popup-dice-desc').innerText = dice.desc;
     document.getElementById('popup-dice-rarity').innerText = dice.rarity;
@@ -151,24 +266,24 @@ function showDiceDetail(diceId) {
     } 
     else {
         // [해금 또는 강화]
-        // dice.next_cost가 반드시 존재함 (백엔드에서 20미만이면 보내줌)
-        const { cards: reqCards, gold: reqGold } = dice.next_cost;
+        // next_cost가 없을 경우를 대비해 기본값 처리 (방어코드)
+        const reqCards = dice.next_cost ? dice.next_cost.cards : 9999;
+        const reqGold = dice.next_cost ? dice.next_cost.gold : 9999;
         
         document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`;
         const pct = Math.min((dice.quantity / reqCards) * 100, 100);
         progress.style.width = `${pct}%`;
 
-        // 보유 조건 체크
         const hasEnoughCards = dice.quantity >= reqCards;
         const hasEnoughGold = currentGold >= reqGold;
 
         if (dice.class_level === 0) {
             // [해금]
             progColorClass = "bg-green-500";
-            if (hasEnoughCards && hasEnoughGold) { // 해금도 이제 골드 비용 있음(1000)
+            if (hasEnoughCards && hasEnoughGold) {
                 canUpgrade = true;
                 btn.innerHTML = `<span>🔓 해금하기</span>`;
-                costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드 (카드 1장)`;
+                costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
                 btnColorClass = "bg-green-500 hover:bg-green-600";
             } else {
                 btn.innerHTML = !hasEnoughCards ? `<span>카드 부족</span>` : `<span>골드 부족</span>`;
@@ -184,10 +299,10 @@ function showDiceDetail(diceId) {
                 btn.innerHTML = `<span>⬆️ 레벨업</span>`;
                 costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
                 
-                btnColorClass = "bg-green-600 hover:bg-green-700"; // 초록 테마
+                btnColorClass = "bg-green-600 hover:bg-green-700"; 
                 progColorClass = "bg-green-500";
             } else {
-                currentViewMode = 'class'; // 불가능해도 미리보기는 보여줌
+                currentViewMode = 'class'; 
                 btn.innerHTML = !hasEnoughCards ? `카드 부족` : `골드 부족`;
                 costInfo.innerText = `필요: 카드 ${reqCards}장, ${reqGold.toLocaleString()} 골드`;
                 btnColorClass = "bg-slate-300 cursor-not-allowed";
@@ -201,7 +316,6 @@ function showDiceDetail(diceId) {
 
     if(canUpgrade) {
         btn.classList.add('btn-pulse-green');
-        // 아이콘 위 파티클
         iconContainer.innerHTML += `<div class="firefly-container" style="border-radius: 1rem;"><div class="firefly"></div><div class="firefly"></div></div>`;
     } else {
         btn.classList.remove('btn-pulse-green');
@@ -237,11 +351,9 @@ function updateStatsView() {
     
     if(stats.specials) { stats.specials.forEach(sp => { addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format); }); }
     
-    // 빈칸 채우기
     const filled = 3 + (stats.specials ? stats.specials.length : 0);
     for(let i=filled; i<6; i++) { grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`; }
     
-    // 버튼 상태
     const btnClass = document.getElementById('btn-view-class'); const btnPower = document.getElementById('btn-view-power');
     btnClass.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='class' ? 'bg-green-100 border-green-300 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
     btnPower.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='power' ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
@@ -265,131 +377,4 @@ function addStatBox(grid, name, iconClass, statData, level, unitSuffix="", forma
 
 function addStatBoxStatic(grid, name, iconClass, val) { 
     grid.innerHTML += `<div class="stat-box justify-between"><i class="${iconClass} text-slate-600 text-lg w-6 text-center"></i><div class="text-right"><div class="text-[10px] text-slate-400 font-bold">${name}</div><div class="text-sm font-bold text-slate-700">${val}</div></div></div>`; 
-}
-
-// [1회 소환 연출]
-function playSingleSummonAnimation(diceData, isNew) {
-    const overlay = document.getElementById('summon-overlay');
-    const container = document.getElementById('summon-dice-container');
-    const textArea = document.getElementById('summon-text-area');
-    const tapArea = document.getElementById('summon-tap-area');
-    
-    // [초기화]
-    overlay.classList.remove('hidden');
-    overlay.classList.add('flex');
-    textArea.classList.add('hidden');
-    textArea.classList.remove('text-reveal'); // 이전 애니메이션 클래스 제거
-    tapArea.classList.add('hidden');
-    
-    // 컨테이너 초기화 (이전 이동 애니메이션 제거)
-    container.innerHTML = '';
-    container.classList.remove('dice-slide-up'); 
-    
-    // 등급별 설정
-    const rarityConfig = {
-        'Common': { color: '#94a3b8', icon: 'ri-focus-line', tailwind: 'text-slate-400' },
-        'Rare':   { color: '#3b82f6', icon: 'ri-shield-line', tailwind: 'text-blue-500' },
-        'Hero':   { color: '#a855f7', icon: 'ri-sword-line', tailwind: 'text-purple-500' },
-        'Legend': { color: '#facc15', icon: 'ri-vip-crown-line', tailwind: 'text-yellow-400' }
-    };
-    const config = rarityConfig[diceData.rarity] || rarityConfig['Common'];
-    
-    // 1. 미확인 주사위 생성 (하강)
-    const hiddenDice = document.createElement('div');
-    hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
-    hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
-    hiddenDice.innerHTML = `<i class="${config.icon} text-6xl text-white opacity-50"></i>`;
-    
-    container.appendChild(hiddenDice);
-
-    // 2. 착지 후 대기 상태 (0.6초 후)
-    setTimeout(() => {
-        // 흰색 플래시
-        const flash = document.createElement('div');
-        flash.className = 'impact-flash';
-        container.appendChild(flash);
-        
-        // 스타일 변경 (등급 확인)
-        hiddenDice.style.backgroundColor = 'white';
-        hiddenDice.style.border = `4px solid ${config.color}`;
-        hiddenDice.style.setProperty('--glow-color', config.color);
-        hiddenDice.classList.remove('summon-drop');
-        hiddenDice.classList.add('summon-waiting');
-        
-        hiddenDice.innerHTML = `<i class="${config.icon} text-7xl ${config.tailwind}"></i>`;
-        
-        // 클릭 이벤트 연결
-        hiddenDice.onclick = () => revealDice(hiddenDice, diceData, isNew, config);
-        
-    }, 600);
-}
-
-function revealDice(element, diceData, isNew, config) {
-    const container = document.getElementById('summon-dice-container');
-
-    // 1. 클릭 이벤트 제거 및 대기 효과 중지
-    element.onclick = null;
-    element.classList.remove('summon-waiting');
-    
-    // 2. 파동 효과 생성 (컨테이너에 붙여서 주사위 뒤로 퍼지게)
-    const ripple = document.createElement('div');
-    ripple.className = 'ripple-effect';
-    ripple.style.setProperty('--glow-color', config.color);
-    container.appendChild(ripple);
-    
-    // 3. 주사위 실체화 (즉시 교체)
-    let realIconHtml = renderDiceIcon(diceData, "w-32 h-32");
-    realIconHtml = realIconHtml.replace("text-4xl", "text-8xl"); // 아이콘 크기 키움
-    
-    // HTML 파싱하여 엘리먼트 생성
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = realIconHtml;
-    const newDiceEl = tempDiv.firstElementChild;
-    
-    // 새 주사위 스타일 보정 (z-index 등)
-    newDiceEl.classList.add('relative', 'z-10'); 
-    newDiceEl.style.boxShadow = `0 0 30px ${config.color}80`; // 등급색 글로우
-    
-    // [중요] 기존 element를 새 주사위로 교체 (DOM 구조 변경 최소화)
-    container.replaceChild(newDiceEl, element);
-    
-    // NEW 뱃지
-    if(isNew) {
-        const badge = document.createElement('div');
-        badge.className = 'absolute -top-4 -right-4 bg-red-500 text-white text-sm font-bold px-2 py-1 rounded-full shadow-lg border-2 border-white new-badge-pop z-20';
-        badge.innerText = "NEW!";
-        container.appendChild(badge);
-    }
-
-    // 4. [시퀀스] 파동 끝난 후 위로 이동 + 텍스트 등장 (0.6초 후)
-    setTimeout(() => {
-        // 주사위 위로 이동
-        container.classList.add('dice-slide-up');
-
-        // 텍스트 등장
-        const textArea = document.getElementById('summon-text-area');
-        const diceName = document.getElementById('summon-dice-name');
-        const tapArea = document.getElementById('summon-tap-area');
-        
-        diceName.innerText = diceData.name;
-        // 이름 색상은 등급색 대신 가독성 좋은 흰색 유지하거나, 필요시 변경
-        // diceName.style.color = config.color; 
-        
-        textArea.classList.remove('hidden');
-        textArea.classList.add('text-reveal');
-        
-        // 닫기 활성화
-        tapArea.classList.remove('hidden');
-        tapArea.onclick = closeSummonOverlay;
-        
-    }, 600); // 파동 시간과 일치시킴
-}
-
-function closeSummonOverlay() {
-    const overlay = document.getElementById('summon-overlay');
-    overlay.classList.remove('flex');
-    overlay.classList.add('hidden');
-    
-    fetchMyResources();
-    fetchMyDice();
 }
