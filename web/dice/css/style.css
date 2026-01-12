@@ -158,11 +158,11 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 
 /* 1. 시계방향 테두리 그리기 */
 @keyframes draw-border-cw {
-    0% { clip-path: polygon(0 0, 0 0, 0 0, 0 0); opacity: 1; } /* 시작 시 보임 */
-    25% { clip-path: polygon(0 0, 100% 0, 100% 0, 100% 0); } 
-    50% { clip-path: polygon(0 0, 100% 0, 100% 100%, 100% 100%); } 
-    75% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); } 
-    100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 1; }
+    0% { clip-path: polygon(0 0, 0 0, 0 0, 0 0); } /* Top-Left */
+    25% { clip-path: polygon(0 0, 100% 0, 100% 0, 100% 0); } /* Top */
+    50% { clip-path: polygon(0 0, 100% 0, 100% 100%, 100% 100%); } /* Right */
+    75% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); } /* Bottom */
+    100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); } /* Left (Full) */
 }
 
 /* 테두리만 있는 박스 */
@@ -171,13 +171,9 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     border: 2px solid white;
     border-radius: 22%;
     box-sizing: border-box;
-    
-    /* [핵심 수정] 
-       1. opacity: 0 으로 기본 숨김 (안전장치)
-       2. forwards -> both 변경! (딜레이 동안 0% 상태 유지) 
-    */
-    opacity: 0; 
-    animation: draw-border-cw 0.4s linear both;
+    /* [수정] 초기 상태에는 아무것도 보이지 않게 설정 (딜레이 동안 숨김) */
+    clip-path: polygon(0 0, 0 0, 0 0, 0 0); 
+    animation: draw-border-cw 0.4s linear forwards;
 }
 
 /* 2. 팡! 등장 (Pop In) */
