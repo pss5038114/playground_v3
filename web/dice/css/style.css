@@ -1,19 +1,32 @@
-/* web/dice/css/style.css */
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
 
 body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 
+/* 탭 전환 애니메이션 */
 .tab-content { display: none; height: calc(100vh - 140px); overflow-y: auto; }
 .tab-content.active { display: flex; animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* 스크롤바 숨김 */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* 게임 캔버스 */
 #game-canvas { background: #334155; border-radius: 12px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+
+/* 미보유 주사위 필터 */
 .dice-unowned { filter: grayscale(100%); opacity: 0.6; }
+
+/* 스탯 박스 공통 */
 .stat-box { position: relative; height: 3.5rem; background-color: #f1f5f9; border-radius: 0.5rem; display: flex; align-items: center; padding: 0.5rem; }
 
-/* 주사위 스타일 */
+/* 팝업 컴팩트 스타일 */
+.popup-compact {
+    max-height: min(85vh, 32rem);
+    padding: 1.25rem !important;
+}
+
+/* --- 주사위 비주얼 스타일 --- */
 .dice-face {
     background-color: #f1f5f9;
     border-radius: 22%;
@@ -35,29 +48,23 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
         0 0 6px -1px var(--dice-color), 0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
 }
 
-/* 이펙트 */
-@keyframes firefly-float {
-    0%, 100% { transform: translate(0, 0); opacity: 0; }
-    50% { opacity: 1; }
-    25% { transform: translate(10px, -10px); }
-    75% { transform: translate(-10px, 10px); }
+/* --- 이펙트 (강화/팝업) --- */
+/* 초록색 펄스 (강화 버튼) */
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
-.firefly-container { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 0.75rem; }
-.firefly {
-    position: absolute; width: 4px; height: 4px; background: #60a5fa;
-    border-radius: 50%; box-shadow: 0 0 4px #60a5fa; opacity: 0;
-}
-.firefly:nth-child(1) { top: 20%; left: 20%; animation: firefly-float 3s infinite ease-in-out; animation-delay: 0s; }
-.firefly:nth-child(2) { top: 80%; left: 70%; animation: firefly-float 4s infinite ease-in-out; animation-delay: 1s; }
-.firefly:nth-child(3) { top: 40%; left: 80%; animation: firefly-float 3.5s infinite ease-in-out; animation-delay: 2s; }
+.btn-pulse-green { animation: pulse-green 2s infinite; }
 
-@keyframes pulse-blue {
-    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+/* 화살표 둥둥 효과 */
+@keyframes float-arrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
 }
-.btn-pulse { animation: pulse-blue 2s infinite; }
+.arrow-float { animation: float-arrow 1s infinite ease-in-out; }
 
+/* 레벨업 버스트 효과 */
 @keyframes burst-ring {
     0% { transform: scale(0.8); opacity: 1; border-width: 4px; }
     100% { transform: scale(2); opacity: 0; border-width: 0; }
@@ -67,30 +74,9 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     animation: burst-ring 0.6s ease-out forwards; pointer-events: none;
 }
 
-@keyframes pulse-green {
-    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } /* green-500 */
-    70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
-}
-.btn-pulse-green {
-    animation: pulse-green 2s infinite;
-}
-
-@keyframes float-arrow {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-}
-.arrow-float {
-    animation: float-arrow 1s infinite ease-in-out;
-}
-
-.popup-compact {
-    max-height: min(85vh, 32rem); /* 높이 제한 강화 */
-    padding: 1.25rem !important;  /* p-5 (20px) */
-}
-
+/* --- 소환(Gacha) 연출 스타일 --- */
 #summon-overlay {
-    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); /* 어두운 배경 */
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
     perspective: 1000px;
 }
 
@@ -103,25 +89,28 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 }
 .summon-drop { animation: drop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 
-/* 2. 등급별 은은한 빛 (Breathing Glow) */
+/* 2. 대기 중 숨쉬는 효과 */
 @keyframes breathe-glow {
     0%, 100% { box-shadow: 0 0 15px var(--glow-color); }
     50% { box-shadow: 0 0 30px var(--glow-color), 0 0 10px var(--glow-color) inset; }
 }
 .summon-waiting { animation: breathe-glow 2s infinite ease-in-out; }
 
-/* 3. 개방 파동 (Ripple Burst) */
+/* 3. 개방 파동 (Ripple) */
 @keyframes ripple-burst {
     0% { transform: scale(1); opacity: 0.8; border-width: 4px; }
     100% { transform: scale(3); opacity: 0; border-width: 0; }
 }
 .ripple-effect {
-    position: absolute; inset: -2px; border-radius: 22%;
-    border: 2px solid var(--glow-color);
-    animation: ripple-burst 0.6s ease-out forwards;
+    position: absolute;
+    inset: -10px;
+    border-radius: 25%;
+    border: 4px solid var(--glow-color);
+    animation: ripple-burst 0.8s ease-out forwards;
+    z-index: 0;
 }
 
-/* 4. 흰색 임팩트 (Flash) */
+/* 4. 흰색 플래시 */
 @keyframes flash-white {
     0% { opacity: 1; }
     100% { opacity: 0; }
@@ -129,19 +118,70 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 .impact-flash {
     position: absolute; inset: 0; background: white; border-radius: 22%;
     animation: flash-white 0.3s ease-out forwards; pointer-events: none;
+    z-index: 20;
 }
 
-/* 텍스트 페이드인 */
+/* 텍스트 등장 */
 @keyframes fade-up {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 .text-reveal { animation: fade-up 0.5s ease-out forwards; }
 
-/* NEW 뱃지 팡 튀어오름 */
+/* NEW 뱃지 팝업 */
 @keyframes pop-badge {
     0% { transform: scale(0); }
     80% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
 .new-badge-pop { animation: pop-badge 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+/* --- 3D Flip 애니메이션 --- */
+.flip-container {
+    perspective: 1000px;
+    width: 8rem;  /* w-32 */
+    height: 8rem; /* h-32 */
+    cursor: pointer;
+    position: relative;
+    z-index: 10;
+}
+
+.flipper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-style: preserve-3d;
+}
+
+.flipper.flipped {
+    transform: rotateY(180deg);
+}
+
+.flip-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 22%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+/* 앞면 (결과): 180도 회전 상태 */
+.flip-front {
+    transform: rotateY(180deg);
+    background: white;
+    z-index: 1;
+}
+
+/* 뒷면 (등급): 초기 상태 */
+.flip-back {
+    transform: rotateY(0deg);
+    background-color: #f8fafc;
+    z-index: 2;
+    border: 4px solid var(--glow-color, #cbd5e1);
+}
