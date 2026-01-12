@@ -5,9 +5,13 @@ async function fetchMyResources() {
         const res = await fetch(`${API_AUTH}/profile/${myId}`);
         if(res.ok) {
             const data = await res.json();
-            document.getElementById('res-gem').innerText = data.gems.toLocaleString();
-            document.getElementById('res-gold').innerText = data.gold.toLocaleString();
-            document.getElementById('res-ticket').innerText = data.tickets.toLocaleString();
+            const gemEl = document.getElementById('res-gem');
+            const goldEl = document.getElementById('res-gold');
+            const ticketEl = document.getElementById('res-ticket');
+            
+            if(gemEl) gemEl.innerText = data.gems.toLocaleString();
+            if(goldEl) goldEl.innerText = data.gold.toLocaleString();
+            if(ticketEl) ticketEl.innerText = data.tickets.toLocaleString();
         }
     } catch(e) {}
 }
@@ -19,35 +23,34 @@ async function addResource(type, amount) {
 
 async function summonDice(count) {
     try {
-        const res = await fetch(`${API_DICE}/summon`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: myId, count: count})
-        });
+        const res = await fetch(`${API_DICE}/summon`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:myId,count:count})});
         const data = await res.json();
-        
         if(!res.ok) {
-            alert(data.detail || "오류");
+            alert(data.detail||"오류");
             return null;
         }
-        // [수정] 성공 시 데이터 반환만 함 (UI 처리는 ui.js에서)
-        return data; 
-        
+        return data;
     } catch(e) { 
         alert("서버 통신 오류");
         return null;
     }
 }
 
+// [수정] 데이터를 리턴하도록 변경하여 ui.js에서 await로 기다릴 수 있게 함
 async function fetchMyDice() {
     try {
         const res = await fetch(`${API_DICE}/list/${myId}`);
         if(res.ok) {
-            currentDiceList = await res.json();
-            // ui.js에 있는 함수 호출
+            const list = await res.json();
+            currentDiceList = list; // 전역 변수 업데이트
+            
+            // UI 렌더링 함수가 있다면 호출
             if(typeof renderDiceGrid === 'function') renderDiceGrid(currentDiceList);
+            
+            return list; // 데이터 리턴 추가
         }
     } catch(e){}
+    return [];
 }
 
 async function upgradeDice(diceId) {
@@ -62,18 +65,14 @@ async function upgradeDice(diceId) {
             }
             await fetchMyResources();
             // 리스트 갱신 후 팝업 업데이트
-            const listRes = await fetch(`${API_DICE}/list/${myId}`);
-            if(listRes.ok) {
-                currentDiceList = await listRes.json();
-                renderDiceGrid(currentDiceList);
-                
-                const updatedDice = currentDiceList.find(d => d.id === diceId);
-                if(updatedDice) {
-                    currentSelectedDice = updatedDice;
-                    const classEl = document.getElementById('popup-dice-class');
-                    if(classEl) classEl.innerText = `Lv.${updatedDice.class_level}`;
-                    showDiceDetail(diceId); // 팝업 리프레시
-                }
+            await fetchMyDice(); 
+            
+            const updatedDice = currentDiceList.find(d => d.id === diceId);
+            if(updatedDice) {
+                currentSelectedDice = updatedDice;
+                const classEl = document.getElementById('popup-dice-class');
+                if(classEl) classEl.innerText = `Lv.${updatedDice.class_level}`;
+                showDiceDetail(diceId); 
             }
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
