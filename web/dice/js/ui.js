@@ -68,7 +68,7 @@ function playSingleSummonAnimation(diceData, isNew) {
     // 컨테이너 초기화
     container.innerHTML = '';
     container.className = "relative w-32 h-32 transition-transform duration-500 cursor-default flex items-center justify-center pointer-events-auto"; 
-    container.onclick = null; // 이전 핸들러 제거
+    container.onclick = null; 
 
     // 등급별 설정
     const rarityConfig = {
@@ -81,8 +81,6 @@ function playSingleSummonAnimation(diceData, isNew) {
     
     // 1. 미확인 주사위 생성 (하강)
     const hiddenDice = document.createElement('div');
-    // [수정] pointer-events-none을 줘서 클릭이 컨테이너로 통과되게 하거나, auto로 줘서 직접 받게 함.
-    // 여기서는 컨테이너가 이벤트를 받을 것이므로 자식은 비주얼 역할만 해도 됨.
     hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
     hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
     hiddenDice.innerHTML = `<i class="${config.icon} text-6xl text-white opacity-50"></i>`;
@@ -91,12 +89,10 @@ function playSingleSummonAnimation(diceData, isNew) {
 
     // 2. 착지 후 대기 상태 (0.6초 후)
     setTimeout(() => {
-        // 흰색 플래시
         const flash = document.createElement('div');
-        flash.className = 'impact-flash'; // css에서 pointer-events: none 확인됨
+        flash.className = 'impact-flash'; 
         container.appendChild(flash);
         
-        // 스타일 변경
         hiddenDice.style.backgroundColor = 'white';
         hiddenDice.style.border = `4px solid ${config.color}`;
         hiddenDice.style.setProperty('--glow-color', config.color);
@@ -105,11 +101,9 @@ function playSingleSummonAnimation(diceData, isNew) {
         
         hiddenDice.innerHTML = `<i class="${config.icon} text-7xl ${config.tailwind}"></i>`;
         
-        // [중요] 컨테이너를 '클릭 가능' 상태로 변경하고 핸들러 부착
         container.style.cursor = 'pointer';
         container.classList.add('cursor-pointer');
         
-        // [핵심] 클릭 이벤트를 주사위가 아닌 컨테이너에 부착 (확실한 클릭 보장)
         container.onclick = function() {
             revealDice(hiddenDice, diceData, isNew, config);
         };
@@ -184,7 +178,6 @@ function closeSummonOverlay() {
     overlay.classList.remove('flex');
     overlay.classList.add('hidden');
     
-    // 닫을 때 컨테이너 초기화 (다음 소환을 위해)
     const container = document.getElementById('summon-dice-container');
     container.classList.remove('dice-slide-up');
     
@@ -192,10 +185,7 @@ function closeSummonOverlay() {
     fetchMyDice();
 }
 
-// -----------------------------------------------------------
-// [덱 및 팝업 로직] (기존 유지)
-// -----------------------------------------------------------
-
+// ... (renderDiceGrid, showDiceDetail 등 하단 로직은 기존과 동일) ...
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
@@ -274,6 +264,7 @@ function showDiceDetail(diceId) {
         document.getElementById('popup-dice-cards').innerText = "MAX";
         progress.style.width = "100%";
         progress.className = "h-full w-full bg-slate-300";
+        
         btn.innerHTML = `<span>MAX LEVEL</span>`;
         costInfo.innerText = "최고 레벨에 도달했습니다.";
         btnColorClass = "bg-slate-400 cursor-not-allowed";
@@ -308,6 +299,7 @@ function showDiceDetail(diceId) {
                 currentViewMode = 'class'; 
                 btn.innerHTML = `<span>⬆️ 레벨업</span>`;
                 costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
+                
                 btnColorClass = "bg-green-600 hover:bg-green-700"; 
                 progColorClass = "bg-green-500";
             } else {

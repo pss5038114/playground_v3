@@ -51,7 +51,7 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 .firefly:nth-child(2) { top: 80%; left: 70%; animation: firefly-float 4s infinite ease-in-out; animation-delay: 1s; }
 .firefly:nth-child(3) { top: 40%; left: 80%; animation: firefly-float 3.5s infinite ease-in-out; animation-delay: 2s; }
 
-/* 초록 펄스 */
+/* 펄스 (초록) */
 @keyframes pulse-green {
     0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
     70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
@@ -59,17 +59,6 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 }
 .btn-pulse-green { animation: pulse-green 2s infinite; }
 
-/* 화살표 둥둥 */
-@keyframes float-arrow {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-}
-.arrow-float { animation: float-arrow 1s infinite ease-in-out; }
-
-/* 팝업 컴팩트 */
-.popup-compact { max-height: min(85vh, 32rem); padding: 1.25rem !important; }
-
-/* 레벨업 버스트 */
 @keyframes burst-ring {
     0% { transform: scale(0.8); opacity: 1; border-width: 4px; }
     100% { transform: scale(2); opacity: 0; border-width: 0; }
@@ -79,11 +68,28 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     animation: burst-ring 0.6s ease-out forwards; pointer-events: none;
 }
 
-/* [NEW] 소환 연출 스타일 */
+/* 화살표 둥둥 */
+@keyframes float-arrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+.arrow-float { animation: float-arrow 1s infinite ease-in-out; }
+
+/* 팝업 컴팩트 */
+.popup-compact {
+    max-height: min(85vh, 32rem);
+    padding: 1.25rem !important;
+}
+
+/* ------------------------------------------------ */
+/* [소환 연출 스타일] */
+/* ------------------------------------------------ */
 #summon-overlay {
     background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
     perspective: 1000px;
 }
+
+/* 1. 하강 */
 @keyframes drop-in {
     0% { transform: translateY(-120vh) scale(0.5); opacity: 0; }
     60% { transform: translateY(20px) scale(1.1); opacity: 1; }
@@ -92,50 +98,14 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
 }
 .summon-drop { animation: drop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 
+/* 2. 대기 (숨쉬기) */
 @keyframes breathe-glow {
     0%, 100% { box-shadow: 0 0 15px var(--glow-color); }
     50% { box-shadow: 0 0 30px var(--glow-color), 0 0 10px var(--glow-color) inset; }
 }
 .summon-waiting { animation: breathe-glow 2s infinite ease-in-out; }
 
-@keyframes ripple-burst {
-    0% { transform: scale(1); opacity: 0.8; border-width: 4px; }
-    100% { transform: scale(3); opacity: 0; border-width: 0; }
-}
-.ripple-effect {
-    position: absolute; inset: -2px; border-radius: 22%;
-    border: 2px solid var(--glow-color);
-    animation: ripple-burst 0.6s ease-out forwards;
-    pointer-events: none; /* 클릭 방해 금지 */
-}
-
-@keyframes flash-white {
-    0% { opacity: 1; } 100% { opacity: 0; }
-}
-.impact-flash {
-    position: absolute; inset: 0; background: white; border-radius: 22%;
-    animation: flash-white 0.3s ease-out forwards; pointer-events: none;
-}
-
-@keyframes fade-up {
-    from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }
-}
-.text-reveal { animation: fade-up 0.5s ease-out forwards; }
-
-@keyframes pop-badge {
-    0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); }
-}
-.new-badge-pop { animation: pop-badge 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-
-@keyframes slide-up-dice {
-    from { transform: translateY(0); }
-    to { transform: translateY(-3rem); } /* 약 50px 위로 */
-}
-.dice-slide-up {
-    animation: slide-up-dice 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-/* 기존 리플 효과 미세 조정 (테두리에서 퍼지도록) */
+/* 3. 파동 (Ripple) */
 @keyframes ripple-burst {
     0% { transform: scale(1); opacity: 0.8; border-width: 4px; }
     100% { transform: scale(2.5); opacity: 0; border-width: 0; }
@@ -144,6 +114,40 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     position: absolute; inset: -2px; border-radius: 22%;
     border: 2px solid var(--glow-color);
     animation: ripple-burst 0.6s ease-out forwards;
-    pointer-events: none; /* 클릭 방해 금지 */
+    pointer-events: none;
     z-index: 0;
 }
+
+/* 4. 플래시 */
+@keyframes flash-white {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.impact-flash {
+    position: absolute; inset: 0; background: white; border-radius: 22%;
+    animation: flash-white 0.3s ease-out forwards; pointer-events: none;
+}
+
+/* 5. 주사위 위로 이동 (부드럽게) */
+@keyframes slide-up-dice {
+    from { transform: translateY(0); }
+    to { transform: translateY(-4rem); } /* 적절한 상승 높이 */
+}
+.dice-slide-up {
+    animation: slide-up-dice 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* 6. 텍스트 등장 */
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.text-reveal { animation: fade-up 0.6s ease-out forwards; }
+
+/* NEW 뱃지 팝 */
+@keyframes pop-badge {
+    0% { transform: scale(0); }
+    80% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+.new-badge-pop { animation: pop-badge 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
