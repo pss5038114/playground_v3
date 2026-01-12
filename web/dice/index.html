@@ -34,12 +34,10 @@
         <div id="tab-clan" class="tab-content flex-col p-4 space-y-4"></div>
 
         <div id="dice-popup" onclick="if(event.target === this) closePopup()" class="absolute inset-0 z-50 bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-200">
-            <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl relative animate-[fadeIn_0.2s_ease-out] flex flex-col scrollbar-hide popup-compact" onclick="event.stopPropagation()">
-                
+            <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative animate-[fadeIn_0.2s_ease-out] flex flex-col scrollbar-hide popup-compact" onclick="event.stopPropagation()">
                 <button onclick="closePopup()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 z-20 p-2">
                     <i class="ri-close-line text-2xl"></i>
                 </button>
-                
                 <div class="flex items-center gap-4 mb-2">
                     <div id="popup-dice-icon-container" class="shrink-0 relative"></div>
                     <div>
@@ -50,16 +48,12 @@
                         </div>
                     </div>
                 </div>
-
                 <p id="popup-dice-desc" class="text-xs text-slate-500 mb-2 bg-slate-50 p-2 rounded-lg leading-tight">설명...</p>
-                
                 <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-2"></div>
-
                 <div class="flex gap-2 mb-2">
                     <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">클래스 업</button>
                     <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">파워 업</button>
                 </div>
-
                 <div class="mt-auto pt-2 border-t border-slate-100">
                     <div class="flex justify-between text-xs mb-1">
                         <span class="text-slate-500">보유 카드</span>
@@ -76,19 +70,19 @@
             </div>
         </div>
 
-        <div id="summon-overlay" class="absolute inset-0 z-[60] hidden flex-col items-center justify-center">
-            <div id="summon-tap-area" class="absolute inset-0 z-0 hidden"></div>
+        <div id="summon-overlay" class="absolute inset-0 z-[60] hidden flex-col items-center justify-center bg-slate-900">
+            <div id="summon-tap-area" class="absolute inset-0 z-0 hidden cursor-pointer"></div>
             
-            <div class="relative z-10 flex flex-col items-center justify-center w-full h-full">
-                <div id="summon-dice-container" class="relative w-32 h-32 transition-all duration-300 cursor-pointer">
+            <div class="relative z-10 flex flex-col items-center justify-center w-full h-full pointer-events-none"> <div id="summon-dice-container" class="relative w-32 h-32 transition-all duration-300 pointer-events-auto">
                     </div>
                 
-                <div id="summon-text-area" class="mt-12 text-center hidden">
+                <div id="summon-text-area" class="mt-12 text-center hidden pointer-events-none">
                     <h2 id="summon-dice-name" class="text-3xl font-extrabold text-white drop-shadow-lg mb-2">Name</h2>
                     <div class="text-slate-400 text-sm animate-pulse">화면을 터치하여 계속</div>
                 </div>
             </div>
         </div>
+
     </main>
 
     <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50"

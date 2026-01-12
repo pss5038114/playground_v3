@@ -17,6 +17,8 @@ function renderDiceIcon(dice, sizeClass="w-10 h-10") {
     const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
     const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
     const symbolIcon = dice.symbol || "ri-dice-fill";
+    // [수정] 텍스트 크기: 부모 폰트 사이즈 상속을 위해 text-4xl 제거하고 sizeClass에 의존하거나, 외부에서 replace로 제어
+    // 여기서는 기본값을 주고, 외부에서 replace 하는 방식을 유지합니다.
     const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0"><i class="${symbolIcon} text-4xl"></i></div>`;
     return `<div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses}" style="${customStyle}">${bgSymbolHtml}<div class="dice-content w-[25%] h-[25%] rounded-full ${dice.color} shadow-sm z-10"></div></div>`;
 }
