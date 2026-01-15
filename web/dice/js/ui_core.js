@@ -1,5 +1,8 @@
 // web/dice/js/ui_core.js
 
+// [버전 관리] HTML 파일 내용이 바뀌면 이 숫자를 올려주세요
+const APP_VERSION = "1.1"; 
+
 async function loadComponents() {
     const tabs = [
         {id:'tab-shop',file:'lobby_shop.html'},
@@ -9,10 +12,11 @@ async function loadComponents() {
         {id:'tab-clan',file:'lobby_clan.html'}
     ];
     
-    // 1. 모든 HTML 탭 로드 완료 대기
+    // 1. 모든 HTML 탭 로드 (캐시 방지 적용)
     await Promise.all(tabs.map(async(t)=>{
         try{
-            const r=await fetch(t.file);
+            // 파일명 뒤에 버전 쿼리스트링 추가
+            const r = await fetch(`${t.file}?v=${APP_VERSION}`);
             if(r.ok) document.getElementById(t.id).innerHTML=await r.text();
         }catch(e){}
     }));
