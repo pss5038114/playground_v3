@@ -1,7 +1,7 @@
 // web/dice/js/ui_deck.js
 
 // ==========================================
-// [필수 유틸리티] 팝업 닫기 & 뷰 모드 토글 (최상단 배치)
+// [필수 유틸리티] 팝업 닫기 & 뷰 모드 토글
 // ==========================================
 
 function closePopup() { 
@@ -69,8 +69,7 @@ function renderDeckSlots() {
             <div class="text-[9px] font-bold text-slate-500 bg-white/50 px-1.5 rounded pointer-events-none mt-0.5">
                 Lv.${dice.class_level}
             </div>
-            
-            </div>
+        </div>
         `;
         container.innerHTML += slotHtml;
     });
@@ -87,11 +86,11 @@ function selectDeckSlot(index) {
         selectedDeckSlot = index;
     }
     
-    // [NEW] 안내 문구 강조 효과
+    // 안내 문구 강조 효과
     const guideText = document.getElementById('deck-guide-text');
     if (guideText) {
         if (selectedDeckSlot !== -1) {
-            guideText.innerText = "교체할 주사위를 아래 목록에서 선택하세요!";
+            guideText.innerHTML = "교체할 주사위를 <br class='sm:hidden'>아래 목록에서 선택하세요!";
             guideText.className = "text-xs text-blue-600 font-bold text-center mt-2 animate-pulse transition-all";
         } else {
             guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
@@ -133,7 +132,6 @@ function equipDice(newDiceId) {
 
     selectedDeckSlot = -1; 
     
-    // 교체 후 안내 문구 원복
     const guideText = document.getElementById('deck-guide-text');
     if (guideText) {
         guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
@@ -181,10 +179,11 @@ function renderDiceGrid(list) {
             borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
         }
 
+        // [수정] 화살표 위치: 기존 top-1 left-1 -> bottom-1 left-2로 변경 (E 마크와 겹침 방지)
         if (isUpgradeable) {
             borderClass = 'border-green-500 ring-2 ring-green-200';
             levelBadgeClass = 'text-white bg-green-500 shadow-sm';
-            arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
+            arrowHtml = `<div class="absolute bottom-1 left-2 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
         const cardHtml = `
@@ -192,13 +191,15 @@ function renderDiceGrid(list) {
              onclick="handleDiceClick('${dice.id}')">
             ${arrowHtml}
             
-            ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-20 shadow-md">E</div>` : ''}
+            ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
 
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
+            
             ${!isInDeck && isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
+            
             <div class="absolute top-2 right-2 w-2 h-2 rounded-full ${rarityDotColor} z-10 shadow-sm"></div>
         </div>`;
         grid.innerHTML += cardHtml;
