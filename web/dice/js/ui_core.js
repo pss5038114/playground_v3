@@ -1,7 +1,7 @@
 // web/dice/js/ui_core.js
 
 // [버전 관리] HTML 파일 내용이 바뀌면 이 숫자를 올려주세요
-const APP_VERSION = "1.4"; 
+const APP_VERSION = "1.5"; 
 
 async function loadComponents() {
     const tabs = [

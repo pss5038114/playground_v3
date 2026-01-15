@@ -287,21 +287,30 @@ async def get_user_stats(username: str):
         if not user:
             raise HTTPException(404, "User not found")
         
-        # 보유한 모든 주사위 조회
-        dice_rows = conn.execute("SELECT class_level FROM user_dice WHERE user_id = ?", (user["id"],)).fetchall()
+        user_id = user["id"]
         
-        base_crit_dmg = 1000 # 기본 100% (내부 단위가 %라면 100, 소수점 관리 필요 시 1000?)
-        # 사용자 요청: "기본 배율은 100%에서 시작"
-        # 그리고 증가치는 정수 퍼센트 (1%, 2%...)
+        # 1. DB에 저장된 주사위 목록 조회
+        dice_rows = conn.execute("SELECT dice_id, class_level FROM user_dice WHERE user_id = ?", (user_id,)).fetchall()
         
-        total_crit_dmg = 100 # 기본값
+        # DB 데이터를 딕셔너리로 변환 { "fire": 2, "ice": 1, ... }
+        user_dice_map = {row["dice_id"]: row["class_level"] for row in dice_rows}
         
-        for row in dice_rows:
-            level = row["class_level"]
+        # 2. 기본 지급 주사위 정의
+        default_dice = ['fire', 'electric', 'wind', 'ice', 'poison']
+        
+        # 3. 기본 주사위가 DB에 없으면 Lv.1로 간주하고 맵에 추가
+        for d_id in default_dice:
+            if d_id not in user_dice_map:
+                user_dice_map[d_id] = 1 # 기본 1레벨
+                
+        # 4. 크리티컬 데미지 계산
+        total_crit_dmg = 100 # 기본 100%
+        
+        for level in user_dice_map.values():
             total_crit_dmg += calculate_crit_damage_for_dice(level)
             
         return {
-            "crit_rate": 5, # 기본 5% 고정
+            "crit_rate": 5, # 5% 고정
             "crit_damage": total_crit_dmg
         }
     finally:
