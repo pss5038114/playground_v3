@@ -20,8 +20,6 @@ CREATE TABLE IF NOT EXISTS user_dice (
     UNIQUE(user_id, dice_id)
 );
 
-/* [수정] 덱 프리셋 지원을 위한 테이블 재정의 */
-/* 주의: 서버 재시작 시 기존 user_decks 데이터는 호환되지 않으므로 playground.db를 삭제하고 재시작하세요. */
 DROP TABLE IF EXISTS user_decks;
 
 CREATE TABLE user_decks (

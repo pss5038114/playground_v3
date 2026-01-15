@@ -6,16 +6,12 @@
 
 function closePopup() { 
     const popup = document.getElementById('dice-popup');
-    if (popup) {
-        popup.classList.add('hidden'); 
-        popup.classList.remove('flex'); 
-    }
+    if (popup) { popup.classList.add('hidden'); popup.classList.remove('flex'); }
     currentSelectedDice = null; 
 }
 
 function toggleViewMode(mode) { 
-    currentViewMode = (currentViewMode === mode) ? null : mode; 
-    updateStatsView(); 
+    currentViewMode = (currentViewMode === mode) ? null : mode; updateStatsView(); 
 }
 
 // ==========================================
