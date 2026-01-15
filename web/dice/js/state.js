@@ -9,7 +9,7 @@ let currentDiceList = [];
 let currentSelectedDice = null;
 let currentViewMode = null; 
 
-// [NEW] 덱 관리 상태
+// [덱 관리 상태]
 // 초기 덱 설정 (빈 슬롯 방지)
 let myDeck = ['fire', 'electric', 'wind', 'ice', 'poison']; 
 let selectedDeckSlot = -1; // -1: 선택 안됨, 0~4: 해당 슬롯 선택됨
