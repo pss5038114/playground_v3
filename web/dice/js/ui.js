@@ -369,7 +369,6 @@ function renderDeckSlots() {
     
     container.innerHTML = "";
     
-    // myDeck은 state.js에서 관리됨
     myDeck.forEach((dice, index) => {
         const slot = document.createElement('div');
         slot.className = `deck-slot ${dice ? 'filled' : ''} ${selectedDeckSlotIndex === index ? 'selected' : ''}`;
@@ -410,7 +409,7 @@ function handleDeckSlotClick(index) {
         listGrid.parentElement.classList.add('editing-mode');
     }
     
-    renderDiceGrid(currentDiceList); // 리스트 갱신 (선택 가능 표시 등)
+    renderDiceGrid(currentDiceList); 
 }
 
 function cancelDeckEdit() {
@@ -425,7 +424,7 @@ function cancelDeckEdit() {
         listGrid.parentElement.classList.remove('editing-mode');
     }
     
-    renderDiceGrid(currentDiceList); // 리스트 원래대로
+    renderDiceGrid(currentDiceList); 
 }
 
 async function equipDiceToDeck(diceId) {
@@ -489,7 +488,6 @@ function renderDiceGrid(list) {
             arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
-        // 덱 편집 모드일 때 클릭 동작 분기
         const clickAction = `onclick="selectedDeckSlotIndex !== null ? equipDiceToDeck('${dice.id}') : showDiceDetail('${dice.id}')"`;
         const disabledClass = (!isOwned && selectedDeckSlotIndex !== null) ? 'opacity-30 pointer-events-none' : '';
 
@@ -616,7 +614,6 @@ async function upgradeDice(diceId) {
             isUpgradeJustHappened = true;
             
             await fetchMyResources();
-            // 리스트 갱신 시 currentDiceList 업데이트
             const listRes = await fetch(`${API_DICE}/list/${myId}`);
             if(listRes.ok) {
                 currentDiceList = await listRes.json();
