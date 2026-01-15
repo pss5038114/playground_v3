@@ -6,12 +6,16 @@
 
 function closePopup() { 
     const popup = document.getElementById('dice-popup');
-    if (popup) { popup.classList.add('hidden'); popup.classList.remove('flex'); }
+    if (popup) {
+        popup.classList.add('hidden'); 
+        popup.classList.remove('flex'); 
+    }
     currentSelectedDice = null; 
 }
 
 function toggleViewMode(mode) { 
-    currentViewMode = (currentViewMode === mode) ? null : mode; updateStatsView(); 
+    currentViewMode = (currentViewMode === mode) ? null : mode; 
+    updateStatsView(); 
 }
 
 // ==========================================
@@ -20,14 +24,14 @@ function toggleViewMode(mode) {
 
 let isUpgradeJustHappened = false;
 
-// [NEW] 통합 UI 렌더링 (프리셋 버튼 + 슬롯 + 이름)
+// [통합] 덱 UI 렌더링 (프리셋, 이름, 슬롯 모두 갱신)
 function renderDeckUI() {
     renderPresetButtons();
     renderDeckName();
     renderDeckSlots();
 }
 
-// [NEW] 프리셋 버튼 렌더링
+// 1. 프리셋 버튼 렌더링 (1~7)
 function renderPresetButtons() {
     const container = document.getElementById('preset-btn-container');
     if (!container) return;
@@ -35,63 +39,81 @@ function renderPresetButtons() {
     container.innerHTML = "";
     for (let i = 1; i <= 7; i++) {
         const isActive = (i === currentPresetIndex);
-        const bgClass = isActive ? "bg-blue-600 text-white shadow-md scale-105" : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50";
+        // 활성 상태면 파란색, 아니면 흰색
+        const bgClass = isActive 
+            ? "bg-blue-600 text-white shadow-md scale-110 border-blue-600" 
+            : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50";
         
         const btn = document.createElement('button');
-        btn.className = `flex-shrink-0 w-8 h-8 rounded-full text-xs font-bold transition-all ${bgClass}`;
+        // w-8 h-8 (32px) 크기
+        btn.className = `flex-shrink-0 w-8 h-8 rounded-full border text-xs font-bold transition-all duration-200 ${bgClass}`;
         btn.innerText = i;
-        btn.onclick = () => switchPreset(i);
+        btn.onclick = function() { switchPreset(i); }; // 클로저 문제 방지
         container.appendChild(btn);
     }
 }
 
-// [NEW] 덱 이름 렌더링
+// 2. 덱 이름 렌더링
 function renderDeckName() {
     const nameEl = document.getElementById('deck-name-display');
-    if (nameEl && myDecks[currentPresetIndex]) {
-        nameEl.innerText = myDecks[currentPresetIndex].name;
+    // myDecks[currentPresetIndex]가 없으면 기본값 'Preset N' 사용
+    if (nameEl) {
+        const currentName = (myDecks[currentPresetIndex] && myDecks[currentPresetIndex].name) 
+                            ? myDecks[currentPresetIndex].name 
+                            : `Preset ${currentPresetIndex}`;
+        nameEl.innerText = currentName;
     }
 }
 
-// [NEW] 프리셋 전환
+// 3. 프리셋 전환
 function switchPreset(index) {
     if (currentPresetIndex === index) return;
     
+    // 현재 상태(변경사항)를 메모리에 임시 저장 (서버 저장은 아님)
+    if (!myDecks[currentPresetIndex]) myDecks[currentPresetIndex] = { name: `Preset ${currentPresetIndex}`, slots: [] };
+    myDecks[currentPresetIndex].slots = [...myDeck];
+
     currentPresetIndex = index;
-    // 해당 프리셋 데이터가 있으면 로드, 없으면 기본값
+    
+    // 새 프리셋 데이터 로드
     if (myDecks[index]) {
-        myDeck = [...myDecks[index].slots]; // 복사해서 사용
+        myDeck = [...myDecks[index].slots];
     } else {
+        // 데이터 없으면 기본 덱
         myDeck = ['fire', 'electric', 'wind', 'ice', 'poison'];
-        myDecks[index] = { name: `Preset ${index}`, slots: myDeck };
+        myDecks[index] = { name: `Preset ${index}`, slots: [...myDeck] };
     }
     
-    selectedDeckSlot = -1; // 슬롯 선택 초기화
-    renderDeckUI();
-    renderDiceGrid(currentDiceList);
-    // 전환 시 서버에 저장하거나 할 필요는 없음 (변경 시점에 저장)
-    // 하지만 확실한 동기화를 위해 현재 상태를 다시 불러올 수도 있음
+    selectedDeckSlot = -1; // 선택 해제
+    
+    renderDeckUI(); // 버튼, 이름, 슬롯 싹 갱신
+    renderDiceGrid(currentDiceList); // 하단 목록의 'E' 마크 갱신
 }
 
-// [NEW] 덱 이름 수정
+// 4. 덱 이름 수정 (Popup Prompt)
 function editDeckName() {
-    const currentName = myDecks[currentPresetIndex].name;
-    const newName = prompt("덱 이름을 입력하세요 (최대 20자):", currentName);
+    const currentName = (myDecks[currentPresetIndex] && myDecks[currentPresetIndex].name) 
+                        ? myDecks[currentPresetIndex].name 
+                        : `Preset ${currentPresetIndex}`;
+                        
+    const newName = prompt("덱 이름을 입력하세요 (최대 12자):", currentName);
     
     if (newName !== null) {
-        const trimmed = newName.trim().slice(0, 20); // 20자 제한
+        const trimmed = newName.trim().slice(0, 12); // 12자 제한 (UI 깨짐 방지)
         if (trimmed.length > 0) {
+            if (!myDecks[currentPresetIndex]) myDecks[currentPresetIndex] = { slots: [...myDeck] };
+            
             myDecks[currentPresetIndex].name = trimmed;
             renderDeckName();
-            saveMyDeck(); // 이름 변경 즉시 저장
+            saveMyDeck(); // 이름 변경은 즉시 저장
         }
     }
 }
 
-// 덱 슬롯 렌더링 (기존 로직 유지하되, 일부 예외 처리 강화)
+// 5. 덱 슬롯 렌더링
 function renderDeckSlots() {
     const container = document.getElementById('deck-slots-container');
-    if (!container) return; 
+    if (!container) return;
     
     container.innerHTML = "";
     let totalLevel = 0;
@@ -124,17 +146,14 @@ function renderDeckSlots() {
         const slotHtml = `
         <div onclick="selectDeckSlot(${index})" 
              class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border-2 ${borderClass} ${bgClass} cursor-pointer transition-all active:scale-95 aspect-[3/4] overflow-hidden">
-            
             <div class="mb-1 pointer-events-none scale-90">${iconHtml}</div>
-            
             <div class="text-[10px] font-bold text-slate-700 w-full text-center truncate px-0.5 pointer-events-none">
                 ${dice.name}
             </div>
             <div class="text-[9px] font-bold text-slate-500 bg-white/50 px-1.5 rounded pointer-events-none mt-0.5">
                 Lv.${dice.class_level}
             </div>
-        </div>
-        `;
+        </div>`;
         container.innerHTML += slotHtml;
     });
 
@@ -144,11 +163,7 @@ function renderDeckSlots() {
 
 // 슬롯 선택
 function selectDeckSlot(index) {
-    if (selectedDeckSlot === index) {
-        selectedDeckSlot = -1; 
-    } else {
-        selectedDeckSlot = index;
-    }
+    selectedDeckSlot = (selectedDeckSlot === index) ? -1 : index;
     
     const guideText = document.getElementById('deck-guide-text');
     if (guideText) {
@@ -160,11 +175,11 @@ function selectDeckSlot(index) {
             guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
         }
     }
-
     renderDeckSlots(); 
     renderDiceGrid(currentDiceList); 
 }
 
+// 주사위 목록 클릭
 function handleDiceClick(diceId) {
     if (selectedDeckSlot !== -1) {
         equipDice(diceId); 
@@ -173,16 +188,15 @@ function handleDiceClick(diceId) {
     }
 }
 
+// 장착/교체
 function equipDice(newDiceId) {
     const dice = currentDiceList.find(d => d.id === newDiceId);
-    
     if (!dice || dice.class_level === 0) {
         alert("보유하지 않은 주사위입니다.");
         return;
     }
 
     const existingIndex = myDeck.indexOf(newDiceId);
-
     if (existingIndex !== -1) {
         const temp = myDeck[selectedDeckSlot];
         myDeck[selectedDeckSlot] = newDiceId;
@@ -191,7 +205,7 @@ function equipDice(newDiceId) {
         myDeck[selectedDeckSlot] = newDiceId;
     }
 
-    selectedDeckSlot = -1; 
+    selectedDeckSlot = -1;
     
     const guideText = document.getElementById('deck-guide-text');
     if (guideText) {
@@ -201,16 +215,17 @@ function equipDice(newDiceId) {
 
     renderDeckSlots();
     renderDiceGrid(currentDiceList);
-    
-    saveMyDeck();
+    saveMyDeck(); // 변경 시 저장
 }
 
+// 보유 목록 렌더링
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
 
-    renderDeckSlots(); // 여기서 슬롯 업데이트
+    // 슬롯 UI도 같이 갱신
+    renderDeckUI();
 
     list.forEach(dice => {
         const isOwned = dice.class_level > 0;
@@ -249,12 +264,16 @@ function renderDiceGrid(list) {
         <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
              onclick="handleDiceClick('${dice.id}')">
             ${arrowHtml}
+            
             ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
+
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
+            
             ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
+            
             <div class="absolute top-2 right-2 w-2 h-2 rounded-full ${rarityDotColor} z-10 shadow-sm"></div>
         </div>`;
         grid.innerHTML += cardHtml;
