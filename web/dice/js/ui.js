@@ -31,148 +31,6 @@ function switchTab(name) {
 }
 
 // -----------------------------------------------------------
-// [덱 관리 로직]
-// -----------------------------------------------------------
-
-// 덱 슬롯 렌더링
-function renderDeckSlots() {
-    const container = document.getElementById('equipped-deck-grid');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    let totalLevel = 0;
-    let diceCount = 0;
-
-    myDeck.forEach((diceId, idx) => {
-        // 주사위 정보 찾기
-        const dice = diceId ? currentDiceList.find(d => d.id === diceId) : null;
-        
-        const slotEl = document.createElement('div');
-        // highlight-z 클래스는 편집 모드일 때만 동적으로 추가됨
-        slotEl.className = `deck-slot ${dice ? 'filled' : 'empty'}`;
-        slotEl.onclick = () => activateDeckEditMode(idx); // 클릭 시 편집 모드 진입
-
-        if (dice) {
-            totalLevel += dice.class_level;
-            diceCount++;
-
-            // 아이콘 (renderDiceIcon 재사용, 크기 조정)
-            // 슬롯에 꽉 차게 하기 위해 w-full 사용하되, renderDiceIcon 내부 로직 활용
-            let iconHtml = renderDiceIcon(dice, "w-12 h-12"); 
-            // 아이콘 크기를 슬롯에 맞게 살짝 CSS로 조정해도 됨
-            
-            slotEl.innerHTML = `
-                <div class="pointer-events-none shrink-0 mb-1 scale-90">${iconHtml}</div>
-                <div class="slot-info">
-                    <div class="text-[10px] font-bold text-slate-700 truncate w-full text-center px-0.5">${dice.name}</div>
-                    <div class="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Lv.${dice.class_level}</div>
-                </div>
-            `;
-        } else {
-            // 빈 슬롯
-            slotEl.innerHTML = `
-                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 mb-1">
-                    <i class="ri-add-line text-2xl"></i>
-                </div>
-                <div class="slot-info">
-                    <span class="text-[10px] text-slate-300">빈 슬롯</span>
-                </div>
-            `;
-        }
-        
-        // 현재 편집 중인 슬롯이면 스타일 추가
-        if (editingSlotIdx === idx) {
-            slotEl.classList.add('editing', 'highlight-z');
-        }
-
-        container.appendChild(slotEl);
-    });
-
-    // 평균 레벨 업데이트
-    const avgEl = document.getElementById('avg-class-level');
-    if(avgEl) {
-        const avg = diceCount > 0 ? (totalLevel / diceCount).toFixed(1) : 1;
-        avgEl.innerText = `평균 Lv.${avg}`;
-    }
-}
-
-// 편집 모드 활성화 (특정 슬롯 클릭 시)
-function activateDeckEditMode(slotIdx) {
-    editingSlotIdx = slotIdx;
-    
-    // 1. 오버레이 표시
-    const overlay = document.getElementById('deck-edit-overlay');
-    if (overlay) overlay.classList.remove('hidden');
-    
-    // 2. 리스트 섹션을 강조 (z-index 높임)
-    const listSection = document.getElementById('dice-list-section');
-    if (listSection) listSection.classList.add('highlight-z');
-    
-    // 3. 덱 섹션도 강조 (선택된 슬롯을 보여주기 위해)
-    const deckSection = document.getElementById('deck-section');
-    // deckSection 전체를 올리지 말고, renderDeckSlots에서 선택된 슬롯만 올림
-    // 하지만 슬롯이 relative라 부모 z-index 영향 받음 -> 부모도 올려야 함
-    if (deckSection) deckSection.classList.add('highlight-z');
-
-    // 4. UI 갱신 (선택된 슬롯 스타일 적용 및 리스트 클릭 이벤트 변경을 위해)
-    renderDeckSlots();
-    renderDiceGrid(currentDiceList); // 리스트도 다시 그려서 클릭 이벤트 갱신
-}
-
-// 편집 모드 취소 (오버레이 클릭 시)
-function cancelDeckEdit() {
-    if (editingSlotIdx === null) return;
-    
-    editingSlotIdx = null;
-    
-    // 오버레이 숨김
-    const overlay = document.getElementById('deck-edit-overlay');
-    if (overlay) overlay.classList.add('hidden');
-    
-    // z-index 복구
-    document.getElementById('dice-list-section')?.classList.remove('highlight-z');
-    document.getElementById('deck-section')?.classList.remove('highlight-z');
-    
-    // UI 갱신
-    renderDeckSlots();
-    renderDiceGrid(currentDiceList);
-}
-
-// 주사위 선택 시 (리스트에서 클릭)
-function selectDiceForDeck(diceId) {
-    if (editingSlotIdx === null) return; // 편집 모드 아닐 땐 무시 (혹은 상세 팝업)
-
-    const targetDice = currentDiceList.find(d => d.id === diceId);
-    if (!targetDice || targetDice.class_level === 0) return; // 미보유는 장착 불가
-
-    // 중복 체크 및 처리
-    const existingIdx = myDeck.findIndex(id => id === diceId);
-    
-    if (existingIdx !== -1) {
-        // [Case 1] 이미 덱에 있는 주사위다.
-        if (existingIdx === editingSlotIdx) {
-            // 같은 자리를 또 누름 -> 장착 해제? 아니면 그냥 유지? 
-            // 보통은 그냥 유지하거나 해제. 여기서는 '유지'하고 편집 종료
-        } else {
-            // 다른 자리에 있음 -> 스왑(Swap) 또는 이동
-            // 현재 편집 중인 자리에 있던 주사위
-            const swapTargetDiceId = myDeck[editingSlotIdx];
-            
-            // 위치 교환
-            myDeck[editingSlotIdx] = diceId;
-            myDeck[existingIdx] = swapTargetDiceId; // 기존 자리로 보냄 (null이면 비워짐)
-        }
-    } else {
-        // [Case 2] 덱에 없는 새 주사위다 -> 그냥 장착
-        myDeck[editingSlotIdx] = diceId;
-    }
-
-    // 편집 종료 및 갱신
-    cancelDeckEdit();
-}
-
-// -----------------------------------------------------------
 // [공통 헬퍼 함수]
 // -----------------------------------------------------------
 
@@ -522,11 +380,6 @@ function renderDiceGrid(list) {
         const isOwned = dice.class_level > 0;
         if(isOwned) ownedCount++;
         
-        // 덱에 포함된 주사위인지 확인 (표시용)
-        const inDeckIndex = myDeck.findIndex(id => id === dice.id);
-        const isInDeck = inDeckIndex !== -1;
-
-        // ... (강화 가능 여부 로직 - 기존 유지) ...
         let isUpgradeable = false;
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
@@ -540,53 +393,25 @@ function renderDiceGrid(list) {
         const rarityBgTextColor = getRarityBgTextColor(dice.rarity);
         const rarityDotColor = getRarityDotColor(dice.rarity);
         
-        // 스타일 결정
         let borderClass = 'border-slate-100';
         let levelBadgeClass = 'text-slate-600 bg-slate-100';
         let arrowHtml = '';
-        let onClickAction = `showDiceDetail('${dice.id}')`; // 기본: 상세 팝업
 
-        // [NEW] 편집 모드일 때 로직
-        if (editingSlotIdx !== null) {
-            // 편집 모드에서는 보유한 주사위만 클릭 가능
-            if (isOwned) {
-                onClickAction = `selectDiceForDeck('${dice.id}')`;
-                borderClass = 'border-slate-300 hover:border-green-400 cursor-pointer';
-                if (dice.id === myDeck[editingSlotIdx]) {
-                    borderClass = 'border-green-500 ring-2 ring-green-200'; // 현재 선택된 것
-                }
-            } else {
-                onClickAction = ''; // 미보유는 클릭 불가
-                borderClass = 'border-slate-100 opacity-50 cursor-not-allowed';
-            }
-        } else {
-            // 일반 모드 (기존 로직: 강화 가능 표시 등)
-            if (isUpgradeable) {
-                borderClass = 'border-green-500 ring-2 ring-green-200';
-                levelBadgeClass = 'text-white bg-green-500 shadow-sm';
-                arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
-            }
-        }
-
-        // [NEW] 덱에 장착중 표시 (인덱스 뱃지)
-        let equipBadge = "";
-        if (isInDeck) {
-            equipBadge = `<div class="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm z-20">E</div>`;
+        if (isUpgradeable) {
+            borderClass = 'border-green-500 ring-2 ring-green-200';
+            levelBadgeClass = 'text-white bg-green-500 shadow-sm';
+            arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
         const cardHtml = `
-        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
-             onclick="${onClickAction}">
-            
+        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
+             onclick="showDiceDetail('${dice.id}')">
             ${arrowHtml}
-            ${equipBadge}
-
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
-            
-            ${isOwned && editingSlotIdx === null ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
+            ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
             <div class="absolute top-2 right-2 w-2 h-2 rounded-full ${rarityDotColor} z-10 shadow-sm"></div>
         </div>`;
         grid.innerHTML += cardHtml;
