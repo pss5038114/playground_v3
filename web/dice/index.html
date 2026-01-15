@@ -137,7 +137,10 @@
                         </div>
                     </div>
 
-                    <div class="flex bg-slate-100 p-1 rounded-xl mb-4">
+                    <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-3">
+                        </div>
+
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-3">
                         <button id="btn-view-class" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-slate-700 shadow-sm transition-all" onclick="toggleViewMode('class')">
                             클래스 정보
                         </button>
@@ -146,8 +149,10 @@
                         </button>
                     </div>
 
-                    <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-4">
-                        </div>
+                    <div id="popup-crit-preview" class="text-center mb-1 hidden">
+                        <span class="text-xs font-bold text-slate-400 mr-1">클래스 업:</span>
+                        <span class="text-sm font-black text-green-500">크리티컬 데미지 +<span id="popup-crit-val">0</span>%</span>
+                    </div>
                 </div>
 
                 <div class="p-4 bg-white border-t border-slate-100 shrink-0 pb-8">

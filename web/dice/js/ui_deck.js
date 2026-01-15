@@ -489,6 +489,7 @@ function showDiceDetail(diceId) {
     document.getElementById('popup-dice-rarity').innerText = dice.rarity;
     document.getElementById('popup-dice-class').innerText = dice.class_level > 0 ? `Lv.${dice.class_level}` : "미보유";
     
+    // 아이콘 처리
     let iconHtml = renderDiceIcon(dice, "w-16 h-16"); iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
     const iconContainer = document.getElementById('popup-dice-icon-container'); const existingParticles = iconContainer.querySelector('.firefly-container'); if(existingParticles) existingParticles.remove();
@@ -497,18 +498,39 @@ function showDiceDetail(diceId) {
     const equipBtn = document.getElementById('popup-equip-btn'); 
     const costInfo = document.getElementById('popup-cost-info'); 
     const progress = document.getElementById('popup-progress-bar'); 
+    
+    // [NEW] 크리티컬 데미지 증가량 표시 요소
+    const critPreview = document.getElementById('popup-crit-preview');
+    const critVal = document.getElementById('popup-crit-val');
+    
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
     
     let canUpgrade = false; 
     let btnColorClass = "bg-blue-600 hover:bg-blue-700"; 
     let progColorClass = "bg-blue-500"; 
-    currentViewMode = null;
+    currentViewMode = null; // 초기화
 
     // 미보유 시 장착 버튼 숨김
     if (dice.class_level === 0) equipBtn.classList.add('hidden');
     else equipBtn.classList.remove('hidden');
 
+    // [NEW] 크리티컬 데미지 계산 및 표시
+    // 공식: (다음 레벨 / 2)의 올림값
+    if (dice.class_level > 0 && dice.class_level < 20) {
+        const nextLevel = dice.class_level + 1;
+        const incVal = Math.ceil(nextLevel / 2);
+        
+        critPreview.classList.remove('hidden');
+        critVal.innerText = incVal;
+        
+        // 클래스 탭 기본 활성화
+        currentViewMode = 'class';
+    } else {
+        critPreview.classList.add('hidden');
+    }
+
     if (dice.class_level >= 20) { 
+        // 만렙 처리
         document.getElementById('popup-dice-cards').innerText = "MAX"; 
         progress.style.width = "100%"; 
         progress.className = "h-full w-full bg-slate-300"; 
@@ -516,24 +538,29 @@ function showDiceDetail(diceId) {
         costInfo.innerText = "최고 레벨에 도달했습니다."; 
         btnColorClass = "bg-slate-400 cursor-not-allowed"; 
         canUpgrade = false; 
+        critPreview.classList.add('hidden'); // 만렙이면 크뎀 증가 표시 숨김
     } 
     else { 
         const reqCards = dice.next_cost ? dice.next_cost.cards : 9999; 
         const reqGold = (dice.class_level === 0) ? 0 : (dice.next_cost ? dice.next_cost.gold : 9999); 
+        
         document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`; 
         const pct = Math.min((dice.quantity / reqCards) * 100, 100); 
         progress.style.width = `${pct}%`; 
+        
         const hasEnoughCards = dice.quantity >= reqCards; 
         const hasEnoughGold = currentGold >= reqGold;
 
         if (dice.class_level === 0) { 
-            // [수정] 해금: 초록색(Green) 테마로 통일
+            // 해금 (미보유)
             progColorClass = "bg-green-500"; 
+            critPreview.classList.add('hidden'); // 해금 시에는 크뎀 증가 표시 안함 (또는 +1% 표시 가능하지만 일단 숨김)
+            
             if (hasEnoughCards) { 
                 canUpgrade = true; 
                 btn.innerHTML = `<span>🔓 획득하기</span>`; 
                 costInfo.innerText = `비용: 무료 (카드 ${reqCards}장)`; 
-                btnColorClass = "bg-green-500 hover:bg-green-600"; // 버튼도 초록색
+                btnColorClass = "bg-green-500 hover:bg-green-600"; 
             } else { 
                 btn.innerHTML = `<span>카드 부족</span>`; 
                 costInfo.innerText = `필요: 카드 ${reqCards}장`; 
@@ -541,15 +568,14 @@ function showDiceDetail(diceId) {
             } 
         } 
         else { 
+            // 레벨업 (보유중)
             if (hasEnoughCards && hasEnoughGold) { 
                 canUpgrade = true; 
-                currentViewMode = 'class'; 
                 btn.innerHTML = `<span>⬆️ 레벨업</span>`; 
                 costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`; 
                 btnColorClass = "bg-green-600 hover:bg-green-700"; 
                 progColorClass = "bg-green-500"; 
             } else { 
-                currentViewMode = 'class'; 
                 btn.innerHTML = !hasEnoughCards ? `카드 부족` : `골드 부족`; 
                 costInfo.innerText = `필요: 카드 ${reqCards}장, ${reqGold.toLocaleString()} 골드`; 
                 btnColorClass = "bg-slate-300 cursor-not-allowed"; 
@@ -560,12 +586,12 @@ function showDiceDetail(diceId) {
     }
     
     btn.className = `relative w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 overflow-hidden ${btnColorClass}`;
-    if(canUpgrade) { btn.classList.add('btn-pulse-green'); } else { btn.classList.remove('btn-pulse-green'); }
+    if(canUpgrade) btn.classList.add('btn-pulse-green'); else btn.classList.remove('btn-pulse-green');
     
     btn.onclick = canUpgrade ? () => upgradeDice(dice.id) : null; 
     btn.disabled = !canUpgrade;
     
-    updateStatsView(); 
+    updateStatsView(); // 버튼 렌더링 포함
     document.getElementById('dice-popup').classList.remove('hidden'); 
     document.getElementById('dice-popup').classList.add('flex');
 }
@@ -626,25 +652,43 @@ async function upgradeDice(diceId) {
 }
 
 // 스탯 뷰 업데이트
-function updateStatsView() {
-    if(!currentSelectedDice) return;
-    const dice = currentSelectedDice; const stats = dice.stats; const level = Math.max(1, dice.class_level);
-    const grid = document.getElementById('popup-stats-grid'); grid.innerHTML = "";
+function updateStatsView() { 
+    if(!currentSelectedDice) return; 
+    const dice = currentSelectedDice; 
+    const stats = dice.stats; 
+    const level = Math.max(1, dice.class_level); 
+    const grid = document.getElementById('popup-stats-grid'); 
+    grid.innerHTML = ""; 
     
-    addStatBox(grid, "공격력", "ri-sword-fill", stats.atk, level);
-    addStatBox(grid, "공격속도", "ri-speed-fill", stats.speed, level, "s");
-    addStatBoxStatic(grid, "타겟", "ri-crosshair-2-fill", stats.target);
+    // ... (스탯 박스 렌더링 로직 기존 동일) ...
+    addStatBox(grid, "공격력", "ri-sword-fill", stats.atk, level); 
+    addStatBox(grid, "공격속도", "ri-speed-fill", stats.speed, level, "s"); 
+    addStatBoxStatic(grid, "타겟", "ri-crosshair-2-fill", stats.target); 
+    if(stats.specials) { stats.specials.forEach(sp => { addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format); }); } 
+    const filled = 3 + (stats.specials ? stats.specials.length : 0); 
+    for(let i=filled; i<6; i++) { grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`; } 
     
-    if(stats.specials) { stats.specials.forEach(sp => { addStatBox(grid, sp.name, sp.icon, sp, level, "", sp.format); }); }
+    // 탭 버튼 스타일 업데이트
+    const btnClass = document.getElementById('btn-view-class'); 
+    const btnPower = document.getElementById('btn-view-power'); 
     
-    const filled = 3 + (stats.specials ? stats.specials.length : 0);
-    for(let i=filled; i<6; i++) { grid.innerHTML += `<div class="stat-box"><div class="text-slate-300 mx-auto text-xl">-</div></div>`; }
+    btnClass.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='class' ? 'bg-green-100 border-green-300 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`; 
+    btnPower.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='power' ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`; 
     
-    const btnClass = document.getElementById('btn-view-class'); const btnPower = document.getElementById('btn-view-power');
-    btnClass.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='class' ? 'bg-green-100 border-green-300 text-green-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
-    btnPower.className = `flex-1 py-2 rounded-lg text-xs font-bold border transition-colors ${currentViewMode==='power' ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`;
+    // [NEW] 크리티컬 데미지 표시 색상 연동 (클래스 탭일 때만 초록색 강조)
+    const critPreview = document.getElementById('popup-crit-preview');
+    if (critPreview) {
+        if (currentViewMode === 'class' && dice.class_level > 0 && dice.class_level < 20) {
+            critPreview.classList.remove('opacity-50', 'grayscale');
+            critPreview.classList.add('text-green-600');
+        } else {
+            // 파워업 탭일 때는 약간 흐리게
+            critPreview.classList.add('opacity-50', 'grayscale');
+            critPreview.classList.remove('text-green-600');
+        }
+    }
     
-    isUpgradeJustHappened = false;
+    isUpgradeJustHappened = false; 
 }
 
 // 스탯 박스 추가 (변동 화살표 포함)
