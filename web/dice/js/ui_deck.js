@@ -27,23 +27,19 @@ let isUpgradeJustHappened = false;
 // 덱 슬롯 렌더링
 function renderDeckSlots() {
     const container = document.getElementById('deck-slots-container');
-    if (!container) return; // 컨테이너가 없으면 중단
+    if (!container) return; 
     
     container.innerHTML = "";
     let totalLevel = 0;
 
-    // 초기 덱 데이터 방어 코드
     if (!myDeck || myDeck.length === 0) {
         myDeck = ['fire', 'electric', 'wind', 'ice', 'poison'];
     }
 
     myDeck.forEach((diceId, index) => {
-        // 현재 목록에서 주사위 정보 찾기
         let dice = currentDiceList.find(d => d.id === diceId);
         
-        // 데이터 로딩 전이라면 가짜 데이터로 형태 유지
         if (!dice) {
-            // 주사위 ID를 기반으로 game_data 스타일을 추측하거나 기본값 사용
             dice = { 
                 id: diceId, 
                 name: diceId.charAt(0).toUpperCase() + diceId.slice(1), 
@@ -59,7 +55,6 @@ function renderDeckSlots() {
         const borderClass = isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200';
         const bgClass = isSelected ? 'bg-blue-50' : 'bg-slate-50';
 
-        // [수정] 슬롯 크기에 맞춰 아이콘 렌더링 (w-14)
         const iconHtml = renderDiceIcon(dice, "w-14 h-14");
 
         const slotHtml = `
@@ -75,8 +70,7 @@ function renderDeckSlots() {
                 Lv.${dice.class_level}
             </div>
             
-            ${isSelected ? `<div class="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm animate-bounce"></div>` : ''}
-        </div>
+            </div>
         `;
         container.innerHTML += slotHtml;
     });
@@ -92,16 +86,29 @@ function selectDeckSlot(index) {
     } else {
         selectedDeckSlot = index;
     }
-    renderDeckSlots(); // 슬롯 UI 갱신
-    renderDiceGrid(currentDiceList); // 하단 목록 UI 갱신 (선택 효과 등)
+    
+    // [NEW] 안내 문구 강조 효과
+    const guideText = document.getElementById('deck-guide-text');
+    if (guideText) {
+        if (selectedDeckSlot !== -1) {
+            guideText.innerText = "교체할 주사위를 아래 목록에서 선택하세요!";
+            guideText.className = "text-xs text-blue-600 font-bold text-center mt-2 animate-pulse transition-all";
+        } else {
+            guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
+            guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
+        }
+    }
+
+    renderDeckSlots(); 
+    renderDiceGrid(currentDiceList); 
 }
 
-// 주사위 클릭 핸들러 (목록에서 클릭 시)
+// 주사위 클릭 핸들러
 function handleDiceClick(diceId) {
     if (selectedDeckSlot !== -1) {
-        equipDice(diceId); // 슬롯 선택 중이면 장착/교체
+        equipDice(diceId); 
     } else {
-        showDiceDetail(diceId); // 아니면 상세 팝업
+        showDiceDetail(diceId); 
     }
 }
 
@@ -117,30 +124,34 @@ function equipDice(newDiceId) {
     const existingIndex = myDeck.indexOf(newDiceId);
 
     if (existingIndex !== -1) {
-        // 이미 덱에 있으면 위치 교환 (Swap)
         const temp = myDeck[selectedDeckSlot];
         myDeck[selectedDeckSlot] = newDiceId;
         myDeck[existingIndex] = temp;
     } else {
-        // 없으면 교체
         myDeck[selectedDeckSlot] = newDiceId;
     }
 
-    selectedDeckSlot = -1; // 선택 해제
+    selectedDeckSlot = -1; 
+    
+    // 교체 후 안내 문구 원복
+    const guideText = document.getElementById('deck-guide-text');
+    if (guideText) {
+        guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
+        guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
+    }
+
     renderDeckSlots();
     renderDiceGrid(currentDiceList);
     
-    // [NEW] 변경된 덱을 서버에 저장
     saveMyDeck();
 }
 
-// 덱 목록 렌더링 (보유 주사위)
+// 덱 목록 렌더링
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
 
-    // 그리드 렌더링 시 슬롯도 같이 갱신하여 싱크 맞춤
     renderDeckSlots();
 
     list.forEach(dice => {
@@ -180,7 +191,9 @@ function renderDiceGrid(list) {
         <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
              onclick="handleDiceClick('${dice.id}')">
             ${arrowHtml}
-            ${isInDeck ? `<div class="absolute top-1 right-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-20">E</div>` : ''}
+            
+            ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-20 shadow-md">E</div>` : ''}
+
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
