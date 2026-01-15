@@ -25,6 +25,9 @@ window.toggleViewMode = toggleViewMode;
 // ==========================================
 
 let isUpgradeJustHappened = false;
+let equippingDiceId = null;
+
+
 
 // [NEW] 빈 공간 클릭 시 선택 해제 (이벤트 리스너)
 document.addEventListener('click', function(e) {
@@ -44,6 +47,15 @@ document.addEventListener('click', function(e) {
         updateGuideText(); // 안내 문구 갱신
         renderDeckSlots();
         renderDiceGrid(currentDiceList);
+    }
+
+    if (target.closest('#dice-popup')) return;
+    
+    // 장착 모드 중인데 슬롯이나 버튼이 아닌 곳을 누르면 취소
+    if (equippingDiceId && !target.closest('#deck-slots-container') && !target.closest('#popup-equip-btn')) {
+        equippingDiceId = null;
+        renderDeckSlots();
+        updateGuideText();
     }
 });
 
@@ -148,6 +160,24 @@ function updateGuideText() {
     }
 }
 
+// [NEW] 장착 모드 시작 (팝업의 노란 버튼 클릭 시)
+function startEquipMode() {
+    if (!currentSelectedDice) return;
+    
+    equippingDiceId = currentSelectedDice.id;
+    closePopup(); // 팝업 닫기
+    
+    // 안내 문구 변경
+    const guideText = document.getElementById('deck-guide-text');
+    if (guideText) {
+        guideText.innerHTML = `<span class="text-yellow-600">✨ 장착할 슬롯을 선택해주세요! ✨</span>`;
+        guideText.className = "text-sm font-bold text-center mt-2 animate-bounce";
+    }
+    
+    renderDeckSlots(); // 슬롯들을 '선택 가능' 상태로 다시 그림
+}
+window.startEquipMode = startEquipMode; // 전역 등록
+
 // 5. 덱 슬롯 렌더링
 function renderDeckSlots() {
     const container = document.getElementById('deck-slots-container');
@@ -168,16 +198,33 @@ function renderDeckSlots() {
         totalLevel += dice.class_level;
 
         const isSelected = (index === selectedDeckSlot);
-        const borderClass = isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200';
-        const bgClass = isSelected ? 'bg-blue-50' : 'bg-slate-50';
+        
+        // [NEW] 장착 모드일 때 스타일
+        let borderClass = 'border-slate-200';
+        let bgClass = 'bg-slate-50';
+        let effectClass = '';
+
+        if (equippingDiceId) {
+            // 장착 모드면 노란색 점선 테두리로 반짝임
+            borderClass = 'border-yellow-400 border-dashed border-2';
+            bgClass = 'bg-yellow-50';
+            effectClass = 'animate-pulse cursor-pointer';
+        } else if (isSelected) {
+            // 기존 선택 모드
+            borderClass = 'border-blue-500 ring-2 ring-blue-200';
+            bgClass = 'bg-blue-50';
+        }
+
         const iconHtml = renderDiceIcon(dice, "w-14 h-14");
 
         const slotHtml = `
         <div onclick="window.selectDeckSlot(${index}); event.stopPropagation();" 
-             class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border-2 ${borderClass} ${bgClass} cursor-pointer transition-all active:scale-95 aspect-[3/4] overflow-hidden">
+             class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border-2 ${borderClass} ${bgClass} ${effectClass} transition-all active:scale-95 aspect-[3/4] overflow-hidden">
             <div class="mb-1 pointer-events-none scale-90">${iconHtml}</div>
             <div class="text-[10px] font-bold text-slate-700 w-full text-center truncate px-0.5 pointer-events-none">${dice.name}</div>
             <div class="text-[9px] font-bold text-slate-500 bg-white/50 px-1.5 rounded pointer-events-none mt-0.5">Lv.${dice.class_level}</div>
+            
+            ${equippingDiceId ? `<div class="absolute inset-0 bg-yellow-400 opacity-10 pointer-events-none"></div>` : ''}
         </div>`;
         container.innerHTML += slotHtml;
     });
@@ -185,16 +232,56 @@ function renderDeckSlots() {
     const avgEl = document.getElementById('deck-avg-class');
     if(avgEl) avgEl.innerText = `평균 Lv.${(totalLevel / 5).toFixed(1)}`;
 }
-window.renderDeckSlots = renderDeckSlots; // 전역 등록 필요
+window.renderDeckSlots = renderDeckSlots;
 
 // 슬롯 선택
 function selectDeckSlot(index) {
+    // [CASE 1] 장착 모드 중일 때 -> 즉시 장착하고 종료
+    if (equippingDiceId) {
+        equipDiceToSlot(equippingDiceId, index);
+        equippingDiceId = null; // 모드 종료
+        return;
+    }
+
+    // [CASE 2] 일반 모드 -> 슬롯 선택/해제
     selectedDeckSlot = (selectedDeckSlot === index) ? -1 : index;
-    updateGuideText(); // [수정] 문구 업데이트 함수 호출
+    updateGuideText();
     renderDeckSlots(); 
     renderDiceGrid(currentDiceList);
 }
 window.selectDeckSlot = selectDeckSlot;
+
+// [NEW] 특정 슬롯에 주사위 장착 (기존 equipDice는 목록 클릭용, 이건 슬롯 클릭용)
+function equipDiceToSlot(diceId, slotIndex) {
+    const existingIndex = myDeck.indexOf(diceId);
+    
+    if (existingIndex !== -1) {
+        // 이미 덱에 있으면 스왑
+        const temp = myDeck[slotIndex];
+        myDeck[slotIndex] = diceId;
+        myDeck[existingIndex] = temp;
+    } else {
+        // 없으면 덮어쓰기
+        myDeck[slotIndex] = diceId;
+    }
+    
+    // 저장 및 UI 갱신
+    saveMyDeck();
+    renderDeckSlots();
+    renderDiceGrid(currentDiceList);
+    
+    // 안내 문구 초기화
+    const guideText = document.getElementById('deck-guide-text');
+    if (guideText) {
+        guideText.innerText = "장착 완료!";
+        setTimeout(() => {
+            if (!equippingDiceId && selectedDeckSlot === -1) {
+                guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
+                guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
+            }
+        }, 1500);
+    }
+}
 
 // 목록 클릭
 function handleDiceClick(diceId) {

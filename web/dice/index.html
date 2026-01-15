@@ -1,135 +1,208 @@
-<!--
-이 코드 수정할 때 마다 아래 부분 버전 업 잊지 않기
-현재: v=1.1
-
-    <script src="js/state.js?v=1.1"></script>
-    <script src="js/utils.js?v=1.1"></script>
-    <script src="js/api.js?v=1.1"></script>
-    
-    <script src="js/ui_core.js?v=1.1"></script>
-    <script src="js/ui_deck.js?v=1.1"></script>
-    <script src="js/ui_summon.js?v=1.1"></script>
-    
-    <script src="js/game.js?v=1.1"></script>
-    <script src="js/main.js?v=1.1"></script>
-
--->
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dice Defense - Playground V3</title>
+    <title>Dice Defense - Lobby</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.8.0/fonts/remixicon.css" rel="stylesheet"/>
-    <link href="css/style.css" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .firefly-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 20; }
+        .firefly { position: absolute; width: 4px; height: 4px; background-color: #fbbf24; border-radius: 50%; box-shadow: 0 0 10px #fbbf24, 0 0 20px #fbbf24; animation: fly 3s infinite ease-in-out; opacity: 0; }
+        .firefly:nth-child(1) { top: 80%; left: 20%; animation-delay: 0s; }
+        .firefly:nth-child(2) { top: 60%; left: 80%; animation-delay: 1.5s; }
+        @keyframes fly { 0% { transform: translate(0, 0) scale(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translate(-20px, -40px) scale(1.5); opacity: 0; } }
+    </style>
 </head>
-<body class="bg-slate-100 h-[100dvh] flex flex-col">
+<body class="bg-slate-900 text-slate-800 select-none overflow-hidden h-screen w-screen relative">
 
-    <nav class="flex-none h-16 bg-white flex justify-between items-center px-4 shadow-sm z-50">
-        <div class="flex items-center gap-3">
-            <button onclick="location.href='../home.html'" class="text-slate-500 hover:text-blue-600 transition-colors">
-                <i class="ri-arrow-left-line text-2xl"></i>
+    <div class="absolute inset-0 z-0 opacity-20 pointer-events-none overflow-hidden">
+        <div class="absolute top-0 -left-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+        <div class="absolute top-0 -right-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-8 left-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+    </div>
+
+    <div class="relative z-10 h-full flex flex-col max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden">
+        
+        <header class="bg-white/80 backdrop-blur-md px-4 py-3 shadow-sm border-b border-slate-100 flex justify-between items-center z-20 shrink-0 h-14">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md">
+                    <i class="ri-dice-fill"></i>
+                </div>
+                <span class="font-black text-lg tracking-tight text-slate-800">DICE</span>
+            </div>
+            <div class="flex gap-2">
+                <div class="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+                    <i class="ri-vip-diamond-fill text-blue-400 text-xs"></i>
+                    <span id="res-gem" class="text-xs font-bold text-slate-700">0</span>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+                    <i class="ri-copper-coin-fill text-yellow-500 text-xs"></i>
+                    <span id="res-gold" class="text-xs font-bold text-slate-700">0</span>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+                    <i class="ri-coupon-3-fill text-green-500 text-xs"></i>
+                    <span id="res-ticket" class="text-xs font-bold text-slate-700">0</span>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-content" class="flex-1 overflow-hidden relative bg-slate-50 p-4">
+            
+            <div id="tab-shop" class="tab-content flex-col h-full w-full hidden">
+                </div>
+
+            <div id="tab-deck" class="tab-content flex-col h-full w-full hidden">
+                </div>
+
+            <div id="tab-battle" class="tab-content flex-col h-full w-full active">
+                </div>
+
+            <div id="tab-event" class="tab-content flex-col h-full w-full hidden">
+                </div>
+
+            <div id="tab-clan" class="tab-content flex-col h-full w-full hidden">
+                </div>
+
+        </main>
+
+        <nav class="bg-white border-t border-slate-200 px-4 py-2 flex justify-between items-center shrink-0 h-[70px] pb-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
+            <button onclick="switchTab('shop')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-shop">
+                <div class="relative">
+                    <i class="ri-store-2-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
+                    <div class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full hidden"></div>
+                </div>
+                <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">상점</span>
             </button>
-            <h1 class="text-lg font-bold text-slate-800 select-none">Dice Defense</h1>
-        </div>
-        <div class="flex gap-3 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-            <div class="flex items-center gap-1"><i class="ri-vip-diamond-fill text-blue-500 text-sm"></i> <span id="res-gem">0</span></div>
-            <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="ri-coins-fill text-yellow-500 text-sm"></i> <span id="res-gold">0</span></div>
-            <div class="w-px h-3 bg-slate-300"></div>
-            <div class="flex items-center gap-1"><i class="ri-coupon-3-fill text-purple-500 text-sm"></i> <span id="res-ticket">0</span></div>
-        </div>
-    </nav>
+            
+            <button onclick="switchTab('deck')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-deck">
+                <i class="ri-stack-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
+                <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">덱</span>
+            </button>
+            
+            <button onclick="switchTab('battle')" class="nav-btn group flex flex-col items-center gap-1 -mt-8 transition-transform active:scale-95" data-target="tab-battle">
+                <div class="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-300 border-4 border-white">
+                    <i class="ri-sword-fill text-2xl text-white"></i>
+                </div>
+                <span class="text-[10px] font-bold text-slate-600 mt-1">전투</span>
+            </button>
+            
+            <button onclick="switchTab('event')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-event">
+                <div class="relative">
+                    <i class="ri-calendar-event-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
+                    <span class="absolute -top-1 -right-2 bg-red-500 text-white text-[8px] px-1 rounded-full hidden">N</span>
+                </div>
+                <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">이벤트</span>
+            </button>
+            
+            <button onclick="switchTab('clan')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-clan">
+                <i class="ri-team-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
+                <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">클랜</span>
+            </button>
+        </nav>
 
-    <main class="flex-1 relative w-full max-w-lg mx-auto bg-slate-50 shadow-2xl overflow-hidden md:border-x md:border-slate-200">
-        <div id="tab-shop" class="tab-content flex-col items-center p-4 space-y-4"></div>
-        <div id="tab-deck" class="tab-content flex-col p-4"></div>
-        <div id="tab-battle" class="tab-content active flex-col p-4 relative"></div>
-        <div id="tab-event" class="tab-content flex-col p-4 space-y-4"></div>
-        <div id="tab-clan" class="tab-content flex-col p-4 space-y-4"></div>
+        <div id="dice-popup" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex-col justify-end transition-opacity duration-300">
+            <div class="bg-white w-full rounded-t-3xl shadow-2xl flex flex-col popup-compact animate-slide-up" style="max-height: 90vh;">
+                <div class="w-full flex justify-center pt-3 pb-1" onclick="closePopup()">
+                    <div class="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+                </div>
 
-        <div id="dice-popup" onclick="if(event.target === this) closePopup()" class="absolute inset-0 z-50 bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm transition-opacity duration-200">
-            <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl relative animate-[fadeIn_0.2s_ease-out] flex flex-col scrollbar-hide popup-compact" onclick="event.stopPropagation()">
-                <button onclick="closePopup()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 z-20 p-2">
-                    <i class="ri-close-line text-2xl"></i>
-                </button>
-                <div class="flex items-center gap-4 mb-2">
-                    <div id="popup-dice-icon-container" class="shrink-0 relative"></div>
-                    <div>
-                        <h3 id="popup-dice-name" class="text-xl font-bold text-slate-800">Dice Name</h3>
-                        <div class="flex gap-2 mt-1">
-                            <span id="popup-dice-rarity" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">Common</span>
-                            <span id="popup-dice-class" class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-600">Lv.1</span>
+                <div class="flex-1 overflow-y-auto px-5 pb-4 scrollbar-hide">
+                    <div class="flex items-start gap-4 mb-4 mt-2">
+                        <div id="popup-dice-icon-container" class="relative w-20 h-20 shrink-0">
+                            </div>
+                        <div class="flex-1 pt-1">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 id="popup-dice-name" class="text-xl font-black text-slate-800 leading-tight">Dice Name</h3>
+                                    <span id="popup-dice-rarity" class="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded mt-1 inline-block">Rare</span>
+                                </div>
+                                <div class="text-right">
+                                    <span id="popup-dice-class" class="text-sm font-bold text-slate-600 block">Lv.1</span>
+                                    <span class="text-[10px] text-slate-400">Class</span>
+                                </div>
+                            </div>
+                            <p id="popup-dice-desc" class="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-2">
+                                주사위 설명이 들어가는 곳입니다.
+                            </p>
                         </div>
                     </div>
-                </div>
-                <p id="popup-dice-desc" class="text-xs text-slate-500 mb-2 bg-slate-50 p-2 rounded-lg leading-tight">설명...</p>
-                <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-2"></div>
-                <div class="flex gap-2 mb-2">
-                    <button id="btn-view-class" onclick="toggleViewMode('class')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">클래스 업</button>
-                    <button id="btn-view-power" onclick="toggleViewMode('power')" class="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">파워 업</button>
-                </div>
-                <div class="mt-auto pt-2 border-t border-slate-100">
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="text-slate-500">보유 카드</span>
-                        <span id="popup-dice-cards" class="font-bold text-blue-600">0 / 5</span>
+
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-4">
+                        <button id="btn-view-class" class="flex-1 py-2 rounded-lg text-xs font-bold bg-white text-slate-700 shadow-sm transition-all" onclick="toggleViewMode('class')">
+                            클래스 정보
+                        </button>
+                        <button id="btn-view-power" class="flex-1 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-600 transition-all" onclick="toggleViewMode('power')">
+                            파워업 정보
+                        </button>
                     </div>
-                    <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mb-3">
-                        <div id="popup-progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-500"></div>
+
+                    <div id="popup-stats-grid" class="grid grid-cols-2 gap-2 mb-4">
+                        </div>
+                </div>
+
+                <div class="p-4 bg-white border-t border-slate-100 shrink-0 pb-8">
+                    <div class="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                        <span id="popup-cost-info">비용: - 골드</span>
+                        <span id="popup-dice-cards">- / -</span>
                     </div>
-                    <button id="popup-action-btn" class="relative w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 overflow-hidden">
-                        <span>업그레이드</span>
-                    </button>
-                    <div id="popup-cost-info" class="text-xs text-slate-400 mt-1 text-center font-medium">비용: 1000골드</div>
+                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-4">
+                        <div id="popup-progress-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
+                    </div>
+                    
+                    <div class="flex gap-2 w-full">
+                        <button id="popup-action-btn" class="flex-1 py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 overflow-hidden relative">
+                            <span>확인</span>
+                        </button>
+                        
+                        <button id="popup-equip-btn" onclick="startEquipMode()" class="w-24 py-3 rounded-xl font-bold text-yellow-900 bg-yellow-400 shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-1 overflow-hidden relative border-b-4 border-yellow-500 active:border-b-0 active:translate-y-1">
+                            <i class="ri-t-shirt-line"></i>
+                            <span>장착</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <<div id="summon-overlay" class="absolute inset-0 z-[60] hidden flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md">
-            <div id="summon-tap-area" class="absolute inset-0 z-0 hidden cursor-pointer"></div>
+        <div id="summon-overlay" class="absolute inset-0 z-[60] bg-slate-900 hidden flex-col items-center justify-center overflow-hidden">
+            <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 animate-pulse"></div>
             
-            <div id="single-summon-wrapper" class="relative z-10 w-full h-full pointer-events-none hidden flex-col items-center justify-center">
-                <div id="summon-dice-container" class="relative w-32 h-32 transition-all duration-300 pointer-events-auto flex items-center justify-center"></div>
-                <div id="summon-text-area" class="absolute bottom-32 w-full text-center hidden transition-all duration-500 pointer-events-none">
-                    <h2 id="summon-dice-name" class="text-3xl font-extrabold text-white drop-shadow-lg mb-2">Name</h2>
-                    <div class="text-slate-400 text-sm animate-pulse">화면을 터치하여 계속</div>
+            <div id="single-summon-wrapper" class="flex flex-col items-center justify-center w-full h-full relative z-10 hidden">
+                <div id="summon-dice-container" class="relative w-32 h-32 transition-transform duration-500">
+                    </div>
+                
+                <div id="summon-text-area" class="mt-8 text-center hidden">
+                    <div id="summon-dice-name" class="text-2xl font-black text-white drop-shadow-lg mb-1">Dice Name</div>
+                    <div class="text-sm font-bold text-slate-400">획득했습니다!</div>
                 </div>
             </div>
 
-            <div id="multi-summon-wrapper" class="relative z-10 w-full h-full hidden flex-col items-center justify-center pt-10 pb-20 pointer-events-none">
-                <div id="summon-grid-container" class="w-full max-w-md px-4 pointer-events-auto"></div>
+            <div id="multi-summon-wrapper" class="flex flex-col items-center justify-center w-full h-full relative z-10 hidden p-4">
+                <h2 class="text-xl font-bold text-white mb-6 tracking-wider">SUMMON RESULTS</h2>
                 
-                <div class="absolute bottom-10 w-full flex justify-center pointer-events-auto">
-                    <button id="summon-skip-btn" class="skip-btn text-white px-6 py-2 rounded-full text-sm font-bold hidden">SKIP ▶</button>
-                    <div id="summon-continue-msg" class="text-slate-400 text-sm animate-pulse hidden">화면을 터치하여 계속</div>
+                <div id="summon-grid-container" class="flex flex-col items-center gap-4 w-full">
+                    </div>
+
+                <div class="mt-8 flex gap-4">
+                    <button id="summon-skip-btn" class="px-6 py-2 rounded-full border border-white/30 text-white font-bold text-sm hover:bg-white/10 transition-colors">SKIP</button>
+                    <div id="summon-continue-msg" class="text-slate-400 text-xs animate-pulse hidden">터치하여 계속하기</div>
                 </div>
             </div>
+
+            <div id="summon-tap-area" class="absolute inset-0 z-20 cursor-pointer hidden"></div>
         </div>
 
-    </main>
+    </div>
 
-    <nav class="flex-none h-20 bg-white border-t border-slate-200 flex justify-between items-center px-1 pb-2 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-50"
-         style="padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); box-sizing: content-box; height: 4rem;">
-        <button onclick="switchTab('shop')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-shop"><i class="ri-store-3-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">상점</span></button>
-        <button onclick="switchTab('deck')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-deck"><i class="ri-layout-grid-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">덱</span></button>
-        <div class="w-16 relative flex justify-center"><button onclick="switchTab('battle')" class="nav-btn absolute -top-10 w-16 h-16 bg-blue-600 rounded-full flex flex-col items-center justify-center text-white shadow-lg shadow-blue-200 ring-4 ring-white transition-transform active:scale-95" data-target="tab-battle"><i class="ri-gamepad-fill text-3xl"></i></button></div>
-        <button onclick="switchTab('event')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-event"><i class="ri-gift-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">이벤트</span></button>
-        <button onclick="switchTab('clan')" class="nav-btn flex-1 flex flex-col items-center gap-1 text-slate-400 hover:text-slate-600 transition-colors" data-target="tab-clan"><i class="ri-group-fill text-2xl mb-0.5"></i><span class="text-[10px] font-bold">클랜</span></button>
-    </nav>
-
-    <script src="js/state.js?v=1.1"></script>
-    <script src="js/utils.js?v=1.1"></script>
-    <script src="js/api.js?v=1.1"></script>
+    <script src="js/state.js?v=1.3"></script>
+    <script src="js/utils.js?v=1.3"></script>
+    <script src="js/api.js?v=1.3"></script>
     
-    <script src="js/ui_core.js?v=1.1"></script>
-    <script src="js/ui_deck.js?v=1.1"></script>
-    <script src="js/ui_summon.js?v=1.1"></script>
+    <script src="js/ui_core.js?v=1.3"></script>
+    <script src="js/ui_deck.js?v=1.3"></script> <script src="js/ui_summon.js?v=1.3"></script>
     
-    <script src="js/game.js?v=1.1"></script>
-    <script src="js/main.js?v=1.1"></script>
-</body>
-</html>
+    <script src="js/game.js?v=1.3"></script>
+    <script src="js/main.js?v=1.3"></script>
 </body>
 </html>
