@@ -184,3 +184,67 @@ async def upgrade_dice(payload: dict = Body(...)):
         
     finally:
         conn.close()
+
+# [NEW] 덱 정보 조회
+@router.get("/deck/{username}")
+async def get_my_deck(username: str):
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT id, deck FROM users WHERE username = ?", (username,)).fetchone()
+        if not user: raise HTTPException(404, "User not found")
+        
+        # 덱 파싱 (콤마 구분 문자열 -> 리스트)
+        deck_ids = user["deck"].split(",") if user["deck"] else ["none"]*5
+        
+        # 덱에 장착된 주사위들의 상세 정보 조회 (레벨 등)
+        deck_data = []
+        for did in deck_ids:
+            if did == "none" or did not in DICE_DATA:
+                deck_data.append(None) # 빈 슬롯
+            else:
+                # 보유 정보 조회
+                row = conn.execute("SELECT class_level FROM user_dice WHERE user_id = ? AND dice_id = ?", (user["id"], did)).fetchone()
+                level = row["class_level"] if row else 0
+                
+                info = DICE_DATA[did]
+                deck_data.append({
+                    "id": did,
+                    "name": info["name"],
+                    "rarity": info["rarity"],
+                    "color": info["color"],
+                    "symbol": info.get("symbol", "ri-dice-fill"),
+                    "class_level": level
+                })
+        
+        return {"deck": deck_data}
+    finally:
+        conn.close()
+
+# [NEW] 덱 저장
+@router.post("/deck")
+async def save_my_deck(payload: dict = Body(...)):
+    username = payload.get("username")
+    deck_ids = payload.get("deck") # List[str] 예: ["fire", "wind", "none", "none", "none"]
+    
+    if not deck_ids or len(deck_ids) != 5:
+        raise HTTPException(400, "잘못된 덱 데이터입니다.")
+
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not user: raise HTTPException(404, "User not found")
+        
+        # 실제로 유저가 보유한 주사위인지 검증 (none 제외)
+        for did in deck_ids:
+            if did != "none":
+                owned = conn.execute("SELECT 1 FROM user_dice WHERE user_id = ? AND dice_id = ? AND class_level > 0", (user["id"], did)).fetchone()
+                if not owned:
+                    raise HTTPException(400, f"미보유 주사위 포함: {did}")
+        
+        deck_str = ",".join(deck_ids)
+        conn.execute("UPDATE users SET deck = ? WHERE id = ?", (deck_str, user["id"]))
+        conn.commit()
+        
+        return {"message": "Deck saved"}
+    finally:
+        conn.close()

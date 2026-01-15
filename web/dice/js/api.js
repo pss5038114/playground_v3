@@ -77,3 +77,31 @@ async function upgradeDice(diceId) {
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
 }
+
+// [NEW] 내 덱 불러오기
+async function fetchMyDeck() {
+    try {
+        const res = await fetch(`${API_DICE}/deck/${myId}`);
+        if(res.ok) {
+            const data = await res.json();
+            // data.deck은 [{id:..., name:...}, null, ...] 형태
+            myDeck = data.deck;
+            if(typeof renderDeckSlots === 'function') renderDeckSlots();
+        }
+    } catch(e) { console.error(e); }
+}
+
+// [NEW] 덱 저장하기
+async function saveMyDeck() {
+    try {
+        // null은 "none"으로 변환하여 전송
+        const deckIds = myDeck.map(d => d ? d.id : "none");
+        await fetch(`${API_DICE}/deck`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username: myId, deck: deckIds })
+        });
+        // 저장 후 다시 불러와서 싱크 맞춤 (선택)
+        // fetchMyDeck(); 
+    } catch(e) { alert("덱 저장 실패"); }
+}

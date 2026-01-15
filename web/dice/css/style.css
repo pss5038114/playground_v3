@@ -86,6 +86,56 @@ body { font-family: 'Pretendard', sans-serif; overflow: hidden; }
     padding: 1.25rem !important;
 }
 
+/* [NEW] 덱 슬롯 스타일 */
+.deck-slot {
+    position: relative;
+    aspect-ratio: 3 / 4; /* 세로로 조금 길게 (이름/레벨 공간) */
+    border-radius: 1rem;
+    border: 2px dashed #cbd5e1; /* slate-300 */
+    background-color: #f8fafc; /* slate-50 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.deck-slot.filled {
+    border: 2px solid #e2e8f0; /* slate-200 */
+    background-color: white;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* 선택된 슬롯 강조 */
+.deck-slot.selected {
+    border-color: #3b82f6 !important; /* blue-500 */
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3) !important;
+    z-index: 60 !important; /* 오버레이 위로 */
+    transform: scale(1.05);
+}
+
+/* [NEW] 편집 모드 오버레이 (Dimming) */
+#deck-edit-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 50;
+    display: none;
+    backdrop-filter: blur(2px);
+}
+
+/* 편집 모드일 때 하단 리스트 강조 */
+.editing-mode #dice-list-grid {
+    position: relative;
+    z-index: 60; /* 오버레이 위로 */
+    background-color: white;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+}
+
 /* 소환 연출 스타일 */
 #summon-overlay { background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); perspective: 1000px; }
 @keyframes drop-in { 0% { transform: translateY(-120vh) scale(0.5); opacity: 0; } 60% { transform: translateY(20px) scale(1.1); opacity: 1; } 80% { transform: translateY(-10px) scale(0.95); } 100% { transform: translateY(0) scale(1); opacity: 1; } }
