@@ -1,7 +1,7 @@
 // web/dice/js/utils.js
 
 function getDiceVisualClasses(dice) {
-    // [수정] 방어 코드 추가: color가 없으면 기본값 사용
+    // [방어 코드] color가 없으면 기본값 사용
     const colorClass = dice.color || 'bg-slate-500'; 
     
     let borderColor = colorClass.replace('bg-', 'border-');
@@ -23,7 +23,6 @@ function renderDiceIcon(dice, sizeClass="w-10 h-10") {
     const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
     const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
     const symbolIcon = dice.symbol || "ri-dice-fill";
-    // [수정] colorClass 참조 안전하게 처리
     const colorClass = dice.color || 'bg-slate-500';
 
     const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0"><i class="${symbolIcon} text-4xl"></i></div>`;
@@ -37,4 +36,14 @@ function getRarityBgIcon(rarity) {
 
 function getRarityDotColor(rarity) {
     switch(rarity) { case 'Legend': return 'bg-yellow-400'; case 'Hero': return 'bg-purple-500'; case 'Rare': return 'bg-blue-500'; default: return 'bg-gray-400'; }
+}
+
+// [NEW] 등급별 배경 아이콘 텍스트 색상 (은은한 틴트)
+function getRarityBgTextColor(rarity) {
+    switch(rarity) { 
+        case 'Legend': return 'text-yellow-200'; // 금색 틴트
+        case 'Hero': return 'text-purple-200';   // 보라색 틴트
+        case 'Rare': return 'text-blue-200';     // 파란색 틴트
+        default: return 'text-slate-200';        // 회색 틴트
+    }
 }

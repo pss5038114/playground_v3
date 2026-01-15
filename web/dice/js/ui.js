@@ -17,7 +17,6 @@ async function loadComponents() {
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     
-    // [중요] 앱 로드 시 내 덱 정보 갱신 (New 뱃지 오류 방지)
     if(typeof fetchMyDice === 'function') fetchMyDice();
 }
 
@@ -40,7 +39,6 @@ function closeSummonOverlay() {
     overlay.classList.remove('flex');
     overlay.classList.add('hidden');
     
-    // 11회 소환용 닫기 영역 초기화 (z-index 복구)
     const tapArea = document.getElementById('summon-tap-area');
     if(tapArea) {
         tapArea.classList.add('hidden');
@@ -48,7 +46,6 @@ function closeSummonOverlay() {
         tapArea.onclick = null;
     }
 
-    // 1회 소환용 컨테이너 초기화
     const container = document.getElementById('summon-dice-container');
     if(container) container.classList.remove('dice-slide-up');
     
@@ -77,7 +74,6 @@ function checkIsNew(diceId) {
 // -----------------------------------------------------------
 
 async function handleSummon(count) {
-    // [버그 수정] 소환 전 보유 목록이 비어있다면 최신화 (모두 NEW 뜨는 문제 방지)
     if (!currentDiceList || currentDiceList.length === 0) {
         await fetchMyDice();
     }
@@ -86,7 +82,6 @@ async function handleSummon(count) {
     if (!data) return;
 
     if (count === 1) {
-        // [1회 소환]
         const resultDice = data.results[0];
         let isNew = checkIsNew(resultDice.id);
         
@@ -97,7 +92,6 @@ async function handleSummon(count) {
         
         playSingleSummonAnimation(resultDice, isNew);
     } else {
-        // [11회 소환]
         document.getElementById('single-summon-wrapper').classList.add('hidden');
         document.getElementById('single-summon-wrapper').classList.remove('flex');
         document.getElementById('multi-summon-wrapper').classList.remove('hidden');
@@ -116,7 +110,6 @@ function playSingleSummonAnimation(diceData, isNew) {
     const textArea = document.getElementById('summon-text-area');
     const tapArea = document.getElementById('summon-tap-area');
     
-    // 초기화
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
     textArea.classList.add('hidden');
@@ -129,14 +122,12 @@ function playSingleSummonAnimation(diceData, isNew) {
 
     const rarityConfig = getRarityConfig(diceData.rarity);
     
-    // 1. 하강
     const hiddenDice = document.createElement('div');
     hiddenDice.className = `w-32 h-32 bg-slate-800 rounded-[22%] flex items-center justify-center shadow-2xl summon-drop relative z-10`;
     hiddenDice.style.boxShadow = `0 0 20px rgba(0,0,0,0.5)`;
     hiddenDice.innerHTML = `<i class="${rarityConfig.icon} text-6xl text-white opacity-50"></i>`;
     container.appendChild(hiddenDice);
 
-    // 2. 대기
     setTimeout(() => {
         const flash = document.createElement('div');
         flash.className = 'impact-flash'; 
@@ -161,13 +152,11 @@ function revealDice(element, diceData, isNew, config) {
     container.style.cursor = 'default';
     element.classList.remove('summon-waiting');
     
-    // 파동
     const ripple = document.createElement('div');
     ripple.className = 'ripple-effect';
     ripple.style.setProperty('--glow-color', config.color);
     container.appendChild(ripple);
     
-    // 주사위 교체
     let realIconHtml = renderDiceIcon(diceData, "w-32 h-32");
     realIconHtml = realIconHtml.replace("text-4xl", "text-8xl"); 
     const tempDiv = document.createElement('div');
@@ -187,7 +176,6 @@ function revealDice(element, diceData, isNew, config) {
         container.appendChild(badge);
     }
 
-    // 결과 표시
     setTimeout(() => {
         container.classList.add('dice-slide-up');
         const textArea = document.getElementById('summon-text-area');
@@ -200,7 +188,7 @@ function revealDice(element, diceData, isNew, config) {
         textArea.classList.add('text-reveal');
         
         tapArea.classList.remove('hidden');
-        tapArea.style.zIndex = "50"; // 맨 앞으로
+        tapArea.style.zIndex = "50"; 
         tapArea.onclick = closeSummonOverlay;
     }, 600);
 }
@@ -246,14 +234,12 @@ function playMultiSummonAnimation(results) {
             const box = document.createElement('div');
             box.className = "relative w-20 h-20 bg-transparent flex items-center justify-center cursor-default"; 
             
-            // 1. 테두리
             const outline = document.createElement('div');
             outline.className = "outline-box";
             const globalIndex = (rowIndex === 0 ? 0 : (rowIndex === 1 ? 4 : 7)) + colIndex;
             outline.style.animationDelay = `${globalIndex * 0.05}s`;
             box.appendChild(outline);
 
-            // 2. 등급 박스
             const hiddenDice = document.createElement('div');
             hiddenDice.className = "absolute inset-0 bg-white rounded-[22%] flex items-center justify-center opacity-0 transform scale-0"; 
             hiddenDice.style.border = `3px solid ${rarityConfig.color}`;
@@ -265,7 +251,6 @@ function playMultiSummonAnimation(results) {
             hiddenDice.style.animation = `pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards ${appearDelay}s, breathe-glow 2s infinite ease-in-out ${appearDelay + 0.4}s`;
             box.appendChild(hiddenDice);
             
-            // [수정] 이름 위치 조정 (-bottom-4)
             const nameLabel = document.createElement('div');
             nameLabel.className = "absolute -bottom-4 text-[10px] font-bold text-white text-center opacity-0 w-24 truncate pointer-events-none";
             nameLabel.innerText = dice.name;
@@ -363,14 +348,14 @@ function checkAllRevealed(diceElements) {
         
         if(tapArea) {
             tapArea.classList.remove('hidden');
-            tapArea.style.zIndex = "50"; // [중요] 완료 시 최상위로 올려서 클릭 감지
+            tapArea.style.zIndex = "50"; 
             tapArea.onclick = closeSummonOverlay;
         }
     }
 }
 
 // -----------------------------------------------------------
-// [덱 및 팝업 로직] (기존 유지)
+// [덱 및 팝업 로직]
 // -----------------------------------------------------------
 
 function renderDiceGrid(list) {
@@ -392,6 +377,7 @@ function renderDiceGrid(list) {
 
         const iconHtml = renderDiceIcon(dice, "w-12 h-12");
         const rarityBgIcon = getRarityBgIcon(dice.rarity);
+        const rarityBgTextColor = getRarityBgTextColor(dice.rarity); // [NEW] 텍스트 색상 적용
         const rarityDotColor = getRarityDotColor(dice.rarity);
         
         let borderClass = 'border-slate-100';
@@ -408,7 +394,7 @@ function renderDiceGrid(list) {
         <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
              onclick="showDiceDetail('${dice.id}')">
             ${arrowHtml}
-            <div class="absolute inset-0 flex items-center justify-center text-slate-100 pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-50"></i></div>
+            <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
@@ -421,6 +407,7 @@ function renderDiceGrid(list) {
 }
 
 function showDiceDetail(diceId) {
+    // ... (기존 showDiceDetail과 동일) ...
     const dice = currentDiceList.find(d => d.id === diceId); if(!dice) return; currentSelectedDice = dice;
     
     document.getElementById('popup-dice-name').innerText = dice.name;
@@ -451,6 +438,7 @@ function showDiceDetail(diceId) {
         document.getElementById('popup-dice-cards').innerText = "MAX";
         progress.style.width = "100%";
         progress.className = "h-full w-full bg-slate-300";
+        
         btn.innerHTML = `<span>MAX LEVEL</span>`;
         costInfo.innerText = "최고 레벨에 도달했습니다.";
         btnColorClass = "bg-slate-400 cursor-not-allowed";
