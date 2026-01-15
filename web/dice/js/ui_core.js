@@ -1,7 +1,5 @@
 // web/dice/js/ui_core.js
 
-// web/dice/js/ui_core.js
-
 async function loadComponents() {
     const tabs = [
         {id:'tab-shop',file:'lobby_shop.html'},
@@ -10,6 +8,8 @@ async function loadComponents() {
         {id:'tab-event',file:'lobby_event.html'},
         {id:'tab-clan',file:'lobby_clan.html'}
     ];
+    
+    // 1. 모든 HTML 탭 로드 완료 대기
     await Promise.all(tabs.map(async(t)=>{
         try{
             const r=await fetch(t.file);
@@ -17,29 +17,34 @@ async function loadComponents() {
         }catch(e){}
     }));
     
+    // 2. 모듈 초기화
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     if(typeof fetchMyDice === 'function') fetchMyDice();
     
-    // [중요] 덱 정보 로드
+    // 3. 덱 정보 로드 및 UI 초기화 (HTML 로드 후 실행 보장)
     if(typeof fetchMyDeck === 'function') {
-        await fetchMyDeck(); // 데이터를 다 받아온 뒤 UI 렌더링
+        await fetchMyDeck(); // 데이터 가져오기
     }
     
-    // 덱 UI 강제 초기화 (혹시 fetchMyDeck에서 안 되었을 경우 대비)
-    if(typeof renderDeckUI === 'function') renderDeckUI();
+    // 4. 데이터 로드 후 UI 강제 렌더링 (특히 덱 탭)
+    if(typeof renderDeckUI === 'function') {
+        renderDeckUI();
+    }
 }
 
-// ... (나머지 코드 유지) ...
 const tabNames = ['shop','deck','battle','event','clan'];
 function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
     document.getElementById(`tab-${name}`).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('text-blue-600',b.dataset.target===`tab-${name}`));
     
+    // 탭 전환 시 해당 탭 UI 갱신
     if(name==='deck') {
         fetchMyDice();
-        fetchMyDeck(); // 덱 탭 진입 시 덱 정보 갱신
+        fetchMyDeck().then(() => {
+            if(typeof renderDeckUI === 'function') renderDeckUI();
+        });
     }
     if(name==='shop') fetchMyResources();
 }
