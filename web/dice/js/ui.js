@@ -17,9 +17,7 @@ async function loadComponents() {
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     
-    // [중요] 앱 로드 시 내 덱 정보 갱신
-    if(typeof fetchMyDice === 'function') await fetchMyDice();
-    if(typeof fetchMyDeck === 'function') await fetchMyDeck();
+    if(typeof fetchMyDice === 'function') fetchMyDice();
 }
 
 const tabNames = ['shop','deck','battle','event','clan'];
@@ -28,10 +26,7 @@ function switchTab(name) {
     document.getElementById(`tab-${name}`).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('text-blue-600',b.dataset.target===`tab-${name}`));
     
-    if(name==='deck') {
-        fetchMyDice();
-        fetchMyDeck();
-    }
+    if(name==='deck') fetchMyDice();
     if(name==='shop') fetchMyResources();
 }
 
@@ -360,101 +355,21 @@ function checkAllRevealed(diceElements) {
 }
 
 // -----------------------------------------------------------
-// [덱 관리 로직]
+// [덱 및 팝업 로직]
 // -----------------------------------------------------------
 
-function renderDeckSlots() {
-    const container = document.getElementById('equipped-deck');
-    if(!container) return;
-    
-    container.innerHTML = "";
-    
-    myDeck.forEach((dice, index) => {
-        const slot = document.createElement('div');
-        slot.className = `deck-slot ${dice ? 'filled' : ''} ${selectedDeckSlotIndex === index ? 'selected' : ''}`;
-        slot.onclick = (e) => {
-            e.stopPropagation(); 
-            handleDeckSlotClick(index);
-        };
+let isUpgradeJustHappened = false;
 
-        if (dice) {
-            let iconHtml = renderDiceIcon(dice, "w-12 h-12");
-            const infoHtml = `
-                <div class="mt-1 text-[10px] font-bold text-slate-700 truncate w-full text-center px-1">${dice.name}</div>
-                <div class="text-[9px] font-bold text-slate-400">Lv.${dice.class_level}</div>
-            `;
-            slot.innerHTML = iconHtml + infoHtml;
-        } else {
-            slot.innerHTML = `<i class="ri-add-line text-3xl text-slate-300"></i>`;
-        }
-        
-        container.appendChild(slot);
-    });
+function closePopup() { 
+    document.getElementById('dice-popup').classList.add('hidden'); 
+    document.getElementById('dice-popup').classList.remove('flex'); 
+    currentSelectedDice = null; 
 }
 
-function handleDeckSlotClick(index) {
-    const overlay = document.getElementById('deck-edit-overlay');
-    const listGrid = document.getElementById('dice-list-grid');
-
-    if (selectedDeckSlotIndex === index) {
-        cancelDeckEdit();
-        return;
-    }
-
-    selectedDeckSlotIndex = index;
-    renderDeckSlots(); 
-
-    if(overlay) overlay.style.display = 'block';
-    if(listGrid && listGrid.parentElement) {
-        listGrid.parentElement.classList.add('editing-mode');
-    }
-    
-    renderDiceGrid(currentDiceList); 
+function toggleViewMode(mode) { 
+    currentViewMode = (currentViewMode === mode) ? null : mode; 
+    updateStatsView(); 
 }
-
-function cancelDeckEdit() {
-    selectedDeckSlotIndex = null;
-    renderDeckSlots();
-    
-    const overlay = document.getElementById('deck-edit-overlay');
-    if(overlay) overlay.style.display = 'none';
-    
-    const listGrid = document.getElementById('dice-list-grid');
-    if(listGrid && listGrid.parentElement) {
-        listGrid.parentElement.classList.remove('editing-mode');
-    }
-    
-    renderDiceGrid(currentDiceList); 
-}
-
-async function equipDiceToDeck(diceId) {
-    if (selectedDeckSlotIndex === null) return; 
-
-    const diceInfo = currentDiceList.find(d => d.id === diceId);
-    if (!diceInfo) return;
-
-    const existingIndex = myDeck.findIndex(d => d && d.id === diceId);
-    
-    if (existingIndex !== -1) {
-        if (existingIndex === selectedDeckSlotIndex) {
-            cancelDeckEdit();
-            return;
-        }
-        const temp = myDeck[selectedDeckSlotIndex];
-        myDeck[selectedDeckSlotIndex] = myDeck[existingIndex];
-        myDeck[existingIndex] = temp;
-    } else {
-        myDeck[selectedDeckSlotIndex] = diceInfo;
-    }
-
-    renderDeckSlots();
-    cancelDeckEdit(); 
-    await saveMyDeck(); 
-}
-
-// -----------------------------------------------------------
-// [리스트 및 팝업 로직]
-// -----------------------------------------------------------
 
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
@@ -488,12 +403,9 @@ function renderDiceGrid(list) {
             arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
-        const clickAction = `onclick="selectedDeckSlotIndex !== null ? equipDiceToDeck('${dice.id}') : showDiceDetail('${dice.id}')"`;
-        const disabledClass = (!isOwned && selectedDeckSlotIndex !== null) ? 'opacity-30 pointer-events-none' : '';
-
         const cardHtml = `
-        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'} ${disabledClass}" 
-             ${clickAction}>
+        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
+             onclick="showDiceDetail('${dice.id}')">
             ${arrowHtml}
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
@@ -519,6 +431,7 @@ function showDiceDetail(diceId) {
     iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
+    // [수정] 반딧불(firefly) 관련 코드 삭제 (cleanup은 유지해도 무방)
     const iconContainer = document.getElementById('popup-dice-icon-container');
     const existingParticles = iconContainer.querySelector('.firefly-container');
     if(existingParticles) existingParticles.remove();
@@ -590,6 +503,7 @@ function showDiceDetail(diceId) {
 
     if(canUpgrade) {
         btn.classList.add('btn-pulse-green');
+        // [수정] firefly 추가하던 코드 삭제됨
     } else {
         btn.classList.remove('btn-pulse-green');
     }

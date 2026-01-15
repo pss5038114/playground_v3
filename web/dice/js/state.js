@@ -6,13 +6,8 @@ const myId = sessionStorage.getItem('username');
 // 전역 상태 관리
 let currentDiceList = [];
 let currentSelectedDice = null;
-let currentViewMode = null; 
-
-// [NEW] 덱 상태
-let myDeck = [null, null, null, null, null]; // 5개 슬롯 (null or dice object)
-let selectedDeckSlotIndex = null; // 현재 편집 중인 슬롯 인덱스 (0~4 or null)
+let currentViewMode = null; // 'class' | 'power' | null
 
 // 게임 관련 전역 변수
 let socket = null;
 let canvas, ctx;
-let isUpgradeJustHappened = false;
