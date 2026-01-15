@@ -171,32 +171,44 @@ async def upgrade_dice(payload: dict = Body(...)):
         user = conn.execute("SELECT id, gold FROM users WHERE username = ?", (username,)).fetchone()
         if not user: raise HTTPException(404, "User not found")
         
-        dice_row = conn.execute("SELECT * FROM user_dice WHERE user_id = ? AND dice_id = ?", (user["id"], dice_id)).fetchone()
-        if not dice_row: raise HTTPException(400, "주사위 정보를 찾을 수 없습니다.")
+        # 주사위 정보 조회
+        user_dice = conn.execute("SELECT * FROM user_dice WHERE user_id = ? AND dice_id = ?", (user["id"], dice_id)).fetchone()
         
-        current_level = dice_row["class_level"]
-        quantity = dice_row["quantity"]
+        current_level = user_dice["class_level"] if user_dice else 0
+        current_quantity = user_dice["quantity"] if user_dice else 0
         
+        # 만약 데이터가 없으면(아예 처음) 0레벨로 취급
+        
+        # [수정] 비용 계산 로직
         if current_level >= 20:
-            raise HTTPException(400, "이미 최대 레벨입니다.")
-        
-        dice_info = DICE_DATA.get(dice_id)
-        if not dice_info: raise HTTPException(400, "잘못된 주사위 ID")
-        
-        rarity = dice_info["rarity"]
-        req_gold = UPGRADE_RULES["gold"][current_level]
-        req_cards = UPGRADE_RULES["cards"][rarity][current_level]
+            raise HTTPException(400, "Max level reached")
             
-        if quantity < req_cards:
-            raise HTTPException(400, "카드가 부족합니다.")
-        if user["gold"] < req_gold:
-             raise HTTPException(400, "골드가 부족합니다.")
-             
-        conn.execute("UPDATE user_dice SET quantity = quantity - ?, class_level = class_level + 1 WHERE id = ?", (req_cards, dice_row["id"]))
-        conn.execute("UPDATE users SET gold = gold - ? WHERE id = ?", (req_gold, user["id"]))
-        conn.commit()
+        # UPGRADE_RULES에서 가져오되, 0레벨(해금)인 경우 골드 비용은 0으로 강제
+        # (기존 데이터에 0레벨 골드 비용이 설정되어 있어도 무시)
+        req_cards = UPGRADE_RULES[current_level]["cards"]
+        req_gold = 0 if current_level == 0 else UPGRADE_RULES[current_level]["gold"]
         
-        return {"message": "Success", "new_level": current_level + 1}
+        if current_quantity < req_cards:
+            raise HTTPException(400, "Not enough cards")
+        if user["gold"] < req_gold:
+            raise HTTPException(400, "Not enough gold")
+            
+        # 차감 및 업데이트
+        new_gold = user["gold"] - req_gold
+        new_quantity = current_quantity - req_cards
+        new_level = current_level + 1
+        
+        conn.execute("UPDATE users SET gold = ? WHERE id = ?", (new_gold, user["id"]))
+        
+        if user_dice:
+            conn.execute("UPDATE user_dice SET quantity = ?, class_level = ? WHERE id = ?", (new_quantity, new_level, user_dice["id"]))
+        else:
+            # 0레벨 -> 1레벨 (첫 획득) INSERT
+            conn.execute("INSERT INTO user_dice (user_id, dice_id, quantity, class_level) VALUES (?, ?, ?, ?)", 
+                         (user["id"], dice_id, new_quantity, new_level))
+            
+        conn.commit()
+        return {"message": "Upgraded", "new_level": new_level, "new_gold": new_gold}
         
     finally:
         conn.close()
