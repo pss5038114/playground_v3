@@ -360,13 +360,12 @@ document.addEventListener('click', function(e) {
 });
 
 // ==========================================
-// [수정됨] 덱 목록 렌더링 (정렬 + 구분선 + NEW 뱃지)
+// [수정됨] 덱 목록 (구분선 + NEW 뱃지 + 초록 테마)
 // ==========================================
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
-    const countEl = document.getElementById('dice-count'); 
     
-    // 1. 정렬: 보유(Lv>0) -> 미보유(Lv=0)
+    // 1. 정렬: 보유 -> 미보유
     list.sort((a, b) => {
         const aOwned = a.class_level > 0;
         const bOwned = b.class_level > 0;
@@ -408,8 +407,7 @@ function renderDiceGrid(list) {
 
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
-            // 0레벨(해금)은 골드 0으로 처리 (유저 데이터 변경 반영)
-            const requiredGold = (dice.class_level === 0) ? 0 : gold;
+            const requiredGold = (dice.class_level === 0) ? 0 : gold; // 0레벨 무료
             
             if (dice.quantity >= cards && currentGold >= requiredGold) {
                 if (dice.class_level === 0) isUnlockable = true;
@@ -430,9 +428,10 @@ function renderDiceGrid(list) {
             borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
         }
 
-        // [NEW 뱃지 및 스타일]
+        // [NEW 뱃지 & 초록 테마 적용]
         if (isUnlockable) {
-            borderClass = 'border-blue-400 ring-2 ring-blue-100 bg-blue-50';
+            // 사용자 요청: 초록색 테마
+            borderClass = 'border-green-500 ring-2 ring-green-100 bg-green-50';
             arrowHtml = `<div class="absolute top-0 right-0 z-20 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm animate-pulse">NEW!</div>`;
         } else if (isUpgradeable) {
             borderClass = 'border-green-500 ring-2 ring-green-200';
@@ -454,6 +453,7 @@ function renderDiceGrid(list) {
         </div>`;
         grid.innerHTML += cardHtml;
     });
+    const countEl = document.getElementById('dice-count'); 
     if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
 }
 window.renderDiceGrid = renderDiceGrid;
@@ -483,12 +483,9 @@ function showDiceDetail(diceId) {
     let progColorClass = "bg-blue-500"; 
     currentViewMode = null;
 
-    // [미보유 시 장착 버튼 숨기기]
-    if (dice.class_level === 0) {
-        equipBtn.classList.add('hidden');
-    } else {
-        equipBtn.classList.remove('hidden');
-    }
+    // 미보유 시 장착 버튼 숨김
+    if (dice.class_level === 0) equipBtn.classList.add('hidden');
+    else equipBtn.classList.remove('hidden');
 
     if (dice.class_level >= 20) { 
         document.getElementById('popup-dice-cards').innerText = "MAX"; 
@@ -498,33 +495,29 @@ function showDiceDetail(diceId) {
         costInfo.innerText = "최고 레벨에 도달했습니다."; 
         btnColorClass = "bg-slate-400 cursor-not-allowed"; 
         canUpgrade = false; 
-    } 
-    else { 
+    } else { 
         const reqCards = dice.next_cost ? dice.next_cost.cards : 9999; 
-        // 0레벨이면 골드 0원으로 처리
         const reqGold = (dice.class_level === 0) ? 0 : (dice.next_cost ? dice.next_cost.gold : 9999); 
-        
         document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`; 
         const pct = Math.min((dice.quantity / reqCards) * 100, 100); 
         progress.style.width = `${pct}%`; 
-        
         const hasEnoughCards = dice.quantity >= reqCards; 
         const hasEnoughGold = currentGold >= reqGold;
 
         if (dice.class_level === 0) { 
-            progColorClass = "bg-blue-500"; 
+            // 해금 상태: 초록색(Green)으로 통일
+            progColorClass = "bg-green-500"; 
             if (hasEnoughCards) { 
                 canUpgrade = true; 
                 btn.innerHTML = `<span>🔓 획득하기</span>`; 
                 costInfo.innerText = `비용: 무료 (카드 ${reqCards}장)`; 
-                btnColorClass = "bg-blue-500 hover:bg-blue-600"; 
+                btnColorClass = "bg-green-500 hover:bg-green-600"; // Green
             } else { 
                 btn.innerHTML = `<span>카드 부족</span>`; 
                 costInfo.innerText = `필요: 카드 ${reqCards}장`; 
                 btnColorClass = "bg-slate-300 cursor-not-allowed"; 
             } 
-        } 
-        else { 
+        } else { 
             if (hasEnoughCards && hasEnoughGold) { 
                 canUpgrade = true; 
                 currentViewMode = 'class'; 
@@ -542,13 +535,10 @@ function showDiceDetail(diceId) {
         } 
         progress.className = `h-full w-0 transition-all duration-500 ${progColorClass}`; 
     }
-    
     btn.className = `relative w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 overflow-hidden ${btnColorClass}`;
-    if(canUpgrade) { btn.classList.add('btn-pulse-green'); } else { btn.classList.remove('btn-pulse-green'); }
-    
+    if(canUpgrade) btn.classList.add('btn-pulse-green'); else btn.classList.remove('btn-pulse-green');
     btn.onclick = canUpgrade ? () => upgradeDice(dice.id) : null; 
     btn.disabled = !canUpgrade;
-    
     updateStatsView(); 
     document.getElementById('dice-popup').classList.remove('hidden'); 
     document.getElementById('dice-popup').classList.add('flex');
