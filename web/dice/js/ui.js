@@ -191,7 +191,6 @@ function revealDice(element, diceData, isNew, config) {
     }, 600);
 }
 
-
 // ==========================================
 // [11회 소환 애니메이션]
 // ==========================================
@@ -527,6 +526,16 @@ async function upgradeDice(diceId) {
             }
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
+}
+function closePopup() { 
+    document.getElementById('dice-popup').classList.add('hidden'); 
+    document.getElementById('dice-popup').classList.remove('flex'); 
+    currentSelectedDice = null; 
+}
+
+function toggleViewMode(mode) { 
+    currentViewMode = (currentViewMode === mode) ? null : mode; 
+    updateStatsView(); 
 }
 
 function updateStatsView() {
