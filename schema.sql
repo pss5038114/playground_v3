@@ -20,11 +20,9 @@ CREATE TABLE IF NOT EXISTS user_dice (
     UNIQUE(user_id, dice_id)
 );
 
-DROP TABLE IF EXISTS user_decks;
-
-CREATE TABLE user_decks (
+CREATE TABLE IF NOT EXISTS user_decks (
     user_id INTEGER,
-    preset_index INTEGER, -- 1~7
+    preset_index INTEGER,
     deck_name TEXT DEFAULT 'Deck 1',
     slot_1 TEXT NOT NULL,
     slot_2 TEXT NOT NULL,
