@@ -10,9 +10,8 @@ let currentSelectedDice = null;
 let currentViewMode = null; 
 
 // [덱 관리 상태]
-// 초기 덱 설정 (빈 슬롯 방지)
 let myDeck = ['fire', 'electric', 'wind', 'ice', 'poison']; 
-let selectedDeckSlot = -1; // -1: 선택 안됨, 0~4: 해당 슬롯 선택됨
+let selectedDeckSlot = -1; 
 
 // 게임 관련 전역 변수
 let socket = null;
