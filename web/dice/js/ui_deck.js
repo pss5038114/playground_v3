@@ -365,6 +365,9 @@ document.addEventListener('click', function(e) {
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     
+    // [중요] 이 줄이 빠져서 오류가 났습니다. 다시 추가했습니다!
+    const countEl = document.getElementById('dice-count'); 
+    
     // 1. 정렬: 보유 -> 미보유
     list.sort((a, b) => {
         const aOwned = a.class_level > 0;
@@ -375,6 +378,7 @@ function renderDiceGrid(list) {
         const scoreA = rarityScore[a.rarity] || 0;
         const scoreB = rarityScore[b.rarity] || 0;
         if (scoreA !== scoreB) return scoreB - scoreA;
+        
         return a.name.localeCompare(b.name);
     });
 
@@ -404,7 +408,6 @@ function renderDiceGrid(list) {
         let isUpgradeable = false;
         let isUnlockable = false;
 
-        // 비용 체크 로직
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
             const requiredGold = (dice.class_level === 0) ? 0 : gold; 
@@ -421,11 +424,11 @@ function renderDiceGrid(list) {
         const rarityDotColor = getRarityDotColor(dice.rarity);
         
         let borderClass = 'border-slate-100';
-        let bgClass = 'bg-slate-100'; // 기본 미보유 배경
+        let bgClass = 'bg-slate-100'; 
         let levelBadgeClass = 'text-slate-600 bg-slate-100';
         let arrowHtml = '';
         
-        // [중요] 흑백 처리 조건: 미보유이면서 && 해금도 불가능할 때만 흑백
+        // 흑백 처리: 미보유 && 해금 불가일 때만
         const isGray = !isOwned && !isUnlockable;
 
         if (isOwned) {
@@ -436,27 +439,24 @@ function renderDiceGrid(list) {
             borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
         }
 
-        // [상태별 스타일 정의]
         if (isUnlockable) {
-            // 해금 가능: 초록색 테마 + NEW 뱃지(좌측)
             borderClass = 'border-green-500 ring-2 ring-green-100';
-            bgClass = 'bg-green-50'; // 배경도 연한 초록색으로 변경
-            // NEW 뱃지 위치: left-0, rounded-br-lg (우측 하단 둥글게)
+            bgClass = 'bg-green-50';
             arrowHtml = `<div class="absolute top-0 left-0 z-20 bg-green-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-br-lg shadow-sm animate-pulse">NEW!</div>`;
         } 
         else if (isUpgradeable) {
-            // 업글 가능: 기존 초록색 화살표
             borderClass = 'border-green-500 ring-2 ring-green-200';
             levelBadgeClass = 'text-white bg-green-500 shadow-sm';
             arrowHtml = `<div class="absolute bottom-1 left-2 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
-        // HTML 생성
         const cardHtml = `
         <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} ${bgClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer" 
              onclick="window.handleDiceClick('${dice.id}'); event.stopPropagation();">
             
-            ${arrowHtml} ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
+            ${arrowHtml}
+            
+            ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
             
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
             
@@ -474,6 +474,7 @@ function renderDiceGrid(list) {
         grid.innerHTML += cardHtml;
     });
     
+    // 이제 여기서 오류가 나지 않습니다.
     if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
 }
 window.renderDiceGrid = renderDiceGrid;
