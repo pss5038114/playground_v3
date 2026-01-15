@@ -12,13 +12,13 @@ function closePopup() {
     }
     currentSelectedDice = null; 
 }
-window.closePopup = closePopup; // 전역 등록
+window.closePopup = closePopup;
 
 function toggleViewMode(mode) { 
     currentViewMode = (currentViewMode === mode) ? null : mode; 
     updateStatsView(); 
 }
-window.toggleViewMode = toggleViewMode; // 전역 등록
+window.toggleViewMode = toggleViewMode;
 
 // ==========================================
 // [덱 관리 로직]
@@ -26,16 +26,35 @@ window.toggleViewMode = toggleViewMode; // 전역 등록
 
 let isUpgradeJustHappened = false;
 
+// [NEW] 빈 공간 클릭 시 선택 해제 (이벤트 리스너)
+document.addEventListener('click', function(e) {
+    // 덱 탭이 활성화되어 있고, 슬롯이 선택된 상태일 때만 동작
+    if (!document.getElementById('tab-deck').classList.contains('active')) return;
+    if (selectedDeckSlot === -1) return;
+
+    // 클릭한 요소가 슬롯, 주사위 목록, 팝업 등이 아니라면 선택 해제
+    const target = e.target;
+    const isSlot = target.closest('#deck-slots-container');
+    const isList = target.closest('#dice-list-grid');
+    const isPopup = target.closest('#dice-popup');
+    const isPresetBtn = target.closest('#preset-btn-container'); // 프리셋 버튼도 제외
+
+    if (!isSlot && !isList && !isPopup && !isPresetBtn) {
+        selectedDeckSlot = -1;
+        updateGuideText(); // 안내 문구 갱신
+        renderDeckSlots();
+        renderDiceGrid(currentDiceList);
+    }
+});
+
 // [통합] 덱 UI 렌더링
 function renderDeckUI() {
-    // DOM이 준비되었는지 확인 (탭이 로드되지 않았으면 중단)
     if (!document.getElementById('preset-btn-container')) return;
-
     renderPresetButtons();
     renderDeckName();
     renderDeckSlots();
 }
-window.renderDeckUI = renderDeckUI; // 전역 등록
+window.renderDeckUI = renderDeckUI;
 
 // 1. 프리셋 버튼 렌더링
 function renderPresetButtons() {
@@ -72,7 +91,6 @@ function renderDeckName() {
 function switchPreset(index) {
     if (currentPresetIndex === index) return;
     
-    // 현재 덱 상태 메모리에 임시 저장
     if (!myDecks[currentPresetIndex]) {
         myDecks[currentPresetIndex] = { name: `Preset ${currentPresetIndex}`, slots: [] };
     }
@@ -80,7 +98,6 @@ function switchPreset(index) {
 
     currentPresetIndex = index;
     
-    // 새 프리셋 로드
     if (myDecks[index]) {
         myDeck = [...myDecks[index].slots];
     } else {
@@ -89,11 +106,12 @@ function switchPreset(index) {
     }
     
     selectedDeckSlot = -1;
+    updateGuideText(); // 탭 전환 시 문구 초기화
     renderDeckUI();
     renderDiceGrid(currentDiceList);
 }
 
-// 4. 덱 이름 수정 (HTML onclick에서 호출됨)
+// 4. 덱 이름 수정
 function editDeckName() {
     const deckData = myDecks[currentPresetIndex];
     const currentName = deckData ? deckData.name : `Preset ${currentPresetIndex}`;
@@ -106,14 +124,29 @@ function editDeckName() {
             if (!myDecks[currentPresetIndex]) {
                 myDecks[currentPresetIndex] = { name: `Preset ${currentPresetIndex}`, slots: [...myDeck] };
             }
-            
             myDecks[currentPresetIndex].name = trimmed;
             renderDeckName();
             saveMyDeck();
         }
     }
 }
-window.editDeckName = editDeckName; // [중요] 전역 등록
+window.editDeckName = editDeckName;
+
+// [NEW] 안내 문구 업데이트 함수 (분리하여 관리)
+function updateGuideText() {
+    const guideText = document.getElementById('deck-guide-text');
+    if (!guideText) return;
+
+    if (selectedDeckSlot !== -1) {
+        // 선택되었을 때: 파란색, 굵게, 애니메이션
+        guideText.innerHTML = "교체할 주사위를 <br class='sm:hidden'>아래 목록에서 선택하세요!";
+        guideText.className = "text-xs text-blue-600 font-bold text-center mt-2 animate-pulse transition-all";
+    } else {
+        // 선택 해제되었을 때: 회색, 기본 폰트
+        guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
+        guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
+    }
+}
 
 // 5. 덱 슬롯 렌더링
 function renderDeckSlots() {
@@ -140,7 +173,7 @@ function renderDeckSlots() {
         const iconHtml = renderDiceIcon(dice, "w-14 h-14");
 
         const slotHtml = `
-        <div onclick="selectDeckSlot(${index})" 
+        <div onclick="window.selectDeckSlot(${index}); event.stopPropagation();" 
              class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border-2 ${borderClass} ${bgClass} cursor-pointer transition-all active:scale-95 aspect-[3/4] overflow-hidden">
             <div class="mb-1 pointer-events-none scale-90">${iconHtml}</div>
             <div class="text-[10px] font-bold text-slate-700 w-full text-center truncate px-0.5 pointer-events-none">${dice.name}</div>
@@ -152,14 +185,16 @@ function renderDeckSlots() {
     const avgEl = document.getElementById('deck-avg-class');
     if(avgEl) avgEl.innerText = `평균 Lv.${(totalLevel / 5).toFixed(1)}`;
 }
-window.selectDeckSlot = selectDeckSlot; // 전역 등록
+window.renderDeckSlots = renderDeckSlots; // 전역 등록 필요
 
 // 슬롯 선택
 function selectDeckSlot(index) {
     selectedDeckSlot = (selectedDeckSlot === index) ? -1 : index;
+    updateGuideText(); // [수정] 문구 업데이트 함수 호출
     renderDeckSlots(); 
     renderDiceGrid(currentDiceList);
 }
+window.selectDeckSlot = selectDeckSlot;
 
 // 목록 클릭
 function handleDiceClick(diceId) {
@@ -169,7 +204,7 @@ function handleDiceClick(diceId) {
         showDiceDetail(diceId); 
     }
 }
-window.handleDiceClick = handleDiceClick; // 전역 등록
+window.handleDiceClick = handleDiceClick;
 
 // 장착/교체
 function equipDice(newDiceId) {
@@ -189,6 +224,7 @@ function equipDice(newDiceId) {
     }
 
     selectedDeckSlot = -1;
+    updateGuideText(); // [수정] 교체 후 문구 초기화
     renderDeckSlots();
     renderDiceGrid(currentDiceList);
     saveMyDeck();
@@ -199,7 +235,7 @@ function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
     
-    renderDeckUI(); // 동기화
+    renderDeckUI(); 
 
     list.forEach(dice => {
         const isOwned = dice.class_level > 0;
@@ -231,7 +267,7 @@ function renderDiceGrid(list) {
 
         const cardHtml = `
         <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
-             onclick="handleDiceClick('${dice.id}')">
+             onclick="window.handleDiceClick('${dice.id}'); event.stopPropagation();">
             ${arrowHtml}
             ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
@@ -245,7 +281,7 @@ function renderDiceGrid(list) {
     });
     if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
 }
-window.renderDiceGrid = renderDiceGrid; // 전역 등록
+window.renderDiceGrid = renderDiceGrid;
 
 // 상세 팝업 표시
 function showDiceDetail(diceId) {
