@@ -179,7 +179,6 @@ function renderDiceGrid(list) {
             borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
         }
 
-        // [수정] 화살표 위치: 기존 top-1 left-1 -> bottom-1 left-2로 변경 (E 마크와 겹침 방지)
         if (isUpgradeable) {
             borderClass = 'border-green-500 ring-2 ring-green-200';
             levelBadgeClass = 'text-white bg-green-500 shadow-sm';
@@ -198,7 +197,7 @@ function renderDiceGrid(list) {
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
             
-            ${!isInDeck && isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
+            ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
             
             <div class="absolute top-2 right-2 w-2 h-2 rounded-full ${rarityDotColor} z-10 shadow-sm"></div>
         </div>`;
