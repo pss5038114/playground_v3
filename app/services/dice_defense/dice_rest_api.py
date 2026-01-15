@@ -90,53 +90,6 @@ async def get_my_dice_list(username: str):
     finally:
         conn.close()
 
-@router.get("/deck/{username}")
-async def get_my_deck(username: str):
-    conn = get_db_connection()
-    try:
-        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if not user: raise HTTPException(404, "User not found")
-        
-        row = conn.execute("SELECT slot_0, slot_1, slot_2, slot_3, slot_4 FROM user_decks WHERE user_id = ?", (user["id"],)).fetchone()
-        
-        # 덱이 없으면 기본값(비어있음) 반환
-        if not row:
-            return {"deck": [None, None, None, None, None]}
-            
-        return {"deck": [row[0], row[1], row[2], row[3], row[4]]}
-    finally:
-        conn.close()
-
-@router.post("/deck/update")
-async def update_my_deck(payload: dict = Body(...)):
-    username = payload.get("username")
-    deck = payload.get("deck") # ["fire", "ice", None, ...]
-    
-    if not deck or len(deck) != 5:
-        raise HTTPException(400, "Invalid deck format")
-        
-    conn = get_db_connection()
-    try:
-        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if not user: raise HTTPException(404, "User not found")
-        
-        # UPSERT (있으면 업데이트, 없으면 삽입)
-        conn.execute("""
-            INSERT INTO user_decks (user_id, slot_0, slot_1, slot_2, slot_3, slot_4)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-            slot_0=excluded.slot_0,
-            slot_1=excluded.slot_1,
-            slot_2=excluded.slot_2,
-            slot_3=excluded.slot_3,
-            slot_4=excluded.slot_4
-        """, (user["id"], deck[0], deck[1], deck[2], deck[3], deck[4]))
-        
-        conn.commit()
-        return {"message": "Deck updated"}
-    finally:
-        conn.close()
-
 @router.post("/summon")
 async def summon_dice(payload: dict = Body(...)):
     username = payload.get("username")

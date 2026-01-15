@@ -77,25 +77,3 @@ async function upgradeDice(diceId) {
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
 }
-
-async function fetchMyDeck() {
-    try {
-        const res = await fetch(`${API_DICE}/deck/${myId}`);
-        if(res.ok) {
-            const data = await res.json();
-            return data.deck; // [id, id, null, ...]
-        }
-    } catch(e){}
-    return [null, null, null, null, null];
-}
-
-async function saveMyDeck(newDeck) {
-    try {
-        await fetch(`${API_DICE}/deck/update`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({username: myId, deck: newDeck})
-        });
-        // 저장 후 별도 알림 없이 조용히 처리하거나, 필요시 토스트 메시지
-    } catch(e) { alert("덱 저장 실패"); }
-}
