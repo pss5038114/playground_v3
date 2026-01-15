@@ -30,6 +30,43 @@ function switchTab(name) {
     if(name==='shop') fetchMyResources();
 }
 
+async function upgradeDice(diceId) {
+    try {
+        const res = await fetch(`${API_DICE}/upgrade`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: myId, dice_id: diceId }) });
+        const data = await res.json();
+        
+        if(res.ok) {
+            // 1. 버튼 버스트 효과 (흰색으로 변경됨)
+            const btn = document.getElementById('popup-action-btn');
+            if(btn) {
+                btn.classList.add('burst-effect');
+                setTimeout(() => btn.classList.remove('burst-effect'), 600);
+            }
+
+            // 2. 데이터 갱신
+            await fetchMyResources();
+            const listRes = await fetch(`${API_DICE}/list/${myId}`);
+            
+            if(listRes.ok) {
+                currentDiceList = await listRes.json();
+                renderDiceGrid(currentDiceList); 
+                
+                const updatedDice = currentDiceList.find(d => d.id === diceId);
+                if(updatedDice) {
+                    currentSelectedDice = updatedDice;
+                    document.getElementById('popup-dice-class').innerText = `Lv.${updatedDice.class_level}`;
+                    
+                    // 3. UI 갱신 (스탯 수치 변경)
+                    showDiceDetail(diceId); 
+
+                    // 4. [NEW] 스탯 상승 이펙트 발동 (UI 갱신 직후 실행)
+                    triggerStatLevelUpEffect(updatedDice);
+                }
+            }
+        } else { alert(data.detail || "오류"); }
+    } catch(e) { alert("통신 오류"); }
+}
+
 // -----------------------------------------------------------
 // [공통 헬퍼 함수]
 // -----------------------------------------------------------
@@ -551,4 +588,49 @@ function addStatBox(grid, name, iconClass, statData, level, unitSuffix="", forma
 
 function addStatBoxStatic(grid, name, iconClass, val) { 
     grid.innerHTML += `<div class="stat-box justify-between"><i class="${iconClass} text-slate-600 text-lg w-6 text-center"></i><div class="text-right"><div class="text-[10px] text-slate-400 font-bold">${name}</div><div class="text-sm font-bold text-slate-700">${val}</div></div></div>`; 
+}
+
+function triggerStatLevelUpEffect(dice) {
+    const grid = document.getElementById('popup-stats-grid');
+    if (!grid) return;
+
+    // 스탯 박스 순서: [0]공격력, [1]공속, [2]타겟, [3~]특수능력
+    const statBoxes = grid.children;
+    const stats = dice.stats;
+
+    // 체크할 스탯 목록 (인덱스 매핑)
+    const checkList = [
+        { idx: 0, val: stats.atk },   // 공격력
+        { idx: 1, val: stats.speed }, // 공속
+        // 타겟(idx 2)은 보통 성장하지 않으므로 패스
+    ];
+
+    // 특수 능력 추가 (idx 3부터 시작)
+    if (stats.specials) {
+        stats.specials.forEach((sp, i) => {
+            checkList.push({ idx: 3 + i, val: sp });
+        });
+    }
+
+    // 이펙트 생성 로직
+    checkList.forEach(item => {
+        // 성장치(c)가 있고 0이 아닌 경우에만 이펙트 표시
+        if (item.val && typeof item.val === 'object' && item.val.c && item.val.c !== 0) {
+            const box = statBoxes[item.idx];
+            if (box) {
+                // 이펙트 요소 생성
+                const effectEl = document.createElement('div');
+                effectEl.className = 'stat-up-pop';
+                effectEl.innerHTML = `<i class="ri-arrow-up-double-line text-green-500 text-5xl drop-shadow-md"></i>`;
+                
+                // 박스에 추가 (box는 relative여야 함 -> css .stat-box에 이미 relative 있음)
+                box.appendChild(effectEl);
+
+                // 애니메이션 끝나면 제거 (메모리 관리)
+                setTimeout(() => {
+                    effectEl.remove();
+                }, 1200);
+            }
+        }
+    });
 }
