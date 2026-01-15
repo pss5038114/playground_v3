@@ -1,22 +1,37 @@
-<div class="flex-1 w-full relative flex flex-col h-full">
-    <div id="game-ui-overlay" class="absolute inset-0 pointer-events-none hidden flex-col justify-between p-2 z-10">
-        <div class="flex justify-between items-start">
-            <div class="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">Wave <span id="wave-num" class="text-yellow-400 font-bold">1</span></div>
-            <div class="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">❤️ 3</div>
-        </div>
-        <div class="flex justify-center items-end pb-2 pointer-events-auto">
-            <button onclick="spawnDice()" class="w-20 h-20 bg-blue-600 rounded-full border-4 border-blue-400 shadow-xl flex flex-col items-center justify-center text-white active:scale-95 transition-transform">
-                <span class="text-xs font-bold">SP</span>
-                <span class="text-lg font-bold" id="sp-cost">10</span>
-            </button>
+<div class="flex flex-col items-center justify-center h-full w-full pb-20">
+    
+    <div class="text-center mb-6 animate-fade-in-down">
+        <h1 class="text-4xl font-black text-slate-800 tracking-tighter mb-2">
+            <span class="text-blue-600">DICE</span> DEFENSE
+        </h1>
+        <p class="text-slate-500 text-sm font-medium">최고의 덱으로 웨이브를 막아내세요!</p>
+    </div>
+
+    <div class="w-full px-4 mb-8 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="bg-white rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+            <div class="flex justify-center gap-1.5 mb-4 overflow-x-auto scrollbar-hide py-1" id="home-preset-btn-container">
+                </div>
+
+            <div id="home-deck-slots-container" class="flex w-full justify-between gap-2 mb-3">
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+            </div>
+
+            <div id="home-deck-name" class="text-center text-xs font-bold text-slate-400 bg-slate-50 py-1.5 rounded-lg mx-auto w-1/2 truncate">
+                Loading...
+            </div>
         </div>
     </div>
-    <canvas id="game-canvas" class="w-full h-full block" width="360" height="640"></canvas>
-    <div id="lobby-overlay" class="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center z-20">
-        <div class="text-6xl mb-4 animate-bounce">🎲</div>
-        <h2 class="text-2xl font-extrabold text-slate-800 mb-1">DICE DEFENSE</h2>
-        <p class="text-slate-400 text-sm mb-8">최고의 덱으로 적을 막아내세요!</p>
-        <button onclick="startGame('pve')" class="w-48 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-200 transition-all mb-3 text-lg"><i class="fas fa-play mr-2"></i> 게임 시작</button>
-        <button onclick="startGame('coop')" class="w-48 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-200 transition-all text-sm"><i class="fas fa-user-friends mr-2"></i> 협동 모드</button>
+
+    <div class="w-full px-4 animate-fade-in-up" style="animation-delay: 0.2s;">
+        <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 group relative overflow-hidden">
+            <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            <span class="text-xl font-black italic tracking-wider">GAME START</span>
+            <i class="ri-arrow-right-s-line text-2xl group-hover:translate-x-1 transition-transform"></i>
+        </button>
     </div>
+
 </div>

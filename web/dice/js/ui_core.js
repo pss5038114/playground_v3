@@ -43,13 +43,20 @@ function switchTab(name) {
     document.getElementById(`tab-${name}`).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('text-blue-600',b.dataset.target===`tab-${name}`));
     
-    // 탭 전환 시 해당 탭 UI 갱신
     if(name==='deck') {
         fetchMyDice();
         fetchMyDeck().then(() => {
             if(typeof renderDeckUI === 'function') renderDeckUI();
         });
     }
+    
+    // [NEW] 전투(홈) 탭 진입 시 홈 덱 UI 갱신
+    if(name==='battle') {
+        fetchMyDeck().then(() => {
+            if(typeof renderHomeDeckUI === 'function') renderHomeDeckUI();
+        });
+    }
+    
     if(name==='shop') fetchMyResources();
 }
 

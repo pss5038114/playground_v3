@@ -21,18 +21,94 @@ function toggleViewMode(mode) {
 window.toggleViewMode = toggleViewMode;
 
 // ==========================================
+// [NEW] 홈 화면 전용 렌더링 함수들
+// ==========================================
+
+function renderHomeDeckUI() {
+    renderHomePresetButtons();
+    renderHomeDeckSlots();
+    renderHomeDeckName();
+}
+window.renderHomeDeckUI = renderHomeDeckUI;
+
+function renderHomePresetButtons() {
+    const container = document.getElementById('home-preset-btn-container');
+    if (!container) return;
+    
+    container.innerHTML = "";
+    for (let i = 1; i <= 7; i++) {
+        const isActive = (i === currentPresetIndex);
+        // 홈 화면은 약간 다른 스타일 (더 컴팩트하게)
+        const bgClass = isActive 
+            ? "bg-blue-600 text-white shadow-md scale-110 border-blue-600" 
+            : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200";
+        
+        const btn = document.createElement('button');
+        btn.className = `flex-shrink-0 w-8 h-8 rounded-full border text-xs font-bold transition-all duration-200 ${bgClass}`;
+        btn.innerText = i;
+        btn.onclick = () => switchPreset(i); // 기존 switchPreset 재사용
+        container.appendChild(btn);
+    }
+}
+
+function renderHomeDeckSlots() {
+    const container = document.getElementById('home-deck-slots-container');
+    if (!container) return;
+    
+    container.innerHTML = "";
+    
+    // 현재 선택된 덱 데이터 가져오기
+    let targetDeck = myDeck; // 현재 활성 덱 (state.js)
+    if (!targetDeck || targetDeck.length === 0) {
+        targetDeck = ['fire', 'electric', 'wind', 'ice', 'poison'];
+    }
+
+    targetDeck.forEach((diceId) => {
+        let dice = currentDiceList.find(d => d.id === diceId);
+        if (!dice) {
+            dice = { id: diceId, name: diceId, class_level: 1, rarity: 'Common', color: 'bg-slate-300' };
+        }
+
+        const iconHtml = renderDiceIcon(dice, "w-12 h-12"); // 홈 화면은 약간 작게 (w-12)
+
+        const slotHtml = `
+        <div class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border border-slate-100 bg-slate-50 aspect-[3/4] overflow-hidden">
+            <div class="mb-1 pointer-events-none scale-90">${iconHtml}</div>
+            <div class="text-[9px] font-bold text-slate-600 w-full text-center truncate px-0.5">${dice.name}</div>
+            <div class="text-[8px] font-bold text-slate-400 bg-white px-1.5 rounded mt-0.5">Lv.${dice.class_level}</div>
+        </div>`;
+        container.innerHTML += slotHtml;
+    });
+}
+
+function renderHomeDeckName() {
+    const nameEl = document.getElementById('home-deck-name');
+    if (nameEl) {
+        const deckData = myDecks[currentPresetIndex];
+        const currentName = deckData ? deckData.name : `Preset ${currentPresetIndex}`;
+        nameEl.innerText = currentName;
+    }
+}
+
+// ==========================================
 // [덱 관리 로직]
 // ==========================================
 
 let isUpgradeJustHappened = false;
 let equippingDiceId = null; // [상태] 장착 모드 활성 여부
 
-// [통합] 덱 UI 렌더링
+// [통합] 덱 UI 렌더링(홈 화면 UI 갱신 추가)
 function renderDeckUI() {
-    if (!document.getElementById('preset-btn-container')) return;
-    renderPresetButtons();
-    renderDeckName();
-    renderDeckSlots();
+    // 덱 편집 탭 UI
+    if (document.getElementById('preset-btn-container')) {
+        renderPresetButtons();
+        renderDeckName();
+        renderDeckSlots();
+    }
+    // [NEW] 홈 화면 UI
+    if (document.getElementById('home-preset-btn-container')) {
+        renderHomeDeckUI();
+    }
 }
 window.renderDeckUI = renderDeckUI;
 
@@ -85,9 +161,11 @@ function switchPreset(index) {
     }
     
     selectedDeckSlot = -1;
-    equippingDiceId = null; // 프리셋 전환 시 장착 모드 취소
+    equippingDiceId = null;
+    
+    // [중요] 탭에 상관없이 UI 갱신 (홈, 덱 탭 모두)
     updateGuideText(); 
-    renderDeckUI();
+    renderDeckUI(); 
     renderDiceGrid(currentDiceList);
 }
 
