@@ -360,6 +360,17 @@ function checkAllRevealed(diceElements) {
 
 let isUpgradeJustHappened = false;
 
+function closePopup() { 
+    document.getElementById('dice-popup').classList.add('hidden'); 
+    document.getElementById('dice-popup').classList.remove('flex'); 
+    currentSelectedDice = null; 
+}
+
+function toggleViewMode(mode) { 
+    currentViewMode = (currentViewMode === mode) ? null : mode; 
+    updateStatsView(); 
+}
+
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
