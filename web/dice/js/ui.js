@@ -418,7 +418,6 @@ function showDiceDetail(diceId) {
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
     const iconContainer = document.getElementById('popup-dice-icon-container');
-    const existingParticles = iconContainer.querySelector('.firefly-container');
     if(existingParticles) existingParticles.remove();
 
     const btn = document.getElementById('popup-action-btn'); 
@@ -488,7 +487,6 @@ function showDiceDetail(diceId) {
 
     if(canUpgrade) {
         btn.classList.add('btn-pulse-green');
-        iconContainer.innerHTML += `<div class="firefly-container" style="border-radius: 1rem;"><div class="firefly"></div><div class="firefly"></div></div>`;
     } else {
         btn.classList.remove('btn-pulse-green');
     }
