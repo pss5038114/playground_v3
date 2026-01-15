@@ -16,6 +16,7 @@ async function loadComponents() {
     }));
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
+    
     if(typeof fetchMyDice === 'function') fetchMyDice();
 }
 
@@ -24,6 +25,7 @@ function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
     document.getElementById(`tab-${name}`).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('text-blue-600',b.dataset.target===`tab-${name}`));
+    
     if(name==='deck') fetchMyDice();
     if(name==='shop') fetchMyResources();
 }
@@ -190,6 +192,7 @@ function revealDice(element, diceData, isNew, config) {
         tapArea.onclick = closeSummonOverlay;
     }, 600);
 }
+
 
 // ==========================================
 // [11회 소환 애니메이션]
@@ -417,7 +420,9 @@ function showDiceDetail(diceId) {
     iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
+    // [수정] 반딧불(firefly) 관련 코드 삭제 (cleanup은 유지해도 무방)
     const iconContainer = document.getElementById('popup-dice-icon-container');
+    const existingParticles = iconContainer.querySelector('.firefly-container');
     if(existingParticles) existingParticles.remove();
 
     const btn = document.getElementById('popup-action-btn'); 
@@ -487,6 +492,7 @@ function showDiceDetail(diceId) {
 
     if(canUpgrade) {
         btn.classList.add('btn-pulse-green');
+        // [수정] firefly 추가하던 코드 삭제됨
     } else {
         btn.classList.remove('btn-pulse-green');
     }
@@ -525,16 +531,6 @@ async function upgradeDice(diceId) {
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
 }
-function closePopup() { 
-    document.getElementById('dice-popup').classList.add('hidden'); 
-    document.getElementById('dice-popup').classList.remove('flex'); 
-    currentSelectedDice = null; 
-}
-
-function toggleViewMode(mode) { 
-    currentViewMode = (currentViewMode === mode) ? null : mode; 
-    updateStatsView(); 
-}
 
 function updateStatsView() {
     if(!currentSelectedDice) return;
@@ -569,7 +565,6 @@ function addStatBox(grid, name, iconClass, statData, level, unitSuffix="", forma
     if (currentViewMode === 'class' && cInc !== 0 && !isMaxLevel) { diffHtml = `<span class="text-[10px] text-green-600 ml-1">(${cInc > 0 ? "+" : ""}${cInc})</span>`; }
     else if (currentViewMode === 'power' && pInc !== 0) { diffHtml = `<span class="text-[10px] text-orange-500 ml-1">(${pInc > 0 ? "+" : ""}${pInc})</span>`; }
     
-    // [수정] 수치가 변하기만 하면 화살표 표시 (감소하는 경우도 포함)
     let arrowHtml = "";
     if (isUpgradeJustHappened && cInc !== 0) {
         arrowHtml = `<div class="stat-up-arrow"><i class="ri-arrow-up-double-line"></i></div>`;
