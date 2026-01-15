@@ -17,8 +17,9 @@ async function loadComponents() {
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     
-    if(typeof fetchMyDice === 'function') await fetchMyDice(); // await 추가
-    if(typeof fetchMyDeck === 'function') await fetchMyDeck(); // [NEW] 덱 로드
+    // [중요] 앱 로드 시 내 덱 정보 갱신
+    if(typeof fetchMyDice === 'function') await fetchMyDice();
+    if(typeof fetchMyDeck === 'function') await fetchMyDeck();
 }
 
 const tabNames = ['shop','deck','battle','event','clan'];
@@ -29,7 +30,7 @@ function switchTab(name) {
     
     if(name==='deck') {
         fetchMyDice();
-        fetchMyDeck(); // 덱 탭 갈 때마다 갱신
+        fetchMyDeck();
     }
     if(name==='shop') fetchMyResources();
 }
@@ -359,37 +360,32 @@ function checkAllRevealed(diceElements) {
 }
 
 // -----------------------------------------------------------
-// [덱 관리 로직] (NEW)
+// [덱 관리 로직]
 // -----------------------------------------------------------
 
-// 덱 슬롯 렌더링
 function renderDeckSlots() {
     const container = document.getElementById('equipped-deck');
     if(!container) return;
     
     container.innerHTML = "";
     
+    // myDeck은 state.js에서 관리됨
     myDeck.forEach((dice, index) => {
         const slot = document.createElement('div');
-        // 슬롯 기본 클래스
         slot.className = `deck-slot ${dice ? 'filled' : ''} ${selectedDeckSlotIndex === index ? 'selected' : ''}`;
         slot.onclick = (e) => {
-            e.stopPropagation(); // 배경 클릭과 구분
+            e.stopPropagation(); 
             handleDeckSlotClick(index);
         };
 
         if (dice) {
-            // [내용 있음]
-            // 아이콘
             let iconHtml = renderDiceIcon(dice, "w-12 h-12");
-            // 이름과 레벨
             const infoHtml = `
                 <div class="mt-1 text-[10px] font-bold text-slate-700 truncate w-full text-center px-1">${dice.name}</div>
                 <div class="text-[9px] font-bold text-slate-400">Lv.${dice.class_level}</div>
             `;
             slot.innerHTML = iconHtml + infoHtml;
         } else {
-            // [비어있음]
             slot.innerHTML = `<i class="ri-add-line text-3xl text-slate-300"></i>`;
         }
         
@@ -397,98 +393,69 @@ function renderDeckSlots() {
     });
 }
 
-// 슬롯 클릭 핸들러 (편집 모드 진입/해제)
 function handleDeckSlotClick(index) {
     const overlay = document.getElementById('deck-edit-overlay');
     const listGrid = document.getElementById('dice-list-grid');
-    const deckContainer = document.getElementById('equipped-deck');
 
-    // 이미 선택된 슬롯을 다시 누르면 취소
     if (selectedDeckSlotIndex === index) {
         cancelDeckEdit();
         return;
     }
 
-    // 편집 모드 진입
     selectedDeckSlotIndex = index;
-    renderDeckSlots(); // 선택 효과 적용 (selected 클래스)
+    renderDeckSlots(); 
 
-    // UI 상태 변경 (Dimming)
-    overlay.style.display = 'block';
-    
-    // 리스트 영역 강조를 위해 클래스 추가 (z-index 조정용)
+    if(overlay) overlay.style.display = 'block';
     if(listGrid && listGrid.parentElement) {
         listGrid.parentElement.classList.add('editing-mode');
     }
+    
+    renderDiceGrid(currentDiceList); // 리스트 갱신 (선택 가능 표시 등)
 }
 
-// 덱 편집 취소 (배경 클릭 등)
 function cancelDeckEdit() {
     selectedDeckSlotIndex = null;
     renderDeckSlots();
     
     const overlay = document.getElementById('deck-edit-overlay');
-    overlay.style.display = 'none';
+    if(overlay) overlay.style.display = 'none';
     
     const listGrid = document.getElementById('dice-list-grid');
     if(listGrid && listGrid.parentElement) {
         listGrid.parentElement.classList.remove('editing-mode');
     }
+    
+    renderDiceGrid(currentDiceList); // 리스트 원래대로
 }
 
-// 보유 주사위 목록에서 주사위 선택 시 (덱 편집 중일 때)
 async function equipDiceToDeck(diceId) {
-    if (selectedDeckSlotIndex === null) return; // 편집 모드 아님
+    if (selectedDeckSlotIndex === null) return; 
 
-    // 선택한 주사위 정보 찾기
     const diceInfo = currentDiceList.find(d => d.id === diceId);
     if (!diceInfo) return;
 
-    // [중복 체크 및 스왑 로직]
-    // 1. 이미 덱에 존재하는지 확인
     const existingIndex = myDeck.findIndex(d => d && d.id === diceId);
     
     if (existingIndex !== -1) {
-        // 이미 덱에 있음 -> 위치 교체 (Swap) or 이동
         if (existingIndex === selectedDeckSlotIndex) {
-            // 같은 자리를 또 누름 -> 변화 없음 (그냥 닫기?)
             cancelDeckEdit();
             return;
         }
-        
-        // A(빈칸 or 다른거) <-> B(이미 있는거)
-        // 기존 위치(B)에 현재 슬롯(A)의 주사위를 보냄 (Swap)
         const temp = myDeck[selectedDeckSlotIndex];
         myDeck[selectedDeckSlotIndex] = myDeck[existingIndex];
         myDeck[existingIndex] = temp;
-        
     } else {
-        // 덱에 없음 -> 그냥 장착 (덮어쓰기)
         myDeck[selectedDeckSlotIndex] = diceInfo;
     }
 
-    // 저장 및 UI 갱신
     renderDeckSlots();
-    cancelDeckEdit(); // 편집 모드 종료
-    await saveMyDeck(); // 서버 저장
+    cancelDeckEdit(); 
+    await saveMyDeck(); 
 }
 
 // -----------------------------------------------------------
-// [주사위카드 및 팝업 로직]
+// [리스트 및 팝업 로직]
 // -----------------------------------------------------------
-
-let isUpgradeJustHappened = false;
-
-function closePopup() { 
-    document.getElementById('dice-popup').classList.add('hidden'); 
-    document.getElementById('dice-popup').classList.remove('flex'); 
-    currentSelectedDice = null; 
-}
-
-function toggleViewMode(mode) { 
-    currentViewMode = (currentViewMode === mode) ? null : mode; 
-    updateStatsView(); 
-}
 
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
@@ -499,7 +466,6 @@ function renderDiceGrid(list) {
         const isOwned = dice.class_level > 0;
         if(isOwned) ownedCount++;
         
-        // ... (강화 가능 여부 로직 유지) ...
         let isUpgradeable = false;
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
@@ -508,7 +474,6 @@ function renderDiceGrid(list) {
             }
         }
 
-        // ... (아이콘 생성 로직 유지) ...
         const iconHtml = renderDiceIcon(dice, "w-12 h-12");
         const rarityBgIcon = getRarityBgIcon(dice.rarity);
         const rarityBgTextColor = getRarityBgTextColor(dice.rarity);
@@ -524,11 +489,8 @@ function renderDiceGrid(list) {
             arrowHtml = `<div class="absolute top-1 left-1 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
-        // [NEW] 클릭 이벤트 분기 처리
-        // 덱 편집 중이면 equipDiceToDeck 호출, 아니면 showDiceDetail 호출
+        // 덱 편집 모드일 때 클릭 동작 분기
         const clickAction = `onclick="selectedDeckSlotIndex !== null ? equipDiceToDeck('${dice.id}') : showDiceDetail('${dice.id}')"`;
-        
-        // 미보유 주사위는 덱에 넣을 수 없음 -> 클릭 막기
         const disabledClass = (!isOwned && selectedDeckSlotIndex !== null) ? 'opacity-30 pointer-events-none' : '';
 
         const cardHtml = `
@@ -559,7 +521,6 @@ function showDiceDetail(diceId) {
     iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
 
-    // [수정] 반딧불(firefly) 관련 코드 삭제 (cleanup은 유지해도 무방)
     const iconContainer = document.getElementById('popup-dice-icon-container');
     const existingParticles = iconContainer.querySelector('.firefly-container');
     if(existingParticles) existingParticles.remove();
@@ -631,7 +592,6 @@ function showDiceDetail(diceId) {
 
     if(canUpgrade) {
         btn.classList.add('btn-pulse-green');
-        // [수정] firefly 추가하던 코드 삭제됨
     } else {
         btn.classList.remove('btn-pulse-green');
     }
@@ -656,6 +616,7 @@ async function upgradeDice(diceId) {
             isUpgradeJustHappened = true;
             
             await fetchMyResources();
+            // 리스트 갱신 시 currentDiceList 업데이트
             const listRes = await fetch(`${API_DICE}/list/${myId}`);
             if(listRes.ok) {
                 currentDiceList = await listRes.json();
