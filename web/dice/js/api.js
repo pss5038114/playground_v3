@@ -79,20 +79,37 @@ async function fetchMyDeck() {
         const res = await fetch(`${API_DICE}/deck/${myId}`);
         if (res.ok) {
             const data = await res.json();
-            myDeck = data.deck; // 전역 변수 업데이트
-            if (typeof renderDeckSlots === 'function') renderDeckSlots();
+            myDecks = data.decks; // 전체 덱 데이터 저장
+            
+            // 현재 선택된 프리셋 데이터 로드
+            if (myDecks[currentPresetIndex]) {
+                myDeck = myDecks[currentPresetIndex].slots;
+            }
+            
+            if (typeof renderDeckUI === 'function') renderDeckUI();
             if (typeof renderDiceGrid === 'function' && currentDiceList.length > 0) renderDiceGrid(currentDiceList);
         }
     } catch(e) { console.error("Deck fetch failed", e); }
 }
 
-// [NEW] 덱 정보 저장하기
+// [수정] 현재 프리셋 저장하기
 async function saveMyDeck() {
     try {
+        // 현재 상태 myDecks에 반영
+        if (myDecks[currentPresetIndex]) {
+            myDecks[currentPresetIndex].slots = myDeck;
+            // 이름은 UI에서 별도로 업데이트 됨
+        }
+
         await fetch(`${API_DICE}/deck/save`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username: myId, deck: myDeck })
+            body: JSON.stringify({ 
+                username: myId, 
+                preset_index: currentPresetIndex,
+                name: myDecks[currentPresetIndex].name,
+                deck: myDeck 
+            })
         });
     } catch(e) { console.error("Deck save failed", e); }
 }

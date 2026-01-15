@@ -10,6 +10,10 @@ let currentSelectedDice = null;
 let currentViewMode = null; 
 
 // [덱 관리 상태]
+let myDecks = {}; // { 1: {name: "Preset 1", slots: [...]}, ... }
+let currentPresetIndex = 1; // 1~7
+// 호환성을 위해 myDeck은 현재 선택된 덱의 slots를 가리키도록 getter를 쓰거나 동기화해야 함
+// 여기서는 동기화 방식으로 사용
 let myDeck = ['fire', 'electric', 'wind', 'ice', 'poison']; 
 let selectedDeckSlot = -1; 
 

@@ -193,35 +193,51 @@ async def get_my_deck(username: str):
         user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if not user: raise HTTPException(404, "User not found")
         
-        # 덱 정보 조회
-        row = conn.execute("SELECT * FROM user_decks WHERE user_id = ?", (user["id"],)).fetchone()
+        user_id = user["id"]
         
-        if row:
-            # 저장된 덱 반환
-            return {
-                "deck": [row["slot_1"], row["slot_2"], row["slot_3"], row["slot_4"], row["slot_5"]]
-            }
-        else:
-            # 덱 정보가 없으면 기본 덱 생성 및 저장
-            default_deck = ['fire', 'electric', 'wind', 'ice', 'poison']
-            conn.execute("""
-                INSERT INTO user_decks (user_id, slot_1, slot_2, slot_3, slot_4, slot_5) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user["id"], *default_deck))
-            conn.commit()
-            
-            return {"deck": default_deck}
+        # 모든 프리셋 조회
+        rows = conn.execute("SELECT * FROM user_decks WHERE user_id = ? ORDER BY preset_index ASC", (user_id,)).fetchall()
+        
+        decks = {}
+        # 기본 덱 (데이터가 없을 경우를 대비)
+        default_deck_slots = ['fire', 'electric', 'wind', 'ice', 'poison']
+        
+        # 1~7번 프리셋 확인 및 생성
+        for i in range(1, 8):
+            found = next((r for r in rows if r["preset_index"] == i), None)
+            if found:
+                decks[i] = {
+                    "name": found["deck_name"],
+                    "slots": [found["slot_1"], found["slot_2"], found["slot_3"], found["slot_4"], found["slot_5"]]
+                }
+            else:
+                # 없으면 DB에 기본값 생성
+                default_name = f"Preset {i}"
+                conn.execute("""
+                    INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (user_id, i, default_name, *default_deck_slots))
+                
+                decks[i] = {
+                    "name": default_name,
+                    "slots": default_deck_slots
+                }
+        
+        conn.commit()
+        return {"decks": decks} # { "1": {name:..., slots:[...]}, ... }
             
     finally:
         conn.close()
 
-# [NEW] 덱 정보 저장하기
+# 덱 정보 저장하기
 @router.post("/deck/save")
 async def save_my_deck(payload: dict = Body(...)):
     username = payload.get("username")
-    deck = payload.get("deck") # ["id1", "id2", ...]
+    preset_index = payload.get("preset_index") # 1~7
+    deck_name = payload.get("name")
+    deck_slots = payload.get("deck") # ["id1", ...]
     
-    if not deck or len(deck) != 5:
+    if not preset_index or not deck_slots or len(deck_slots) != 5:
         raise HTTPException(400, "Invalid deck format")
         
     conn = get_db_connection()
@@ -229,13 +245,20 @@ async def save_my_deck(payload: dict = Body(...)):
         user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if not user: raise HTTPException(404, "User not found")
         
-        # 덱 업데이트 (없으면 INSERT, 있으면 UPDATE - REPLACE 구문 사용)
+        # 해당 프리셋 업데이트 (INSERT OR REPLACE)
         conn.execute("""
-            REPLACE INTO user_decks (user_id, slot_1, slot_2, slot_3, slot_4, slot_5)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (user["id"], *deck))
-        conn.commit()
+            INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, preset_index) DO UPDATE SET
+                deck_name=excluded.deck_name,
+                slot_1=excluded.slot_1,
+                slot_2=excluded.slot_2,
+                slot_3=excluded.slot_3,
+                slot_4=excluded.slot_4,
+                slot_5=excluded.slot_5
+        """, (user["id"], preset_index, deck_name, *deck_slots))
         
+        conn.commit()
         return {"message": "Deck saved"}
     finally:
         conn.close()
