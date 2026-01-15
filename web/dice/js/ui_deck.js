@@ -21,7 +21,29 @@ function toggleViewMode(mode) {
 window.toggleViewMode = toggleViewMode;
 
 // ==========================================
-// [NEW] 홈 화면 전용 렌더링 함수들
+// [덱 관리 로직]
+// ==========================================
+
+let isUpgradeJustHappened = false;
+let equippingDiceId = null; // 장착 모드 상태
+
+// [통합] 덱 UI 렌더링
+function renderDeckUI() {
+    // 덱 탭(편집) UI
+    if (document.getElementById('preset-btn-container')) {
+        renderPresetButtons();
+        renderDeckName();
+        renderDeckSlots();
+    }
+    // 홈 화면(전투) UI
+    if (document.getElementById('home-preset-btn-container')) {
+        renderHomeDeckUI();
+    }
+}
+window.renderDeckUI = renderDeckUI;
+
+// ==========================================
+// [홈 화면 전용 렌더링]
 // ==========================================
 
 function renderHomeDeckUI() {
@@ -38,7 +60,6 @@ function renderHomePresetButtons() {
     container.innerHTML = "";
     for (let i = 1; i <= 7; i++) {
         const isActive = (i === currentPresetIndex);
-        // 홈 화면은 약간 다른 스타일 (더 컴팩트하게)
         const bgClass = isActive 
             ? "bg-blue-600 text-white shadow-md scale-110 border-blue-600" 
             : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200";
@@ -46,7 +67,7 @@ function renderHomePresetButtons() {
         const btn = document.createElement('button');
         btn.className = `flex-shrink-0 w-8 h-8 rounded-full border text-xs font-bold transition-all duration-200 ${bgClass}`;
         btn.innerText = i;
-        btn.onclick = () => switchPreset(i); // 기존 switchPreset 재사용
+        btn.onclick = () => switchPreset(i);
         container.appendChild(btn);
     }
 }
@@ -57,8 +78,7 @@ function renderHomeDeckSlots() {
     
     container.innerHTML = "";
     
-    // 현재 선택된 덱 데이터 가져오기
-    let targetDeck = myDeck; // 현재 활성 덱 (state.js)
+    let targetDeck = myDeck; 
     if (!targetDeck || targetDeck.length === 0) {
         targetDeck = ['fire', 'electric', 'wind', 'ice', 'poison'];
     }
@@ -69,7 +89,7 @@ function renderHomeDeckSlots() {
             dice = { id: diceId, name: diceId, class_level: 1, rarity: 'Common', color: 'bg-slate-300' };
         }
 
-        const iconHtml = renderDiceIcon(dice, "w-12 h-12"); // 홈 화면은 약간 작게 (w-12)
+        const iconHtml = renderDiceIcon(dice, "w-12 h-12");
 
         const slotHtml = `
         <div class="relative flex-1 flex flex-col items-center justify-center p-1 rounded-xl border border-slate-100 bg-slate-50 aspect-[3/4] overflow-hidden">
@@ -91,28 +111,10 @@ function renderHomeDeckName() {
 }
 
 // ==========================================
-// [덱 관리 로직]
+// [덱 탭 렌더링 함수들]
 // ==========================================
 
-let isUpgradeJustHappened = false;
-let equippingDiceId = null; // [상태] 장착 모드 활성 여부
-
-// [통합] 덱 UI 렌더링(홈 화면 UI 갱신 추가)
-function renderDeckUI() {
-    // 덱 편집 탭 UI
-    if (document.getElementById('preset-btn-container')) {
-        renderPresetButtons();
-        renderDeckName();
-        renderDeckSlots();
-    }
-    // [NEW] 홈 화면 UI
-    if (document.getElementById('home-preset-btn-container')) {
-        renderHomeDeckUI();
-    }
-}
-window.renderDeckUI = renderDeckUI;
-
-// 1. 프리셋 버튼 렌더링
+// 1. 프리셋 버튼
 function renderPresetButtons() {
     const container = document.getElementById('preset-btn-container');
     if (!container) return;
@@ -132,7 +134,7 @@ function renderPresetButtons() {
     }
 }
 
-// 2. 덱 이름 렌더링
+// 2. 덱 이름
 function renderDeckName() {
     const nameEl = document.getElementById('deck-name-display');
     if (nameEl) {
@@ -162,18 +164,15 @@ function switchPreset(index) {
     
     selectedDeckSlot = -1;
     equippingDiceId = null;
-    
-    // [중요] 탭에 상관없이 UI 갱신 (홈, 덱 탭 모두)
     updateGuideText(); 
-    renderDeckUI(); 
+    renderDeckUI();
     renderDiceGrid(currentDiceList);
 }
 
-// 4. 덱 이름 수정
+// 4. 이름 수정
 function editDeckName() {
     const deckData = myDecks[currentPresetIndex];
     const currentName = deckData ? deckData.name : `Preset ${currentPresetIndex}`;
-                        
     const newName = prompt("덱 이름을 입력하세요 (최대 12자):", currentName);
     
     if (newName !== null) {
@@ -190,42 +189,37 @@ function editDeckName() {
 }
 window.editDeckName = editDeckName;
 
-// [안내 문구 업데이트]
+// 안내 문구
 function updateGuideText() {
     const guideText = document.getElementById('deck-guide-text');
     if (!guideText) return;
 
     if (equippingDiceId) {
-        // 장착 모드
         guideText.innerHTML = `<span class="text-yellow-600 font-bold animate-pulse">✨ 장착할 슬롯을 선택해주세요! ✨</span>`;
         guideText.className = "text-sm text-center mt-2 transition-all";
     } else if (selectedDeckSlot !== -1) {
-        // 슬롯 선택 모드
         guideText.innerHTML = "교체할 주사위를 <br class='sm:hidden'>아래 목록에서 선택하세요!";
         guideText.className = "text-xs text-blue-600 font-bold text-center mt-2 animate-pulse transition-all";
     } else {
-        // 기본 상태
         guideText.innerText = "슬롯을 선택하고 아래 목록에서 주사위를 눌러 교체하세요.";
         guideText.className = "text-[10px] text-slate-400 text-center mt-2 transition-all";
     }
 }
 
-// [장착 모드 시작]
+// 장착 모드 시작
 function startEquipMode() {
     if (!currentSelectedDice) return;
     equippingDiceId = currentSelectedDice.id;
     closePopup();
-    
-    selectedDeckSlot = -1; // 기존 슬롯 선택은 해제
+    selectedDeckSlot = -1;
     updateGuideText();
     renderDeckSlots();
 }
 window.startEquipMode = startEquipMode;
 
-// [장착 실행 - 수정됨: 즉시 반영]
+// 장착 실행 (슬롯 클릭)
 function equipDiceToSlot(diceId, slotIndex) {
     const existingIndex = myDeck.indexOf(diceId);
-    
     if (existingIndex !== -1) {
         const temp = myDeck[slotIndex];
         myDeck[slotIndex] = diceId;
@@ -233,13 +227,9 @@ function equipDiceToSlot(diceId, slotIndex) {
     } else {
         myDeck[slotIndex] = diceId;
     }
-    
     saveMyDeck();
-    
-    // [수정] 즉시 모드 종료 및 UI 원복
     equippingDiceId = null;
     selectedDeckSlot = -1;
-    
     updateGuideText();
     renderDeckSlots();
     renderDiceGrid(currentDiceList);
@@ -265,13 +255,11 @@ function renderDeckSlots() {
         totalLevel += dice.class_level;
 
         const isSelected = (index === selectedDeckSlot);
-        
         let borderClass = 'border-slate-200';
         let bgClass = 'bg-slate-50';
         let effectClass = '';
 
         if (equippingDiceId) {
-            // 장착 모드: 노란 점선 + 반짝임
             borderClass = 'border-yellow-400 border-dashed border-2';
             bgClass = 'bg-yellow-50';
             effectClass = 'animate-pulse cursor-pointer shadow-yellow-100 shadow-lg scale-105';
@@ -298,15 +286,12 @@ function renderDeckSlots() {
 }
 window.renderDeckSlots = renderDeckSlots;
 
-// 슬롯 선택 함수
+// 슬롯 선택
 function selectDeckSlot(index) {
-    // [CASE 1] 장착 모드 -> 장착 실행
     if (equippingDiceId) {
         equipDiceToSlot(equippingDiceId, index);
         return;
     }
-
-    // [CASE 2] 일반 모드 -> 선택/해제
     selectedDeckSlot = (selectedDeckSlot === index) ? -1 : index;
     updateGuideText();
     renderDeckSlots(); 
@@ -331,7 +316,6 @@ function equipDice(newDiceId) {
         alert("보유하지 않은 주사위입니다.");
         return;
     }
-
     const existingIndex = myDeck.indexOf(newDiceId);
     if (existingIndex !== -1) {
         const temp = myDeck[selectedDeckSlot];
@@ -340,7 +324,6 @@ function equipDice(newDiceId) {
     } else {
         myDeck[selectedDeckSlot] = newDiceId;
     }
-
     selectedDeckSlot = -1;
     updateGuideText();
     renderDeckSlots();
@@ -348,33 +331,25 @@ function equipDice(newDiceId) {
     saveMyDeck();
 }
 
-// [수정] 빈 공간 클릭 감지 (장착 취소 및 선택 해제)
+// 배경 클릭 감지
 document.addEventListener('click', function(e) {
     if (!document.getElementById('tab-deck').classList.contains('active')) return;
-
     const target = e.target;
-    
-    // 1. 장착 모드 취소 (슬롯이나 장착버튼이 아닌 곳 클릭 시)
     if (equippingDiceId) {
-        // 슬롯 컨테이너 내부나 팝업 버튼 클릭은 허용
         const isSlot = target.closest('#deck-slots-container');
         const isEquipBtn = target.closest('#popup-equip-btn');
-        
         if (!isSlot && !isEquipBtn) {
             equippingDiceId = null;
             updateGuideText();
             renderDeckSlots();
-            return; // 취소 처리 후 종료
+            return;
         }
     }
-
-    // 2. 일반 슬롯 선택 해제 (슬롯이나 리스트가 아닌 곳 클릭 시)
     if (selectedDeckSlot !== -1) {
         const isSlot = target.closest('#deck-slots-container');
         const isList = target.closest('#dice-list-grid');
         const isPopup = target.closest('#dice-popup');
         const isPresetBtn = target.closest('#preset-btn-container');
-
         if (!isSlot && !isList && !isPopup && !isPresetBtn) {
             selectedDeckSlot = -1;
             updateGuideText();
@@ -384,23 +359,62 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// 그리드 렌더링
+// ==========================================
+// [수정됨] 덱 목록 렌더링 (정렬 + 구분선 + NEW 뱃지)
+// ==========================================
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
-    const countEl = document.getElementById('dice-count'); grid.innerHTML = ""; let ownedCount = 0;
+    const countEl = document.getElementById('dice-count'); 
     
-    renderDeckUI(); 
+    // 1. 정렬: 보유(Lv>0) -> 미보유(Lv=0)
+    list.sort((a, b) => {
+        const aOwned = a.class_level > 0;
+        const bOwned = b.class_level > 0;
+        if (aOwned !== bOwned) return aOwned ? -1 : 1;
+        
+        const rarityScore = { 'Legend': 4, 'Hero': 3, 'Rare': 2, 'Common': 1 };
+        const scoreA = rarityScore[a.rarity] || 0;
+        const scoreB = rarityScore[b.rarity] || 0;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        
+        return a.name.localeCompare(b.name);
+    });
+
+    grid.innerHTML = ""; 
+    let ownedCount = 0;
+    let separatorRendered = false; 
+    const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
+
+    renderDeckUI();
 
     list.forEach(dice => {
         const isOwned = dice.class_level > 0;
         if(isOwned) ownedCount++;
-        const isInDeck = myDeck.includes(dice.id);
         
+        // [구분선]
+        if (!isOwned && !separatorRendered) {
+            grid.innerHTML += `
+                <div class="col-span-3 sm:col-span-4 flex items-center gap-2 my-2 opacity-50">
+                    <div class="h-px bg-slate-300 flex-1"></div>
+                    <span class="text-[10px] font-bold text-slate-400">미보유</span>
+                    <div class="h-px bg-slate-300 flex-1"></div>
+                </div>`;
+            separatorRendered = true;
+        }
+        
+        const isInDeck = myDeck.includes(dice.id);
         let isUpgradeable = false;
+        let isUnlockable = false;
+
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
-            const currentGold = parseInt(document.getElementById('res-gold')?.innerText.replace(/,/g, '') || '0');
-            if (dice.class_level > 0 && dice.quantity >= cards && currentGold >= gold) isUpgradeable = true;
+            // 0레벨(해금)은 골드 0으로 처리 (유저 데이터 변경 반영)
+            const requiredGold = (dice.class_level === 0) ? 0 : gold;
+            
+            if (dice.quantity >= cards && currentGold >= requiredGold) {
+                if (dice.class_level === 0) isUnlockable = true;
+                else isUpgradeable = true;
+            }
         }
 
         const iconHtml = renderDiceIcon(dice, "w-12 h-12");
@@ -412,8 +426,15 @@ function renderDiceGrid(list) {
         let levelBadgeClass = 'text-slate-600 bg-slate-100';
         let arrowHtml = '';
 
-        if (isInDeck) borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
-        if (isUpgradeable) {
+        if (isInDeck) {
+            borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
+        }
+
+        // [NEW 뱃지 및 스타일]
+        if (isUnlockable) {
+            borderClass = 'border-blue-400 ring-2 ring-blue-100 bg-blue-50';
+            arrowHtml = `<div class="absolute top-0 right-0 z-20 bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm animate-pulse">NEW!</div>`;
+        } else if (isUpgradeable) {
             borderClass = 'border-green-500 ring-2 ring-green-200';
             levelBadgeClass = 'text-white bg-green-500 shadow-sm';
             arrowHtml = `<div class="absolute bottom-1 left-2 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
@@ -425,10 +446,10 @@ function renderDiceGrid(list) {
             ${arrowHtml}
             ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
-            <div class="mb-1 z-10 shrink-0">${iconHtml}</div>
+            <div class="mb-1 z-10 shrink-0 ${!isOwned ? 'opacity-50 grayscale' : ''}">${iconHtml}</div>
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             ${isOwned ? `<span class="text-[10px] font-bold ${levelBadgeClass} px-1.5 rounded mt-1 z-10 shrink-0 transition-colors">Lv.${dice.class_level}</span>` : `<span class="text-[10px] font-bold text-slate-400 mt-1 z-10 shrink-0">미획득</span>`}
-            ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : ""}
+            ${isOwned ? `<span class="text-[9px] text-slate-400 absolute bottom-1 right-2 z-10">${dice.quantity}장</span>` : `<span class="text-[9px] text-slate-500 font-bold absolute bottom-1 right-2 z-10">${dice.quantity}/${dice.next_cost ? dice.next_cost.cards : '-'}</span>`}
             <div class="absolute top-2 right-2 w-2 h-2 rounded-full ${rarityDotColor} z-10 shadow-sm"></div>
         </div>`;
         grid.innerHTML += cardHtml;
@@ -437,115 +458,110 @@ function renderDiceGrid(list) {
 }
 window.renderDiceGrid = renderDiceGrid;
 
-// 상세 팝업 표시
+// ==========================================
+// [수정됨] 상세 팝업 (장착 버튼 숨김 처리)
+// ==========================================
 function showDiceDetail(diceId) {
     const dice = currentDiceList.find(d => d.id === diceId); if(!dice) return; currentSelectedDice = dice;
-    
     document.getElementById('popup-dice-name').innerText = dice.name;
     document.getElementById('popup-dice-desc').innerText = dice.desc;
     document.getElementById('popup-dice-rarity').innerText = dice.rarity;
     document.getElementById('popup-dice-class').innerText = dice.class_level > 0 ? `Lv.${dice.class_level}` : "미보유";
     
-    let iconHtml = renderDiceIcon(dice, "w-16 h-16");
-    iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
+    let iconHtml = renderDiceIcon(dice, "w-16 h-16"); iconHtml = iconHtml.replace("text-4xl", "text-6xl"); 
     document.getElementById('popup-dice-icon-container').innerHTML = iconHtml;
-
-    // 파티클 초기화
-    const iconContainer = document.getElementById('popup-dice-icon-container');
-    const existingParticles = iconContainer.querySelector('.firefly-container');
-    if(existingParticles) existingParticles.remove();
+    const iconContainer = document.getElementById('popup-dice-icon-container'); const existingParticles = iconContainer.querySelector('.firefly-container'); if(existingParticles) existingParticles.remove();
 
     const btn = document.getElementById('popup-action-btn'); 
+    const equipBtn = document.getElementById('popup-equip-btn'); 
     const costInfo = document.getElementById('popup-cost-info'); 
-    const progress = document.getElementById('popup-progress-bar');
+    const progress = document.getElementById('popup-progress-bar'); 
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
-
-    let canUpgrade = false;
-    let btnColorClass = "bg-blue-600 hover:bg-blue-700";
-    let progColorClass = "bg-blue-500";
     
+    let canUpgrade = false; 
+    let btnColorClass = "bg-blue-600 hover:bg-blue-700"; 
+    let progColorClass = "bg-blue-500"; 
     currentViewMode = null;
 
-    if (dice.class_level >= 20) {
-        document.getElementById('popup-dice-cards').innerText = "MAX";
-        progress.style.width = "100%";
-        progress.className = "h-full w-full bg-slate-300";
-        
-        btn.innerHTML = `<span>MAX LEVEL</span>`;
-        costInfo.innerText = "최고 레벨에 도달했습니다.";
-        btnColorClass = "bg-slate-400 cursor-not-allowed";
-        canUpgrade = false;
-    } 
-    else {
-        const reqCards = dice.next_cost ? dice.next_cost.cards : 9999;
-        const reqGold = dice.next_cost ? dice.next_cost.gold : 9999;
-        
-        document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`;
-        const pct = Math.min((dice.quantity / reqCards) * 100, 100);
-        progress.style.width = `${pct}%`;
+    // [미보유 시 장착 버튼 숨기기]
+    if (dice.class_level === 0) {
+        equipBtn.classList.add('hidden');
+    } else {
+        equipBtn.classList.remove('hidden');
+    }
 
-        const hasEnoughCards = dice.quantity >= reqCards;
+    if (dice.class_level >= 20) { 
+        document.getElementById('popup-dice-cards').innerText = "MAX"; 
+        progress.style.width = "100%"; 
+        progress.className = "h-full w-full bg-slate-300"; 
+        btn.innerHTML = `<span>MAX LEVEL</span>`; 
+        costInfo.innerText = "최고 레벨에 도달했습니다."; 
+        btnColorClass = "bg-slate-400 cursor-not-allowed"; 
+        canUpgrade = false; 
+    } 
+    else { 
+        const reqCards = dice.next_cost ? dice.next_cost.cards : 9999; 
+        // 0레벨이면 골드 0원으로 처리
+        const reqGold = (dice.class_level === 0) ? 0 : (dice.next_cost ? dice.next_cost.gold : 9999); 
+        
+        document.getElementById('popup-dice-cards').innerText = `${dice.quantity} / ${reqCards}`; 
+        const pct = Math.min((dice.quantity / reqCards) * 100, 100); 
+        progress.style.width = `${pct}%`; 
+        
+        const hasEnoughCards = dice.quantity >= reqCards; 
         const hasEnoughGold = currentGold >= reqGold;
 
-        if (dice.class_level === 0) {
-            progColorClass = "bg-green-500";
-            if (hasEnoughCards && hasEnoughGold) {
-                canUpgrade = true;
-                btn.innerHTML = `<span>🔓 해금하기</span>`;
-                costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
-                btnColorClass = "bg-green-500 hover:bg-green-600";
-            } else {
-                btn.innerHTML = !hasEnoughCards ? `<span>카드 부족</span>` : `<span>골드 부족</span>`;
-                costInfo.innerText = !hasEnoughCards ? "카드를 더 모으세요" : `비용: ${reqGold.toLocaleString()} 골드`;
-                btnColorClass = "bg-slate-300 cursor-not-allowed";
-            }
-        } else {
-            if (hasEnoughCards && hasEnoughGold) {
-                canUpgrade = true;
+        if (dice.class_level === 0) { 
+            progColorClass = "bg-blue-500"; 
+            if (hasEnoughCards) { 
+                canUpgrade = true; 
+                btn.innerHTML = `<span>🔓 획득하기</span>`; 
+                costInfo.innerText = `비용: 무료 (카드 ${reqCards}장)`; 
+                btnColorClass = "bg-blue-500 hover:bg-blue-600"; 
+            } else { 
+                btn.innerHTML = `<span>카드 부족</span>`; 
+                costInfo.innerText = `필요: 카드 ${reqCards}장`; 
+                btnColorClass = "bg-slate-300 cursor-not-allowed"; 
+            } 
+        } 
+        else { 
+            if (hasEnoughCards && hasEnoughGold) { 
+                canUpgrade = true; 
                 currentViewMode = 'class'; 
-                btn.innerHTML = `<span>⬆️ 레벨업</span>`;
-                costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`;
+                btn.innerHTML = `<span>⬆️ 레벨업</span>`; 
+                costInfo.innerText = `비용: ${reqGold.toLocaleString()} 골드`; 
                 btnColorClass = "bg-green-600 hover:bg-green-700"; 
-                progColorClass = "bg-green-500";
-            } else {
+                progColorClass = "bg-green-500"; 
+            } else { 
                 currentViewMode = 'class'; 
-                btn.innerHTML = !hasEnoughCards ? `카드 부족` : `골드 부족`;
-                costInfo.innerText = `필요: 카드 ${reqCards}장, ${reqGold.toLocaleString()} 골드`;
-                btnColorClass = "bg-slate-300 cursor-not-allowed";
-                progColorClass = "bg-slate-400";
-            }
-        }
-        progress.className = `h-full w-0 transition-all duration-500 ${progColorClass}`;
+                btn.innerHTML = !hasEnoughCards ? `카드 부족` : `골드 부족`; 
+                costInfo.innerText = `필요: 카드 ${reqCards}장, ${reqGold.toLocaleString()} 골드`; 
+                btnColorClass = "bg-slate-300 cursor-not-allowed"; 
+                progColorClass = "bg-slate-400"; 
+            } 
+        } 
+        progress.className = `h-full w-0 transition-all duration-500 ${progColorClass}`; 
     }
-
+    
     btn.className = `relative w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 overflow-hidden ${btnColorClass}`;
-
-    if(canUpgrade) {
-        btn.classList.add('btn-pulse-green');
-    } else {
-        btn.classList.remove('btn-pulse-green');
-    }
-
+    if(canUpgrade) { btn.classList.add('btn-pulse-green'); } else { btn.classList.remove('btn-pulse-green'); }
+    
     btn.onclick = canUpgrade ? () => upgradeDice(dice.id) : null; 
     btn.disabled = !canUpgrade;
     
-    updateStatsView();
+    updateStatsView(); 
     document.getElementById('dice-popup').classList.remove('hidden'); 
     document.getElementById('dice-popup').classList.add('flex');
 }
 
-// [NEW] 스탯 UI 업데이트 (api.js에서 호출)
+// [스탯 UI 업데이트 및 애니메이션]
 function updateStatsUI(stats) {
     const dmgEl = document.getElementById('stat-crit-dmg');
     const rateEl = document.getElementById('stat-crit-rate');
-    
-    if (dmgEl) {
-        // 숫자 카운팅 애니메이션 효과
-        animateValue(dmgEl, parseInt(dmgEl.innerText.replace('%','')) || 100, stats.crit_damage, 500);
-    }
+    if (dmgEl) animateValue(dmgEl, parseInt(dmgEl.innerText.replace('%','')) || 100, stats.crit_damage, 500);
     if (rateEl) rateEl.innerText = `${stats.crit_rate}%`;
 }
-window.updateStatsUI = updateStatsUI; // 전역 등록
+window.updateStatsUI = updateStatsUI;
 
 // [Helper] 숫자 카운팅 애니메이션
 function animateValue(obj, start, end, duration) {
@@ -556,43 +572,41 @@ function animateValue(obj, start, end, duration) {
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
         const current = Math.floor(progress * (end - start) + start);
         obj.innerHTML = `${current.toLocaleString()}%`;
-        if (progress < 1) {
-            window.requestAnimationFrame(step);
-        } else {
-            obj.innerHTML = `${end.toLocaleString()}%`; // 최종값 보정
-        }
+        if (progress < 1) window.requestAnimationFrame(step);
+        else obj.innerHTML = `${end.toLocaleString()}%`;
     };
     window.requestAnimationFrame(step);
 }
 
 // 주사위 업그레이드
-async function upgradeDice(diceId) {
-    try {
-        const res = await fetch(`${API_DICE}/upgrade`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: myId, dice_id: diceId }) });
-        const data = await res.json();
-        if(res.ok) {
-            const btn = document.getElementById('popup-action-btn');
-            btn.classList.add('burst-effect');
-            setTimeout(() => btn.classList.remove('burst-effect'), 600);
-            
-            isUpgradeJustHappened = true;
-            
-            await fetchMyResources();
-            const listRes = await fetch(`${API_DICE}/list/${myId}`);
-            if(listRes.ok) {
-                currentDiceList = await listRes.json();
+// upgradeDice 함수도 기존대로 유지하되 스탯 갱신 추가된 버전 사용
+async function upgradeDice(diceId) { 
+    try { 
+        const res = await fetch(`${API_DICE}/upgrade`, { 
+            method: 'POST', headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({ username: myId, dice_id: diceId }) 
+        }); 
+        const data = await res.json(); 
+        if(res.ok) { 
+            const btn = document.getElementById('popup-action-btn'); 
+            btn.classList.add('burst-effect'); 
+            setTimeout(() => btn.classList.remove('burst-effect'), 600); 
+            isUpgradeJustHappened = true; 
+            await fetchMyResources(); 
+            if (typeof fetchMyStats === 'function') fetchMyStats(); // 스탯 갱신
+            const listRes = await fetch(`${API_DICE}/list/${myId}`); 
+            if(listRes.ok) { 
+                currentDiceList = await listRes.json(); 
                 renderDiceGrid(currentDiceList); 
-                const updatedDice = currentDiceList.find(d => d.id === diceId);
-                if(updatedDice) {
-                    currentSelectedDice = updatedDice;
-                    document.getElementById('popup-dice-class').innerText = `Lv.${updatedDice.class_level}`;
-                    showDiceDetail(diceId);
-                }
-            }
-            // [추가] 업그레이드 성공 시 스탯 갱신!
-            if (typeof fetchMyStats === 'function') fetchMyStats();
-        } else { alert(data.detail || "오류"); }
-    } catch(e) { alert("통신 오류"); }
+                const updatedDice = currentDiceList.find(d => d.id === diceId); 
+                if(updatedDice) { 
+                    currentSelectedDice = updatedDice; 
+                    document.getElementById('popup-dice-class').innerText = `Lv.${updatedDice.class_level}`; 
+                    showDiceDetail(diceId); 
+                } 
+            } 
+        } else { alert(data.detail || "오류"); } 
+    } catch(e) { alert("통신 오류"); } 
 }
 
 // 스탯 뷰 업데이트
