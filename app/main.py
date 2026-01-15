@@ -6,18 +6,17 @@ from contextlib import asynccontextmanager
 from app.services.auth.auth_api import router as auth_router
 from app.services.dice_defense.dice_rest_api import router as dice_router
 from app.services.mail.mail_api import router as mail_router
-from app.core.database import init_db # [NEW]
+from app.core.database import init_db
 
-# [NEW] 앱 시작 시 DB 초기화 로직 수행
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db() # 서버 시작 시 스키마 적용
+    print(">>> Server Starting... Initializing Database...")
+    init_db() # 여기서 DB 테이블 생성
     yield
-    # 서버 종료 시 실행할 로직 (필요시 추가)
+    print(">>> Server Shutting down...")
 
-app = FastAPI(lifespan=lifespan) # lifespan 등록
+app = FastAPI(lifespan=lifespan)
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +25,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 라우터 등록
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(dice_router, prefix="/api/dice", tags=["Dice Defense"])
 app.include_router(mail_router, prefix="/api/mail", tags=["Mail"])
