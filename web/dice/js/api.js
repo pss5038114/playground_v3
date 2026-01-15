@@ -36,18 +36,14 @@ async function summonDice(count) {
     }
 }
 
-// [수정] 데이터를 리턴하도록 변경하여 ui.js에서 await로 기다릴 수 있게 함
 async function fetchMyDice() {
     try {
         const res = await fetch(`${API_DICE}/list/${myId}`);
         if(res.ok) {
             const list = await res.json();
-            currentDiceList = list; // 전역 변수 업데이트
-            
-            // UI 렌더링 함수가 있다면 호출
+            currentDiceList = list;
             if(typeof renderDiceGrid === 'function') renderDiceGrid(currentDiceList);
-            
-            return list; // 데이터 리턴 추가
+            return list;
         }
     } catch(e){}
     return [];
@@ -64,7 +60,6 @@ async function upgradeDice(diceId) {
                 setTimeout(() => btn.classList.remove('burst-effect'), 600);
             }
             await fetchMyResources();
-            // 리스트 갱신 후 팝업 업데이트
             await fetchMyDice(); 
             
             const updatedDice = currentDiceList.find(d => d.id === diceId);
@@ -76,4 +71,28 @@ async function upgradeDice(diceId) {
             }
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
+}
+
+// [NEW] 덱 정보 가져오기
+async function fetchMyDeck() {
+    try {
+        const res = await fetch(`${API_DICE}/deck/${myId}`);
+        if (res.ok) {
+            const data = await res.json();
+            myDeck = data.deck; // 전역 변수 업데이트
+            if (typeof renderDeckSlots === 'function') renderDeckSlots();
+            if (typeof renderDiceGrid === 'function' && currentDiceList.length > 0) renderDiceGrid(currentDiceList);
+        }
+    } catch(e) { console.error("Deck fetch failed", e); }
+}
+
+// [NEW] 덱 정보 저장하기
+async function saveMyDeck() {
+    try {
+        await fetch(`${API_DICE}/deck/save`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username: myId, deck: myDeck })
+        });
+    } catch(e) { console.error("Deck save failed", e); }
 }

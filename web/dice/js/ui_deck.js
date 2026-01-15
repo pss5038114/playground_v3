@@ -129,6 +129,9 @@ function equipDice(newDiceId) {
     selectedDeckSlot = -1; // 선택 해제
     renderDeckSlots();
     renderDiceGrid(currentDiceList);
+    
+    // [NEW] 변경된 덱을 서버에 저장
+    saveMyDeck();
 }
 
 // 덱 목록 렌더링 (보유 주사위)

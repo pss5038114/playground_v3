@@ -184,3 +184,58 @@ async def upgrade_dice(payload: dict = Body(...)):
         
     finally:
         conn.close()
+
+# [NEW] 덱 정보 불러오기
+@router.get("/deck/{username}")
+async def get_my_deck(username: str):
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not user: raise HTTPException(404, "User not found")
+        
+        # 덱 정보 조회
+        row = conn.execute("SELECT * FROM user_decks WHERE user_id = ?", (user["id"],)).fetchone()
+        
+        if row:
+            # 저장된 덱 반환
+            return {
+                "deck": [row["slot_1"], row["slot_2"], row["slot_3"], row["slot_4"], row["slot_5"]]
+            }
+        else:
+            # 덱 정보가 없으면 기본 덱 생성 및 저장
+            default_deck = ['fire', 'electric', 'wind', 'ice', 'poison']
+            conn.execute("""
+                INSERT INTO user_decks (user_id, slot_1, slot_2, slot_3, slot_4, slot_5) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user["id"], *default_deck))
+            conn.commit()
+            
+            return {"deck": default_deck}
+            
+    finally:
+        conn.close()
+
+# [NEW] 덱 정보 저장하기
+@router.post("/deck/save")
+async def save_my_deck(payload: dict = Body(...)):
+    username = payload.get("username")
+    deck = payload.get("deck") # ["id1", "id2", ...]
+    
+    if not deck or len(deck) != 5:
+        raise HTTPException(400, "Invalid deck format")
+        
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not user: raise HTTPException(404, "User not found")
+        
+        # 덱 업데이트 (없으면 INSERT, 있으면 UPDATE - REPLACE 구문 사용)
+        conn.execute("""
+            REPLACE INTO user_decks (user_id, slot_1, slot_2, slot_3, slot_4, slot_5)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (user["id"], *deck))
+        conn.commit()
+        
+        return {"message": "Deck saved"}
+    finally:
+        conn.close()

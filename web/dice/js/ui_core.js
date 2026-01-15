@@ -18,15 +18,22 @@ async function loadComponents() {
     if(typeof initGameCanvas === 'function') initGameCanvas();
     if(typeof fetchMyResources === 'function') fetchMyResources();
     if(typeof fetchMyDice === 'function') fetchMyDice();
+    
+    // [NEW] 덱 정보 불러오기
+    if(typeof fetchMyDeck === 'function') fetchMyDeck();
 }
 
+// ... (나머지 코드 유지) ...
 const tabNames = ['shop','deck','battle','event','clan'];
 function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
     document.getElementById(`tab-${name}`).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('text-blue-600',b.dataset.target===`tab-${name}`));
     
-    if(name==='deck') fetchMyDice();
+    if(name==='deck') {
+        fetchMyDice();
+        fetchMyDeck(); // 덱 탭 진입 시 덱 정보 갱신
+    }
     if(name==='shop') fetchMyResources();
 }
 
