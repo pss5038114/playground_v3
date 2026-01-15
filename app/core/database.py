@@ -11,6 +11,26 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# [NEW] DB 초기화 및 마이그레이션 함수
+def init_db():
+    print(f"[*] Checking Database schema at {DB_PATH}...")
+    
+    # 스키마 파일이 존재하는지 확인
+    if not os.path.exists(SCHEMA_PATH):
+        print(f"[!] Schema file not found: {SCHEMA_PATH}")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+            schema_script = f.read()
+            conn.executescript(schema_script) # 스크립트 일괄 실행
+            print("[*] Database schema applied successfully.")
+    except Exception as e:
+        print(f"[!] Error applying schema: {e}")
+    finally:
+        conn.close()
+
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
