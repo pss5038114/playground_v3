@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Body
 from app.core.database import get_db_connection
 from app.services.dice_defense.game_data import DICE_DATA, RARITY_ORDER, UPGRADE_RULES
 import random
+import math
 
 router = APIRouter()
 
@@ -30,6 +31,21 @@ def pick_one_dice():
         candidates = list(DICE_DATA.keys())
     
     return random.choice(candidates)
+
+# [NEW] 크리티컬 데미지 계산 헬퍼 함수
+def calculate_crit_damage_for_dice(class_level: int) -> int:
+    """
+    주사위 하나가 기여하는 크리티컬 데미지 계산
+    공식: 1, 1, 2, 2, 3, 3, 4... 순서로 누적
+    즉, 레벨 L까지의 sum(ceil(i/2))
+    """
+    if class_level < 1:
+        return 0
+    
+    total = 0
+    for i in range(1, class_level + 1):
+        total += math.ceil(i / 2)
+    return total
 
 @router.get("/list/{username}")
 async def get_my_dice_list(username: str):
@@ -260,5 +276,33 @@ async def save_my_deck(payload: dict = Body(...)):
         
         conn.commit()
         return {"message": "Deck saved"}
+    finally:
+        conn.close()
+
+@router.get("/stats/{username}")
+async def get_user_stats(username: str):
+    conn = get_db_connection()
+    try:
+        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not user:
+            raise HTTPException(404, "User not found")
+        
+        # 보유한 모든 주사위 조회
+        dice_rows = conn.execute("SELECT class_level FROM user_dice WHERE user_id = ?", (user["id"],)).fetchall()
+        
+        base_crit_dmg = 1000 # 기본 100% (내부 단위가 %라면 100, 소수점 관리 필요 시 1000?)
+        # 사용자 요청: "기본 배율은 100%에서 시작"
+        # 그리고 증가치는 정수 퍼센트 (1%, 2%...)
+        
+        total_crit_dmg = 100 # 기본값
+        
+        for row in dice_rows:
+            level = row["class_level"]
+            total_crit_dmg += calculate_crit_damage_for_dice(level)
+            
+        return {
+            "crit_rate": 5, # 기본 5% 고정
+            "crit_damage": total_crit_dmg
+        }
     finally:
         conn.close()

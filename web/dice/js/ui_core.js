@@ -48,6 +48,9 @@ function switchTab(name) {
         fetchMyDeck().then(() => {
             if(typeof renderDeckUI === 'function') renderDeckUI();
         });
+        
+        // [NEW] 스탯 정보 가져오기
+        if(typeof fetchMyStats === 'function') fetchMyStats();
     }
     
     // [NEW] 전투(홈) 탭 진입 시 홈 덱 UI 갱신

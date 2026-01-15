@@ -126,3 +126,14 @@ async function saveMyDeck() {
         }
     } catch(e) { console.error("Deck save error", e); }
 }
+
+// [NEW] 유저 스탯(크리티컬 등) 가져오기
+async function fetchMyStats() {
+    try {
+        const res = await fetch(`${API_DICE}/stats/${myId}`);
+        if (res.ok) {
+            const data = await res.json();
+            updateStatsUI(data); // UI 업데이트 함수 호출
+        }
+    } catch(e) { console.error("Stats fetch error", e); }
+}

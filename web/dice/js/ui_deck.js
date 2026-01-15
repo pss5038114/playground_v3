@@ -534,6 +534,37 @@ function showDiceDetail(diceId) {
     document.getElementById('dice-popup').classList.add('flex');
 }
 
+// [NEW] 스탯 UI 업데이트 (api.js에서 호출)
+function updateStatsUI(stats) {
+    const dmgEl = document.getElementById('stat-crit-dmg');
+    const rateEl = document.getElementById('stat-crit-rate');
+    
+    if (dmgEl) {
+        // 숫자 카운팅 애니메이션 효과
+        animateValue(dmgEl, parseInt(dmgEl.innerText.replace('%','')) || 100, stats.crit_damage, 500);
+    }
+    if (rateEl) rateEl.innerText = `${stats.crit_rate}%`;
+}
+window.updateStatsUI = updateStatsUI; // 전역 등록
+
+// [Helper] 숫자 카운팅 애니메이션
+function animateValue(obj, start, end, duration) {
+    if (start === end) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        const current = Math.floor(progress * (end - start) + start);
+        obj.innerHTML = `${current.toLocaleString()}%`;
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        } else {
+            obj.innerHTML = `${end.toLocaleString()}%`; // 최종값 보정
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
 // 주사위 업그레이드
 async function upgradeDice(diceId) {
     try {
@@ -558,6 +589,8 @@ async function upgradeDice(diceId) {
                     showDiceDetail(diceId);
                 }
             }
+            // [추가] 업그레이드 성공 시 스탯 갱신!
+            if (typeof fetchMyStats === 'function') fetchMyStats();
         } else { alert(data.detail || "오류"); }
     } catch(e) { alert("통신 오류"); }
 }

@@ -27,6 +27,33 @@
     </div>
 </div>
 
+<div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-4 shadow-lg mb-4 text-white relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-4 opacity-10"><i class="ri-sword-fill text-6xl"></i></div>
+    
+    <div class="flex justify-between items-center relative z-10">
+        <div class="flex flex-col">
+            <span class="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1">
+                <i class="ri-fire-fill text-yellow-500"></i> 크리티컬 데미지
+            </span>
+            <div class="flex items-baseline gap-1">
+                <span id="stat-crit-dmg" class="text-2xl font-black text-yellow-400 tracking-tight">100%</span>
+                <span class="text-xs text-slate-500 font-bold">Base 100%</span>
+            </div>
+        </div>
+
+        <div class="h-8 w-px bg-slate-700"></div>
+
+        <div class="flex flex-col items-end">
+            <span class="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1">
+                크리티컬 확률 <i class="ri-focus-3-line text-blue-400"></i>
+            </span>
+            <div class="flex items-baseline gap-1">
+                <span id="stat-crit-rate" class="text-2xl font-black text-blue-400 tracking-tight">5%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="flex-1 overflow-y-auto pb-20 scrollbar-hide">
     <div class="flex justify-between items-center mb-2 px-1">
         <h4 class="text-xs font-bold text-slate-400">보유 주사위 목록</h4>
