@@ -365,36 +365,31 @@ document.addEventListener('click', function(e) {
 function renderDiceGrid(list) {
     const grid = document.getElementById('dice-list-grid'); if(!grid) return;
     
-    // 1. 정렬: 보유(Lv>0) -> 미보유(Lv=0)
+    // 1. 정렬: 보유 -> 미보유
     list.sort((a, b) => {
         const aOwned = a.class_level > 0;
         const bOwned = b.class_level > 0;
-        
-        // 보유 여부가 다르면 보유한 것이 위로
         if (aOwned !== bOwned) return aOwned ? -1 : 1;
         
-        // 희귀도 정렬 (Legend > Hero > Rare > Common)
         const rarityScore = { 'Legend': 4, 'Hero': 3, 'Rare': 2, 'Common': 1 };
         const scoreA = rarityScore[a.rarity] || 0;
         const scoreB = rarityScore[b.rarity] || 0;
         if (scoreA !== scoreB) return scoreB - scoreA;
-        
-        // 이름 정렬
         return a.name.localeCompare(b.name);
     });
 
     grid.innerHTML = ""; 
     let ownedCount = 0;
-    let separatorRendered = false; // 구분선 렌더링 여부 체크
+    let separatorRendered = false; 
     const currentGold = parseInt(document.getElementById('res-gold').innerText.replace(/,/g, '')) || 0;
 
-    renderDeckUI(); // 상단 슬롯 UI 동기화
+    renderDeckUI();
 
     list.forEach(dice => {
         const isOwned = dice.class_level > 0;
         if(isOwned) ownedCount++;
         
-        // [NEW] 구분선 추가 (보유 목록 끝난 직후 한 번만 실행)
+        // [구분선]
         if (!isOwned && !separatorRendered) {
             grid.innerHTML += `
                 <div class="col-span-3 sm:col-span-4 flex items-center gap-2 my-2 opacity-50">
@@ -407,12 +402,12 @@ function renderDiceGrid(list) {
         
         const isInDeck = myDeck.includes(dice.id);
         let isUpgradeable = false;
-        let isUnlockable = false; // 해금 가능 여부
+        let isUnlockable = false;
 
+        // 비용 체크 로직
         if (dice.next_cost) {
             const { cards, gold } = dice.next_cost;
-            // 0레벨(해금)은 골드 비용 0원으로 간주
-            const requiredGold = (dice.class_level === 0) ? 0 : gold;
+            const requiredGold = (dice.class_level === 0) ? 0 : gold; 
             
             if (dice.quantity >= cards && currentGold >= requiredGold) {
                 if (dice.class_level === 0) isUnlockable = true;
@@ -426,32 +421,46 @@ function renderDiceGrid(list) {
         const rarityDotColor = getRarityDotColor(dice.rarity);
         
         let borderClass = 'border-slate-100';
+        let bgClass = 'bg-slate-100'; // 기본 미보유 배경
         let levelBadgeClass = 'text-slate-600 bg-slate-100';
         let arrowHtml = '';
+        
+        // [중요] 흑백 처리 조건: 미보유이면서 && 해금도 불가능할 때만 흑백
+        const isGray = !isOwned && !isUnlockable;
+
+        if (isOwned) {
+            bgClass = 'bg-white hover:bg-slate-50';
+        }
 
         if (isInDeck) {
             borderClass = 'border-slate-400 bg-slate-50 ring-2 ring-slate-100'; 
         }
 
-        // [수정] 해금 가능 시 초록색 테마 + 초록색 NEW 뱃지
+        // [상태별 스타일 정의]
         if (isUnlockable) {
-            borderClass = 'border-green-500 ring-2 ring-green-100 bg-green-50'; // 초록색 테두리/배경
-            arrowHtml = `<div class="absolute top-0 right-0 z-20 bg-green-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg shadow-sm animate-pulse">NEW!</div>`;
+            // 해금 가능: 초록색 테마 + NEW 뱃지(좌측)
+            borderClass = 'border-green-500 ring-2 ring-green-100';
+            bgClass = 'bg-green-50'; // 배경도 연한 초록색으로 변경
+            // NEW 뱃지 위치: left-0, rounded-br-lg (우측 하단 둥글게)
+            arrowHtml = `<div class="absolute top-0 left-0 z-20 bg-green-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-br-lg shadow-sm animate-pulse">NEW!</div>`;
         } 
         else if (isUpgradeable) {
+            // 업글 가능: 기존 초록색 화살표
             borderClass = 'border-green-500 ring-2 ring-green-200';
             levelBadgeClass = 'text-white bg-green-500 shadow-sm';
             arrowHtml = `<div class="absolute bottom-1 left-2 z-20 arrow-float bg-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm border border-green-200"><i class="ri-arrow-up-double-line text-green-600 text-xs font-bold"></i></div>`;
         }
 
+        // HTML 생성
         const cardHtml = `
-        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer ${isOwned ? 'bg-white hover:bg-slate-50' : 'bg-slate-100 dice-unowned'}" 
+        <div class="aspect-square w-full rounded-xl shadow-sm border-2 ${borderClass} ${bgClass} flex flex-col items-center justify-center relative overflow-hidden transition-transform active:scale-95 cursor-pointer" 
              onclick="window.handleDiceClick('${dice.id}'); event.stopPropagation();">
-            ${arrowHtml}
-            ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
+            
+            ${arrowHtml} ${isInDeck ? `<div class="absolute top-1 left-1 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-30 shadow-md">E</div>` : ''}
             
             <div class="absolute inset-0 flex items-center justify-center ${rarityBgTextColor} pointer-events-none -z-0"><i class="${rarityBgIcon} text-7xl opacity-40"></i></div>
-            <div class="mb-1 z-10 shrink-0 ${!isOwned ? 'opacity-50 grayscale' : ''}">${iconHtml}</div>
+            
+            <div class="mb-1 z-10 shrink-0 ${isGray ? 'opacity-50 grayscale' : ''}">${iconHtml}</div>
             
             <div class="font-bold text-xs text-slate-700 z-10 truncate w-full text-center px-1 shrink-0">${dice.name}</div>
             
@@ -465,7 +474,6 @@ function renderDiceGrid(list) {
         grid.innerHTML += cardHtml;
     });
     
-    const countEl = document.getElementById('dice-count'); 
     if(countEl) countEl.innerText = `${ownedCount}/${list.length}`;
 }
 window.renderDiceGrid = renderDiceGrid;
