@@ -72,8 +72,9 @@
 
         </main>
 
-        <nav class="bg-white border-t border-slate-200 px-4 py-2 flex justify-between items-center shrink-0 h-[70px] pb-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
-            <button onclick="switchTab('shop')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-shop">
+        <nav class="bg-white border-t border-slate-200 grid grid-cols-5 items-stretch shrink-0 h-[70px] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30 relative">
+            
+            <button onclick="switchTab('shop')" class="nav-btn group flex flex-col items-center justify-center gap-1 w-full h-full active:bg-slate-50 transition-colors border-r border-slate-100" data-target="tab-shop">
                 <div class="relative">
                     <i class="ri-store-2-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
                     <div class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full hidden"></div>
@@ -81,19 +82,21 @@
                 <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">상점</span>
             </button>
             
-            <button onclick="switchTab('deck')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-deck">
+            <button onclick="switchTab('deck')" class="nav-btn group flex flex-col items-center justify-center gap-1 w-full h-full active:bg-slate-50 transition-colors" data-target="tab-deck">
                 <i class="ri-stack-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
                 <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">덱</span>
             </button>
             
-            <button onclick="switchTab('battle')" class="nav-btn group flex flex-col items-center gap-1 -mt-8 transition-transform active:scale-95" data-target="tab-battle">
-                <div class="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-300 border-4 border-white">
-                    <i class="ri-sword-fill text-2xl text-white"></i>
-                </div>
-                <span class="text-[10px] font-bold text-slate-600 mt-1">전투</span>
-            </button>
+            <div class="relative w-full h-full flex justify-center z-10 pointer-events-none">
+                <button onclick="switchTab('battle')" class="nav-btn group flex flex-col items-center gap-1 -mt-8 pointer-events-auto transition-transform active:scale-95" data-target="tab-battle">
+                    <div class="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-300 border-4 border-white">
+                        <i class="ri-sword-fill text-2xl text-white"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-600 mt-1">전투</span>
+                </button>
+            </div>
             
-            <button onclick="switchTab('event')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-event">
+            <button onclick="switchTab('event')" class="nav-btn group flex flex-col items-center justify-center gap-1 w-full h-full active:bg-slate-50 transition-colors" data-target="tab-event">
                 <div class="relative">
                     <i class="ri-calendar-event-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
                     <span class="absolute -top-1 -right-2 bg-red-500 text-white text-[8px] px-1 rounded-full hidden">N</span>
@@ -101,7 +104,7 @@
                 <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">이벤트</span>
             </button>
             
-            <button onclick="switchTab('clan')" class="nav-btn group flex flex-col items-center gap-1 w-12 transition-all active:scale-90" data-target="tab-clan">
+            <button onclick="switchTab('clan')" class="nav-btn group flex flex-col items-center justify-center gap-1 w-full h-full active:bg-slate-50 transition-colors border-l border-slate-100" data-target="tab-clan">
                 <i class="ri-team-line text-2xl text-slate-400 group-hover:text-blue-500 transition-colors"></i>
                 <span class="text-[9px] font-bold text-slate-400 group-hover:text-blue-600">클랜</span>
             </button>
