@@ -4,7 +4,9 @@ import os
 # DB 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
+
 DB_PATH = os.path.join(project_root, "playground.db")
+SCHEMA_PATH = "schema.sql" # 스키마 파일 경로
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
