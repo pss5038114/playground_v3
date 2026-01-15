@@ -1,5 +1,7 @@
 // web/dice/js/ui_core.js
 
+// web/dice/js/ui_core.js
+
 async function loadComponents() {
     const tabs = [
         {id:'tab-shop',file:'lobby_shop.html'},
@@ -19,8 +21,13 @@ async function loadComponents() {
     if(typeof fetchMyResources === 'function') fetchMyResources();
     if(typeof fetchMyDice === 'function') fetchMyDice();
     
-    // [NEW] 덱 정보 불러오기
-    if(typeof fetchMyDeck === 'function') fetchMyDeck();
+    // [중요] 덱 정보 로드
+    if(typeof fetchMyDeck === 'function') {
+        await fetchMyDeck(); // 데이터를 다 받아온 뒤 UI 렌더링
+    }
+    
+    // 덱 UI 강제 초기화 (혹시 fetchMyDeck에서 안 되었을 경우 대비)
+    if(typeof renderDeckUI === 'function') renderDeckUI();
 }
 
 // ... (나머지 코드 유지) ...

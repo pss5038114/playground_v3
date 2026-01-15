@@ -95,21 +95,34 @@ async function fetchMyDeck() {
 // [수정] 현재 프리셋 저장하기
 async function saveMyDeck() {
     try {
-        // 현재 상태 myDecks에 반영
-        if (myDecks[currentPresetIndex]) {
-            myDecks[currentPresetIndex].slots = myDeck;
-            // 이름은 UI에서 별도로 업데이트 됨
+        // 현재 상태를 myDecks에 반영
+        if (!myDecks[currentPresetIndex]) {
+            myDecks[currentPresetIndex] = { name: `Preset ${currentPresetIndex}`, slots: [] };
         }
+        myDecks[currentPresetIndex].slots = myDeck;
 
-        await fetch(`${API_DICE}/deck/save`, {
+        // 이름이 없으면 기본값 사용
+        const deckName = myDecks[currentPresetIndex].name || `Preset ${currentPresetIndex}`;
+        
+        // 덱이 비어있으면 기본값 사용
+        const deckSlots = (myDeck && myDeck.length === 5) ? myDeck : ['fire', 'electric', 'wind', 'ice', 'poison'];
+
+        const payload = { 
+            username: myId, 
+            preset_index: currentPresetIndex,
+            name: deckName,
+            deck: deckSlots 
+        };
+
+        const res = await fetch(`${API_DICE}/deck/save`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                username: myId, 
-                preset_index: currentPresetIndex,
-                name: myDecks[currentPresetIndex].name,
-                deck: myDeck 
-            })
+            body: JSON.stringify(payload)
         });
-    } catch(e) { console.error("Deck save failed", e); }
+        
+        if (!res.ok) {
+            const err = await res.json();
+            console.error("Deck save failed:", err);
+        }
+    } catch(e) { console.error("Deck save error", e); }
 }
