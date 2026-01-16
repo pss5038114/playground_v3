@@ -3,11 +3,13 @@
 // 전역 변수
 let canvas, ctx;
 let gameMap = null;
-let scaleRatio = 1;
 let currentMode = 'solo';
+let animationFrameId;
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
+    console.log("Game Script Loaded.");
+    
     // URL 파라미터 확인 (mode)
     const urlParams = new URLSearchParams(window.location.search);
     currentMode = urlParams.get('mode') || 'solo';
@@ -20,16 +22,15 @@ window.onload = async function() {
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 로딩 시작
+    // 로딩 시퀀스 시작
     await runLoadingSequence();
 };
 
 // 2. 이탈 방지 (뒤로가기/새로고침 경고)
 function setupLeaveWarning() {
     window.addEventListener('beforeunload', (event) => {
-        // 표준 방식
         event.preventDefault();
-        event.returnValue = ''; // Chrome에서는 이 설정이 필요함
+        event.returnValue = ''; 
         return '';
     });
 }
@@ -37,15 +38,16 @@ function setupLeaveWarning() {
 // 3. 로딩 시뮬레이션
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
-    const uiLayer = document.getElementById('ui-layer');
+    const uiTop = document.getElementById('ui-top');
+    const uiBottom = document.getElementById('ui-bottom');
     
     try {
         updateLoading(10, "Connecting to server...");
-        // TODO: 웹소켓 연결 (dice_socket.py)
+        // TODO: 웹소켓 연결 로직
         await sleep(500);
 
         updateLoading(40, "Fetching map data...");
-        // [임시] 서버에서 맵 데이터 수신 (game.py의 get_map_data)
+        // 서버 데이터 모의 (여기서 맵 데이터 생성)
         gameMap = getMockMapData(); 
         await sleep(500);
 
@@ -57,10 +59,21 @@ async function runLoadingSequence() {
         await sleep(300);
 
         // 로딩 화면 제거 & UI 표시
-        loadingScreen.classList.add('opacity-0', 'pointer-events-none');
-        setTimeout(() => loadingScreen.remove(), 500); // DOM에서 완전 제거
-        uiLayer.classList.remove('hidden');
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.pointerEvents = 'none';
+        
+        setTimeout(() => {
+            loadingScreen.style.display = 'none'; // 완전히 가리기
+        }, 500);
 
+        // 인게임 UI 보이기
+        if(uiTop) uiTop.classList.remove('hidden');
+        if(uiBottom) {
+            uiBottom.classList.remove('hidden');
+            uiBottom.classList.add('flex');
+        }
+
+        console.log("Game Loop Starting...");
         // 게임 루프 시작
         requestAnimationFrame(gameLoop);
 
@@ -104,12 +117,15 @@ function setupCanvas() {
         finalH = w / targetAspect;
     }
 
-    canvas.width = 1080;  // 내부 좌표계 고정
+    // 캔버스 내부 해상도 고정
+    canvas.width = 1080;  
     canvas.height = 1920; 
     
-    // CSS로 화면에 맞게 늘리기/줄이기
+    // CSS로 화면 표출 크기 조정
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
+    
+    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
 // 5. 게임 루프 (그리기)
@@ -121,19 +137,21 @@ function gameLoop() {
     ctx.fillStyle = "#1e293b"; // slate-800
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기 (이전에 만든 로직 활용)
+    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
 
-    requestAnimationFrame(gameLoop);
+    animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// [임시] 유틸리티
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// --- Helper Functions (자체 내장) ---
 
-// [수정됨] 백엔드 SoloGameSession 로직과 100% 일치
+function sleep(ms) { 
+    return new Promise(r => setTimeout(r, ms)); 
+}
+
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
@@ -143,14 +161,12 @@ function getMockMapData() {
     const offsetX = (width - (7 * unit)) / 2;
     const offsetY = (height - (5 * unit)) / 2;
 
-    // Helper: 논리 좌표 -> 픽셀 좌표
     const toPixel = (ux, uy) => ({
         x: offsetX + ux * unit,
         y: offsetY + uy * unit
     });
 
     // 1. Path (U자 형태)
-    // (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
     const logicPath = [
         {x: 0.5, y: -1.0},
         {x: 0.5, y: 3.5},
@@ -160,10 +176,9 @@ function getMockMapData() {
     const path = logicPath.map(p => toPixel(p.x, p.y));
 
     // 2. Grid (5x3)
-    // 주사위 중심: x=1.5~5.5, y=0.5~2.5
     const grid = [];
     const rows = 3, cols = 5;
-    const cellSize = unit * 0.9; // 조금 작게
+    const cellSize = unit * 0.9; 
 
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
@@ -184,15 +199,14 @@ function getMockMapData() {
     return { width, height, path, grid };
 }
 
-// [수정] drawPath: 시작점과 끝점 처리
 function drawPath(ctx, path) {
     if(path.length < 2) return;
 
     ctx.beginPath();
-    ctx.lineWidth = 100; // 길 너비 (Unit Size 140보다 작게)
+    ctx.lineWidth = 100; // 길 너비
     ctx.strokeStyle = "#334155"; // slate-700
-    ctx.lineCap = "butt"; // 끝부분 평평하게
-    ctx.lineJoin = "round"; // 코너 둥글게
+    ctx.lineCap = "butt"; 
+    ctx.lineJoin = "round"; 
 
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
@@ -211,68 +225,36 @@ function drawPath(ctx, path) {
     }
     ctx.stroke();
     ctx.setLineDash([]);
-    
-    // 시작/끝 지점 표시 (디버그용)
-    // ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
-    // ctx.beginPath(); ctx.arc(path[0].x, path[0].y, 20, 0, Math.PI*2); ctx.fill();
-    
-    // ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
-    // ctx.beginPath(); ctx.arc(path[path.length-1].x, path[path.length-1].y, 20, 0, Math.PI*2); ctx.fill();
 }
-
-// [NEW] 로딩 완료 시 UI 표시
-async function runLoadingSequence() {
-    // ... (기존 로직) ...
-    
-    // 로딩 끝난 후 UI 보이기
-    document.getElementById('ui-top').classList.remove('hidden');
-    document.getElementById('ui-bottom').classList.remove('hidden');
-    document.getElementById('ui-bottom').classList.add('flex'); // flex display 복구
-    
-    requestAnimationFrame(gameLoop);
-}
-// [NEW] 항복/디버그 함수
-window.toggleDebug = function() {
-    alert("디버그 모드 전환 (구현 예정)");
-};
-window.confirmSurrender = function() {
-    if(confirm("정말 항복하시겠습니까?")) {
-        window.location.href = 'index.html';
-    }
-};
-window.powerUp = function(index) {
-    console.log("Power Up Slot:", index);
-};
 
 function drawGrid(ctx, grid) {
-    ctx.lineWidth = 3;
-    
+    ctx.lineWidth = 4;
     grid.forEach((cell, idx) => {
-        // 슬롯 배경 (약간의 그라데이션 효과)
-        // const gradient = ctx.createLinearGradient(cell.x, cell.y, cell.x, cell.y + cell.h);
-        // gradient.addColorStop(0, "rgba(255, 255, 255, 0.08)");
-        // gradient.addColorStop(1, "rgba(255, 255, 255, 0.02)");
-        
+        // 배경
         ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
         
-        // 둥근 사각형 (Rounded Rect)
-        const r = 16; // radius
+        // 둥근 사각형 그리기 (간단 구현)
+        const r = 16; 
+        const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
+        
         ctx.beginPath();
-        ctx.roundRect(cell.x, cell.y, cell.w, cell.h, r);
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        
         ctx.fill();
         ctx.stroke();
-        
-        // 슬롯 번호 (디버깅용, 아주 흐리게)
-        // ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-        // ctx.font = "20px Arial";
-        // ctx.fillText(idx, cell.x + 10, cell.y + 30);
     });
 }
 
-// [임시] 소환 버튼 테스트
-window.spawnDice = function() {
-    console.log("Dice Spawn Requested!");
-    // 나중에 여기에 서버로 소환 요청 보내는 로직 추가
-    // socket.emit('spawn', ...);
+// UI 함수들
+window.toggleDebug = function() { alert("디버그 모드 준비중"); };
+window.confirmSurrender = function() {
+    if(confirm("정말 포기하시겠습니까?")) window.location.href = 'index.html';
 };
+window.spawnDice = function() { console.log("Spawn Request"); };
+window.powerUp = function(idx) { console.log("Power Up:", idx); };
