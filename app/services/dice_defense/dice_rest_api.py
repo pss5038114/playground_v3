@@ -1,6 +1,5 @@
 # app/services/dice_defense/dice_rest_api.py
-from fastapi import APIRouter, HTTPException, Body, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Body
 from app.core.database import get_db_connection
 from app.services.dice_defense.game_data import DICE_DATA, RARITY_ORDER, UPGRADE_RULES
 import random
@@ -17,6 +16,7 @@ RARITY_WEIGHTS = [
 ]
 
 def pick_one_dice():
+    """확률에 따라 주사위 하나를 랜덤하게 선택합니다."""
     r = random.random()
     cumulative = 0.0
     selected_rarity = "Common"
@@ -32,81 +32,20 @@ def pick_one_dice():
     
     return random.choice(candidates)
 
+# [NEW] 크리티컬 데미지 계산 헬퍼 함수
 def calculate_crit_damage_for_dice(class_level: int) -> int:
-    if class_level < 1: return 0
+    """
+    주사위 하나가 기여하는 크리티컬 데미지 계산
+    공식: 1, 1, 2, 2, 3, 3, 4... 순서로 누적
+    즉, 레벨 L까지의 sum(ceil(i/2))
+    """
+    if class_level < 1:
+        return 0
+    
     total = 0
     for i in range(1, class_level + 1):
         total += math.ceil(i / 2)
     return total
-
-# -------------------------------------------------------------------------
-# [중요] /deck/active는 /deck/{username} 보다 반드시 먼저 정의되어야 함
-# -------------------------------------------------------------------------
-@router.get("/deck/active")
-async def get_active_deck(request: Request):
-    """
-    게임 시작 시 호출. 
-    SessionMiddleware가 없으면 여기서 500 에러 발생 -> HTML 리턴 -> 클라이언트 JS 에러
-    """
-    user_id = request.session.get("user_id")
-    if not user_id:
-        # 401 에러를 주면 game.js에서 catch해서 로그인 페이지로 보낼 수 있음
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
-    
-    conn = get_db_connection()
-    try:
-        # 1. 유저의 프리셋 1번 덱 조회
-        target_preset = 1 
-        deck_row = conn.execute("""
-            SELECT slot_1, slot_2, slot_3, slot_4, slot_5 
-            FROM user_decks 
-            WHERE user_id = ? AND preset_index = ?
-        """, (user_id, target_preset)).fetchone()
-        
-        # 덱 정보가 없으면 기본 덱으로 구성
-        if not deck_row:
-            slots = ['fire', 'electric', 'wind', 'ice', 'poison']
-        else:
-            slots = [deck_row["slot_1"], deck_row["slot_2"], deck_row["slot_3"], deck_row["slot_4"], deck_row["slot_5"]]
-            
-        # 2. 덱에 포함된 주사위들의 레벨 조회
-        user_dice_rows = conn.execute("SELECT dice_id, class_level FROM user_dice WHERE user_id = ?", (user_id,)).fetchall()
-        user_dice_map = {row["dice_id"]: row["class_level"] for row in user_dice_rows}
-
-        # 3. game_data.py 정보와 합치기
-        deck_full_data = []
-        for dice_id in slots:
-            # 정적 데이터 (없으면 fire로 대체하여 에러 방지)
-            static_info = DICE_DATA.get(dice_id, DICE_DATA["fire"])
-            
-            # 유저 데이터 (없으면 1레벨)
-            level = user_dice_map.get(dice_id, 1)
-            
-            # 최종 객체 생성
-            dice_object = {
-                "id": dice_id,
-                "class_level": level,
-                "name": static_info["name"],
-                "rarity": static_info["rarity"],
-                "color": static_info["color"],
-                "symbol": static_info.get("symbol", "ri-question-mark"),
-                "desc": static_info.get("desc", ""),
-                "stats": static_info.get("stats", {}),
-            }
-            deck_full_data.append(dice_object)
-            
-        return {"deck": deck_full_data}
-        
-    except Exception as e:
-        print(f"[API ERROR] get_active_deck: {e}")
-        # 서버 로그에 에러를 찍고 500 반환
-        return JSONResponse({"error": str(e)}, status_code=500)
-    finally:
-        conn.close()
-
-# -------------------------------------------------------------------------
-# 기존 API들
-# -------------------------------------------------------------------------
 
 @router.get("/list/{username}")
 async def get_my_dice_list(username: str):
@@ -144,12 +83,17 @@ async def get_my_dice_list(username: str):
                     dice_data["class_level"] = 1
                     updates_needed.append((user_id, dice_id, 1, 0))
 
+            # 다음 레벨업 비용 계산
             curr_lv = dice_data["class_level"]
             if curr_lv < 20: 
                 rarity = info["rarity"]
                 req_gold = UPGRADE_RULES["gold"][curr_lv]
                 req_cards = UPGRADE_RULES["cards"][rarity][curr_lv]
-                dice_data["next_cost"] = {"gold": req_gold, "cards": req_cards}
+                
+                dice_data["next_cost"] = {
+                    "gold": req_gold,
+                    "cards": req_cards
+                }
 
             result.append(dice_data)
 
@@ -194,6 +138,7 @@ async def summon_dice(payload: dict = Body(...)):
                 
         conn.commit()
         
+        # [수정] 반환 데이터에 상세 정보 포함 (color, symbol 등)
         response_results = []
         for did in results_ids:
             info = DICE_DATA[did]
@@ -201,7 +146,7 @@ async def summon_dice(payload: dict = Body(...)):
                 "id": did,
                 "name": info["name"],
                 "rarity": info["rarity"],
-                "color": info["color"],
+                "color": info["color"], # 중요: 이것 때문에 에러가 났음
                 "symbol": info.get("symbol", "ri-dice-fill"),
                 "desc": info["desc"]
             })
@@ -232,7 +177,8 @@ async def upgrade_dice(payload: dict = Body(...)):
         current_level = dice_row["class_level"]
         quantity = dice_row["quantity"]
         
-        if current_level >= 20: raise HTTPException(400, "이미 최대 레벨입니다.")
+        if current_level >= 20:
+            raise HTTPException(400, "이미 최대 레벨입니다.")
         
         dice_info = DICE_DATA.get(dice_id)
         if not dice_info: raise HTTPException(400, "잘못된 주사위 ID")
@@ -241,17 +187,21 @@ async def upgrade_dice(payload: dict = Body(...)):
         req_gold = UPGRADE_RULES["gold"][current_level]
         req_cards = UPGRADE_RULES["cards"][rarity][current_level]
             
-        if quantity < req_cards: raise HTTPException(400, "카드가 부족합니다.")
-        if user["gold"] < req_gold: raise HTTPException(400, "골드가 부족합니다.")
+        if quantity < req_cards:
+            raise HTTPException(400, "카드가 부족합니다.")
+        if user["gold"] < req_gold:
+             raise HTTPException(400, "골드가 부족합니다.")
              
         conn.execute("UPDATE user_dice SET quantity = quantity - ?, class_level = class_level + 1 WHERE id = ?", (req_cards, dice_row["id"]))
         conn.execute("UPDATE users SET gold = gold - ? WHERE id = ?", (req_gold, user["id"]))
         conn.commit()
         
         return {"message": "Success", "new_level": current_level + 1}
+        
     finally:
         conn.close()
 
+# [NEW] 덱 정보 불러오기
 @router.get("/deck/{username}")
 async def get_my_deck(username: str):
     conn = get_db_connection()
@@ -260,11 +210,15 @@ async def get_my_deck(username: str):
         if not user: raise HTTPException(404, "User not found")
         
         user_id = user["id"]
+        
+        # 모든 프리셋 조회
         rows = conn.execute("SELECT * FROM user_decks WHERE user_id = ? ORDER BY preset_index ASC", (user_id,)).fetchall()
         
         decks = {}
+        # 기본 덱 (데이터가 없을 경우를 대비)
         default_deck_slots = ['fire', 'electric', 'wind', 'ice', 'poison']
         
+        # 1~7번 프리셋 확인 및 생성
         for i in range(1, 8):
             found = next((r for r in rows if r["preset_index"] == i), None)
             if found:
@@ -273,25 +227,31 @@ async def get_my_deck(username: str):
                     "slots": [found["slot_1"], found["slot_2"], found["slot_3"], found["slot_4"], found["slot_5"]]
                 }
             else:
+                # 없으면 DB에 기본값 생성
                 default_name = f"Preset {i}"
                 conn.execute("""
                     INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (user_id, i, default_name, *default_deck_slots))
                 
-                decks[i] = {"name": default_name, "slots": default_deck_slots}
+                decks[i] = {
+                    "name": default_name,
+                    "slots": default_deck_slots
+                }
         
         conn.commit()
-        return {"decks": decks}
+        return {"decks": decks} # { "1": {name:..., slots:[...]}, ... }
+            
     finally:
         conn.close()
 
+# 덱 정보 저장하기
 @router.post("/deck/save")
 async def save_my_deck(payload: dict = Body(...)):
     username = payload.get("username")
-    preset_index = payload.get("preset_index") 
+    preset_index = payload.get("preset_index") # 1~7
     deck_name = payload.get("name")
-    deck_slots = payload.get("deck")
+    deck_slots = payload.get("deck") # ["id1", ...]
     
     if not preset_index or not deck_slots or len(deck_slots) != 5:
         raise HTTPException(400, "Invalid deck format")
@@ -301,6 +261,7 @@ async def save_my_deck(payload: dict = Body(...)):
         user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if not user: raise HTTPException(404, "User not found")
         
+        # 해당 프리셋 업데이트 (INSERT OR REPLACE)
         conn.execute("""
             INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -323,24 +284,33 @@ async def get_user_stats(username: str):
     conn = get_db_connection()
     try:
         user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if not user: raise HTTPException(404, "User not found")
+        if not user:
+            raise HTTPException(404, "User not found")
         
         user_id = user["id"]
+        
+        # 1. DB에 저장된 주사위 목록 조회
         dice_rows = conn.execute("SELECT dice_id, class_level FROM user_dice WHERE user_id = ?", (user_id,)).fetchall()
         
+        # DB 데이터를 딕셔너리로 변환 { "fire": 2, "ice": 1, ... }
         user_dice_map = {row["dice_id"]: row["class_level"] for row in dice_rows}
+        
+        # 2. 기본 지급 주사위 정의
         default_dice = ['fire', 'electric', 'wind', 'ice', 'poison']
         
+        # 3. 기본 주사위가 DB에 없으면 Lv.1로 간주하고 맵에 추가
         for d_id in default_dice:
             if d_id not in user_dice_map:
-                user_dice_map[d_id] = 1 
+                user_dice_map[d_id] = 1 # 기본 1레벨
                 
-        total_crit_dmg = 100 
+        # 4. 크리티컬 데미지 계산
+        total_crit_dmg = 100 # 기본 100%
+        
         for level in user_dice_map.values():
             total_crit_dmg += calculate_crit_damage_for_dice(level)
             
         return {
-            "crit_rate": 5,
+            "crit_rate": 5, # 5% 고정
             "crit_damage": total_crit_dmg
         }
     finally:

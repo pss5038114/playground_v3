@@ -5,23 +5,28 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
-let userDeck = []; // [중요] 서버에서 가져온 완전한 주사위 데이터 객체 배열
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
     console.log("Game Script Loaded.");
     
+    // URL 파라미터 확인 (mode)
     const urlParams = new URLSearchParams(window.location.search);
     currentMode = urlParams.get('mode') || 'solo';
     console.log(`Initializing game in [${currentMode}] mode...`);
 
+    // 이탈 방지 이벤트 등록
     setupLeaveWarning();
+
+    // 캔버스 크기 설정
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
+    // 로딩 시퀀스 시작
     await runLoadingSequence();
 };
 
+// 2. 이탈 방지 (뒤로가기/새로고침 경고)
 function setupLeaveWarning() {
     window.addEventListener('beforeunload', (event) => {
         event.preventDefault();
@@ -30,177 +35,134 @@ function setupLeaveWarning() {
     });
 }
 
-// 2. 로딩 시뮬레이션
+// 3. 로딩 시뮬레이션
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
+    const uiTop = document.getElementById('ui-top');
+    const uiBottom = document.getElementById('ui-bottom');
     
     try {
         updateLoading(10, "Connecting to server...");
-        await sleep(300);
-
-        updateLoading(30, "Fetching map data...");
-        gameMap = getMockMapData(); 
-        await sleep(300);
-
-        // 덱 데이터 불러오기 (서버 원본 데이터 사용)
-        updateLoading(50, "Loading User Deck...");
-        await fetchUserDeck(); 
-        
-        // 덱 데이터가 준비되면 하단 UI 렌더링
-        if (userDeck && userDeck.length > 0) {
-            renderBottomDeckSlots(); 
-        } else {
-            console.error("User Deck is empty!");
-        }
+        // TODO: 웹소켓 연결 로직
         await sleep(500);
 
-        updateLoading(80, "Synchronizing...");
-        await sleep(400);
+        updateLoading(40, "Fetching map data...");
+        // 서버 데이터 모의 (여기서 맵 데이터 생성)
+        gameMap = getMockMapData(); 
+        await sleep(500);
 
-        updateLoading(100, "Ready!");
-        await sleep(200);
+        updateLoading(70, "Loading resources...");
+        // TODO: 이미지 프리로딩
+        await sleep(800);
 
-        // 로딩 화면 제거
-        if(loadingScreen) {
-            loadingScreen.style.opacity = '0';
-            setTimeout(() => loadingScreen.style.display = 'none', 500);
+        updateLoading(100, "Ready to Battle!");
+        await sleep(300);
+
+        // 로딩 화면 제거 & UI 표시
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.pointerEvents = 'none';
+        
+        setTimeout(() => {
+            loadingScreen.style.display = 'none'; // 완전히 가리기
+        }, 500);
+
+        // 인게임 UI 보이기
+        if(uiTop) uiTop.classList.remove('hidden');
+        if(uiBottom) {
+            uiBottom.classList.remove('hidden');
+            uiBottom.classList.add('flex');
         }
 
         console.log("Game Loop Starting...");
+        // 게임 루프 시작
         requestAnimationFrame(gameLoop);
 
     } catch (e) {
         console.error("Loading Failed:", e);
         alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
-        window.location.href = 'index.html'; 
+        window.location.href = 'index.html'; // 로비로 강제 이동
     }
 }
 
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
-    const txt = document.querySelector('#game-loading h2');
+    const txt = document.getElementById('loading-text');
     if(bar) bar.style.width = `${percent}%`;
-    if(txt && text) txt.innerText = text;
+    if(txt) txt.innerText = text;
 }
 
-// 3. 덱 데이터 가져오기 (API 연동 - 원본 데이터 사용)
-async function fetchUserDeck() {
-    try {
-        // dice_rest_api.py의 get_active_deck 호출
-        // 이 API는 game_data.py의 모든 정보를 포함한 완성된 객체를 반환함
-        const res = await fetch('/api/dice/deck/active');
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-        
-        const data = await res.json();
-        if (data.deck && Array.isArray(data.deck)) {
-            userDeck = data.deck;
-            console.log("Deck loaded successfully:", userDeck);
-        } else {
-            throw new Error("Invalid deck data format");
-        }
-    } catch (err) {
-        console.error("Failed to fetch user deck:", err);
-        alert("덱 정보를 불러오는데 실패했습니다. 네트워크를 확인해주세요.");
-        // 오류 발생 시 게임 진행 불가 처리 (빈 배열 유지)
-        userDeck = [];
-    }
-}
-
-// [수정됨] 하단 덱 슬롯 렌더링 (utils.js의 renderDiceIcon 사용)
-function renderBottomDeckSlots() {
-    const slots = document.querySelectorAll('.dice-slot');
-    
-    userDeck.forEach((dice, index) => {
-        if (index >= slots.length) return;
-        const slot = slots[index];
-        
-        // 1. 기존 슬롯 스타일 초기화
-        slot.className = 'dice-slot relative w-full h-full flex items-center justify-center rounded-xl overflow-hidden';
-        slot.style = ""; 
-        
-        // 2. utils.js의 renderDiceIcon 함수 사용
-        // (dice 객체는 이미 server에서 올바른 color, rarity, symbol 값을 가지고 있음)
-        const iconHtml = renderDiceIcon(dice, "w-full h-full");
-        
-        // 3. 레벨 표시 (카드 위에 오버레이)
-        const levelHtml = `
-            <div class="absolute bottom-0 right-0 bg-black/60 backdrop-blur-[2px] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-tl-lg z-20 pointer-events-none">
-                Lv.${dice.class_level}
-            </div>
-        `;
-        
-        // 4. 슬롯에 주입
-        slot.innerHTML = iconHtml + levelHtml;
-        
-        // 클릭 효과 (디버그용 정보 출력)
-        slot.onclick = () => {
-             console.log(`Selected dice info:`, dice);
-             // 예: dice.stats.atk 등을 바로 확인 가능
-        };
-    });
-}
-
-function getFallbackIcon(id) {
-    // 이제 서버에서 symbol을 보내주므로 거의 사용되지 않음
-    return 'ri-question-mark';
-}
-
-// 4. 캔버스 설정
+// 4. 캔버스 설정 (반응형)
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
-    const container = document.getElementById('game-container');
+    const container = document.getElementById('game-container'); // 변경점: 컨테이너 기준
     
     if(!canvas || !container) return;
     ctx = canvas.getContext('2d');
 
+    // 컨테이너의 현재 크기 가져오기
     const w = container.clientWidth;
     const h = container.clientHeight;
+
+    // 게임 내부 해상도 (9:16 비율)
     const targetRatio = 1080 / 1920;
     const containerRatio = w / h;
 
     let finalW, finalH;
 
+    // 비율에 맞춰 꽉 차게 계산 (Letterboxing)
     if (containerRatio > targetRatio) {
+        // 컨테이너가 더 납작함 -> 높이에 맞춤
         finalH = h;
         finalW = h * targetRatio;
     } else {
+        // 컨테이너가 더 길쭉함 -> 너비에 맞춤
         finalW = w;
         finalH = w / targetRatio;
     }
 
+    // 캔버스 내부 해상도는 고정 (선명도 유지)
     canvas.width = 1080;  
     canvas.height = 1920; 
     
+    // 화면 표시 크기 (CSS)
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
 }
 
-// 5. 게임 루프 (그리기)
+// 5. 게임 루프 (그리기) - 색상 변경됨
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경: 밝은 회색
+    // 배경 클리어 & 다시 그리기
     ctx.clearRect(0, 0, 1080, 1920);
+    
+    // [수정됨] 배경색: 약간 밝은 회색 (Gray-100 / Slate-50)
     ctx.fillStyle = "#f3f4f6"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
+    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
     
+    // (여기에 나중에 몬스터, 주사위 그리기 추가됨)
+
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// --- Helper Functions ---
+// --- Helper Functions (자체 내장) ---
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms) { 
+    return new Promise(r => setTimeout(r, ms)); 
+}
 
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
-    const unit = 140;
+    const unit = 140; // 1 단위 크기
     
+    // 중앙 정렬 오프셋
     const offsetX = (width - (7 * unit)) / 2;
     const offsetY = (height - (5 * unit)) / 2;
 
@@ -209,14 +171,16 @@ function getMockMapData() {
         y: offsetY + uy * unit
     });
 
+    // [수정] Path (역 U자 형태 '∩' - 화면 하단 시작/종료)
     const logicPath = [
-        {x: 0.5, y: 4.0}, 
-        {x: 0.5, y: -0.5},
-        {x: 6.5, y: -0.5},
-        {x: 6.5, y: 4.0} 
+        {x: 0.5, y: 4.0},  // Start (왼쪽 하단)
+        {x: 0.5, y: -0.5}, // Corner 1 (왼쪽 상단)
+        {x: 6.5, y: -0.5}, // Corner 2 (오른쪽 상단)
+        {x: 6.5, y: 4.0}   // End (오른쪽 하단)
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
 
+    // 2. Grid (5x3)
     const grid = [];
     const rows = 3, cols = 5;
     const cellSize = unit * 0.9; 
@@ -243,10 +207,12 @@ function getMockMapData() {
 function drawPath(ctx, path) {
     if(path.length < 2) return;
 
+    // 1. 도로 (Road)
     ctx.beginPath();
-    ctx.lineWidth = 100;
-    ctx.strokeStyle = "#d1d5db"; // 밝은 회색 길
-    ctx.lineCap = "butt"; 
+    ctx.lineWidth = 100; // 길 너비
+    // [수정됨] 도로 색상: 회색 (Gray-300) - 배경보다 조금 더 어둡게
+    ctx.strokeStyle = "#d1d5db"; 
+    ctx.lineCap = "butt"; // 튀어나옴 방지 유지
     ctx.lineJoin = "round"; 
 
     ctx.moveTo(path[0].x, path[0].y);
@@ -255,11 +221,14 @@ function drawPath(ctx, path) {
     }
     ctx.stroke();
     
-    // 파란색 실선 중앙선
+    // 2. 중앙선 (Center Line)
     ctx.beginPath();
     ctx.lineWidth = 4;
+    // [수정됨] 선 색상: 파란색 (Blue-500)
     ctx.strokeStyle = "#3b82f6";
-    ctx.setLineDash([]);
+    // [수정됨] 실선으로 변경 (점선 해제)
+    ctx.setLineDash([]); 
+    
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
         ctx.lineTo(path[i].x, path[i].y);
@@ -268,13 +237,14 @@ function drawPath(ctx, path) {
 }
 
 function drawGrid(ctx, grid) {
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2; // 선 두께 약간 줄임
     grid.forEach((cell, idx) => {
-        // 슬롯 배경: 흰색
+        // [수정됨] 슬롯 배경: 밝은 흰색
         ctx.fillStyle = "#ffffff";
-        // 슬롯 테두리: 연한 회색
+        // [수정됨] 슬롯 테두리: 연한 회색
         ctx.strokeStyle = "#e5e7eb";
         
+        // 둥근 사각형 그리기
         const r = 16; 
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
         
@@ -286,12 +256,14 @@ function drawGrid(ctx, grid) {
         ctx.arcTo(x, y, x + w, y, r);
         ctx.closePath();
         
+        // 그림자 효과 살짝 (선택사항)
         ctx.shadowColor = "rgba(0,0,0,0.05)";
         ctx.shadowBlur = 4;
         ctx.shadowOffsetY = 2;
         
         ctx.fill();
         
+        // 그림자 끄고 테두리 그리기
         ctx.shadowColor = "transparent";
         ctx.stroke();
     });
