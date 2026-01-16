@@ -39,20 +39,21 @@ def calculate_crit_damage_for_dice(class_level: int) -> int:
     """
     if class_level < 1:
         return 0
-    
     total = 0
     for i in range(1, class_level + 1):
         total += math.ceil(i / 2)
     return total
 
 # -------------------------------------------------------------------------
-# [NEW] 전투 로딩 시 사용: 현재 장착된 덱(Preset 1) 가져오기
+# [수정됨] 전투 로딩 시 사용: 현재 장착된 덱(Preset 1)의 '완전한 정보' 가져오기
 # -------------------------------------------------------------------------
 @router.get("/deck/active")
 async def get_active_deck(request: Request):
     """
-    게임 시작 시 로딩 화면에서 호출됩니다.
-    현재 유저가 선택한(혹은 1번) 프리셋의 주사위 정보를 반환합니다.
+    게임 시작 시 호출.
+    1. DB에서 유저의 덱 구성(Slot 1~5)을 가져옵니다.
+    2. DB에서 해당 주사위들의 보유 레벨(Class Level)을 가져옵니다.
+    3. game_data.py의 정적 데이터(Stats, Color, Symbol 등)와 병합하여 반환합니다.
     """
     user_id = request.session.get("user_id")
     if not user_id:
@@ -60,39 +61,50 @@ async def get_active_deck(request: Request):
     
     conn = get_db_connection()
     try:
-        # 1. 유저의 Active 덱 인덱스를 가져와야 하지만, 
-        #    지금은 요청하신 대로 'Preset 1'을 기본으로 사용합니다.
-        #    (추후 users 테이블에 active_deck_index 컬럼이 있다면 그걸 조회하도록 수정 가능)
+        # 1. 덱 정보 조회 (일단 Preset 1번 고정, 추후 active_deck 컬럼 추가 시 변경 가능)
         target_preset = 1 
-
-        # 2. user_decks 테이블에서 조회
-        row = conn.execute("""
+        deck_row = conn.execute("""
             SELECT slot_1, slot_2, slot_3, slot_4, slot_5 
             FROM user_decks 
             WHERE user_id = ? AND preset_index = ?
         """, (user_id, target_preset)).fetchone()
         
-        # 3. DB에 덱 정보가 없으면 기본 덱(불,전기,바람,얼음,독) 사용
-        if not row:
+        # 덱이 없으면 기본 덱 설정
+        if not deck_row:
             slots = ['fire', 'electric', 'wind', 'ice', 'poison']
         else:
-            slots = [row["slot_1"], row["slot_2"], row["slot_3"], row["slot_4"], row["slot_5"]]
+            slots = [deck_row["slot_1"], deck_row["slot_2"], deck_row["slot_3"], deck_row["slot_4"], deck_row["slot_5"]]
             
-        # 4. 클라이언트가 렌더링하기 좋게 데이터 가공 (색상, 심볼 포함)
-        deck_list = []
+        # 2. 보유 주사위 레벨 조회 (덱에 포함된 주사위만)
+        # placeholders = ','.join(['?'] * len(slots))
+        # 쿼리 복잡도를 줄이기 위해 전체 조회 후 매핑하거나, 반복문 사용 (데이터가 적으므로 전체 조회가 나음)
+        user_dice_rows = conn.execute("SELECT dice_id, class_level FROM user_dice WHERE user_id = ?", (user_id,)).fetchall()
+        user_dice_map = {row["dice_id"]: row["class_level"] for row in user_dice_rows}
+
+        # 3. 데이터 병합 (Full Object 생성)
+        deck_full_data = []
         for dice_id in slots:
-            # DICE_DATA에서 정보 조회 (없는 ID일 경우 기본값 fire 처리)
-            info = DICE_DATA.get(dice_id, DICE_DATA["fire"])
+            # game_data.py에서 정적 데이터 가져오기
+            static_info = DICE_DATA.get(dice_id, DICE_DATA["fire"]) # fallback to fire safely
             
-            deck_list.append({
+            # DB에서 레벨 가져오기 (없으면 1레벨)
+            level = user_dice_map.get(dice_id, 1)
+            
+            # 모든 정보 합치기
+            dice_object = {
                 "id": dice_id,
-                "name": info["name"],
-                "color": info["color"], # UI 렌더링에 필수
-                "rarity": info["rarity"],
-                "symbol": info.get("symbol", "ri-question-mark") # 아이콘 클래스
-            })
+                "class_level": level,
+                # 아래는 game_data.py의 모든 속성을 그대로 전달
+                "name": static_info["name"],
+                "rarity": static_info["rarity"],
+                "color": static_info["color"], # e.g., "bg-red-500"
+                "symbol": static_info.get("symbol", "ri-question-mark"),
+                "desc": static_info.get("desc", ""),
+                "stats": static_info.get("stats", {}), # atk, speed 등 상세 스탯 포함
+            }
+            deck_full_data.append(dice_object)
             
-        return {"deck": deck_list}
+        return {"deck": deck_full_data}
         
     except Exception as e:
         print(f"[Error] get_active_deck: {e}")
@@ -101,7 +113,7 @@ async def get_active_deck(request: Request):
         conn.close()
 
 # -------------------------------------------------------------------------
-# 기존 API 유지
+# (기존 API 코드들 유지...)
 # -------------------------------------------------------------------------
 
 @router.get("/list/{username}")

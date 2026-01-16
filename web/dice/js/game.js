@@ -5,7 +5,7 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
-let userDeck = []; // 덱 데이터
+let userDeck = []; // [중요] 서버에서 가져온 완전한 주사위 데이터 객체 배열
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
@@ -42,10 +42,16 @@ async function runLoadingSequence() {
         gameMap = getMockMapData(); 
         await sleep(300);
 
-        // 덱 데이터 불러오기
+        // 덱 데이터 불러오기 (서버 원본 데이터 사용)
         updateLoading(50, "Loading User Deck...");
         await fetchUserDeck(); 
-        renderBottomDeckSlots(); // [중요] 주사위 그리기 (흰색 바탕+아이콘)
+        
+        // 덱 데이터가 준비되면 하단 UI 렌더링
+        if (userDeck && userDeck.length > 0) {
+            renderBottomDeckSlots(); 
+        } else {
+            console.error("User Deck is empty!");
+        }
         await sleep(500);
 
         updateLoading(80, "Synchronizing...");
@@ -72,97 +78,71 @@ async function runLoadingSequence() {
 
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
-    const txt = document.querySelector('#game-loading h2'); // 텍스트 요소 찾기
+    const txt = document.querySelector('#game-loading h2');
     if(bar) bar.style.width = `${percent}%`;
     if(txt && text) txt.innerText = text;
 }
 
-// 3. 덱 데이터 가져오기 (API 연동)
+// 3. 덱 데이터 가져오기 (API 연동 - 원본 데이터 사용)
 async function fetchUserDeck() {
     try {
-        // 실제 API 호출 (dice_rest_api.py와 연동)
+        // dice_rest_api.py의 get_active_deck 호출
+        // 이 API는 game_data.py의 모든 정보를 포함한 완성된 객체를 반환함
         const res = await fetch('/api/dice/deck/active');
-        if (res.ok) {
-            const data = await res.json();
-            if (data.deck) {
-                userDeck = data.deck;
-                console.log("Deck loaded:", userDeck);
-                return;
-            }
+        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+        
+        const data = await res.json();
+        if (data.deck && Array.isArray(data.deck)) {
+            userDeck = data.deck;
+            console.log("Deck loaded successfully:", userDeck);
+        } else {
+            throw new Error("Invalid deck data format");
         }
-        throw new Error("API response invalid");
     } catch (err) {
-        console.warn("Failed to fetch deck from API, using mock data:", err);
-        // Fallback: 모의 데이터 (테스트용)
-        userDeck = [
-            { id: 'fire', name: 'Fire', color: '#ef4444', symbol: 'ri-fire-fill' },     
-            { id: 'electric', name: 'Electric', color: '#eab308', symbol: 'ri-flashlight-fill' }, 
-            { id: 'wind', name: 'Wind', color: '#10b981', symbol: 'ri-windy-fill' },     
-            { id: 'ice', name: 'Ice', color: '#3b82f6', symbol: 'ri-snowflake-fill' },       
-            { id: 'poison', name: 'Poison', color: '#a855f7', symbol: 'ri-skull-2-fill' }  
-        ];
+        console.error("Failed to fetch user deck:", err);
+        alert("덱 정보를 불러오는데 실패했습니다. 네트워크를 확인해주세요.");
+        // 오류 발생 시 게임 진행 불가 처리 (빈 배열 유지)
+        userDeck = [];
     }
 }
 
-// [수정됨] 하단 덱 슬롯 렌더링 (흰색 바탕 + 색상 테두리 + 아이콘)
+// [수정됨] 하단 덱 슬롯 렌더링 (utils.js의 renderDiceIcon 사용)
 function renderBottomDeckSlots() {
     const slots = document.querySelectorAll('.dice-slot');
     
     userDeck.forEach((dice, index) => {
         if (index >= slots.length) return;
-        
         const slot = slots[index];
-        // 기존 내용(Lv.1 텍스트 등) 유지하면서 스타일 변경
         
-        // 1. 스타일 초기화 (기존 클래스 영향 제거)
-        slot.className = 'aspect-square rounded-lg relative dice-slot flex items-center justify-center group transition-all duration-200';
+        // 1. 기존 슬롯 스타일 초기화
+        slot.className = 'dice-slot relative w-full h-full flex items-center justify-center rounded-xl overflow-hidden';
+        slot.style = ""; 
         
-        // 2. [수정] 흰색 배경 & 색상 테두리 적용 (4cc143 스타일)
-        slot.style.backgroundColor = '#ffffff'; // 흰색 바탕
-        slot.style.border = `2px solid ${dice.color}`; // 주사위 색상 테두리
-        slot.style.boxShadow = `0 2px 5px rgba(0,0,0,0.1)`; // 살짝 그림자
-
-        // 3. 아이콘 추가 (주사위 눈 대신)
-        // 기존 아이콘이 있다면 제거
-        const oldIcon = slot.querySelector('i');
-        if(oldIcon) oldIcon.remove();
-
-        // 새 아이콘 생성
-        const iconClass = dice.symbol || getFallbackIcon(dice.id);
-        const iconEl = document.createElement('i');
+        // 2. utils.js의 renderDiceIcon 함수 사용
+        // (dice 객체는 이미 server에서 올바른 color, rarity, symbol 값을 가지고 있음)
+        const iconHtml = renderDiceIcon(dice, "w-full h-full");
         
-        // [수정] 아이콘 색상을 주사위 색상으로 설정
-        iconEl.className = `${iconClass} text-3xl`; // 크기 키움
-        iconEl.style.color = dice.color; // 아이콘 색상 = 주사위 색상
+        // 3. 레벨 표시 (카드 위에 오버레이)
+        const levelHtml = `
+            <div class="absolute bottom-0 right-0 bg-black/60 backdrop-blur-[2px] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-tl-lg z-20 pointer-events-none">
+                Lv.${dice.class_level}
+            </div>
+        `;
         
-        // 슬롯에 추가 (맨 뒤로 보내지 않고 중앙 배치)
-        slot.appendChild(iconEl);
+        // 4. 슬롯에 주입
+        slot.innerHTML = iconHtml + levelHtml;
         
-        // 4. 레벨 텍스트 스타일 조정 (가독성 확보)
-        const levelSpan = slot.querySelector('span');
-        if(levelSpan) {
-            levelSpan.className = 'absolute bottom-0.5 right-1 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity';
-            levelSpan.style.color = '#64748b'; // slate-500
-            // 아이콘과 겹치지 않게 호버 시에만 보이거나 구석으로 이동
-        }
-        
-        // 클릭 효과
+        // 클릭 효과 (디버그용 정보 출력)
         slot.onclick = () => {
-             // 덱 선택 로직 (필요 시 구현)
-             console.log(`Selected dice: ${dice.name}`);
+             console.log(`Selected dice info:`, dice);
+             // 예: dice.stats.atk 등을 바로 확인 가능
         };
     });
 }
 
 function getFallbackIcon(id) {
-    switch(id) {
-        case 'fire': return 'ri-fire-fill';
-        case 'electric': return 'ri-flashlight-fill';
-        case 'wind': return 'ri-windy-fill';
-        case 'ice': return 'ri-snowflake-fill';
-        case 'poison': return 'ri-skull-2-fill';
-        default: return 'ri-question-mark';
-    }
+    // 이제 서버에서 symbol을 보내주므로 거의 사용되지 않음
+    return 'ri-question-mark';
 }
 
 // 4. 캔버스 설정
