@@ -103,7 +103,7 @@ class DiceRoomManager:
         if room_code in self._rooms:
             self._rooms[room_code].stop()
             del self._rooms[room_code]
-            print(f"=== Room Removed: {code} ===")
+            print(f"=== Room Removed: {room_code} ===")
 
 # 전역 인스턴스
 room_manager = DiceRoomManager()
