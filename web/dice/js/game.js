@@ -133,27 +133,43 @@ function gameLoop() {
 // [임시] 유틸리티
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// [수정됨] 백엔드 로직과 싱크를 맞춘 7x4 맵 데이터
 function getMockMapData() {
-    // Solo 모드 맵 데이터 (서버 game.py와 일치시킴)
+    const width = 1080;
+    const height = 1920;
+    
+    // Grid (7x4)
     const grid = [];
-    const rows = 3, cols = 5;
-    const startX = 140, startY = 1350;
-    const size = 160, gap = 20;
+    const rows = 4, cols = 7;
+    const cell_size = 125, gap = 15;
+    
+    const total_w = cols * cell_size + (cols - 1) * gap;
+    const startX = (width - total_w) / 2;
+    const startY = 1350;
     
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
-            grid.push({ x: startX + c*(size+gap), y: startY + r*(size+gap), w: size, h: size });
+            grid.push({
+                index: r*cols + c,
+                x: startX + c*(cell_size+gap),
+                y: startY + r*(cell_size+gap),
+                w: cell_size, h: cell_size
+            });
         }
     }
     
-    return {
-        path: [
-            {x: 100, y: -50}, {x: 100, y: 400}, {x: 980, y: 400},
-            {x: 980, y: 800}, {x: 100, y: 800}, {x: 100, y: 1200},
-            {x: 980, y: 1200}, {x: 980, y: 2000}
-        ],
-        grid: grid
-    };
+    // Path (심플한 U자 + 중앙 관통형)
+    // 몬스터가 그리드 사이를 지나가게 하여 긴장감 조성
+    const path = [
+        {x: 100, y: -100},    // 시작
+        {x: 100, y: 1200},    // 좌측 하단으로 내려옴
+        {x: 980, y: 1200},    // 우측으로 횡단 (그리드 바로 위)
+        {x: 980, y: 300},     // 우측 상단으로 올라감
+        {x: 540, y: 300},     // 중앙으로 이동
+        {x: 540, y: 2000}     // 중앙을 가로질러 아래로 골인 (End)
+    ];
+    
+    return { width, height, path, grid };
 }
 
 function drawPath(ctx, path) {
@@ -176,12 +192,28 @@ function drawPath(ctx, path) {
 }
 
 function drawGrid(ctx, grid) {
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
+    
     grid.forEach((cell, idx) => {
+        // 슬롯 배경 (약간의 그라데이션 효과)
+        // const gradient = ctx.createLinearGradient(cell.x, cell.y, cell.x, cell.y + cell.h);
+        // gradient.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+        // gradient.addColorStop(1, "rgba(255, 255, 255, 0.02)");
+        
         ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
-        ctx.strokeRect(cell.x, cell.y, cell.w, cell.h);
+        
+        // 둥근 사각형 (Rounded Rect)
+        const r = 16; // radius
+        ctx.beginPath();
+        ctx.roundRect(cell.x, cell.y, cell.w, cell.h, r);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 슬롯 번호 (디버깅용, 아주 흐리게)
+        // ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+        // ctx.font = "20px Arial";
+        // ctx.fillText(idx, cell.x + 10, cell.y + 30);
     });
 }
 
