@@ -4,30 +4,46 @@ import string
 import json
 from typing import Dict, List, Optional
 from fastapi import WebSocket
-
-# 추후 구현할 실제 게임 로직(SoloGameLogic)을 import
-# from .modes.solo.game import SoloGameLogic 
+from app.core.global_ticker import ticker  # [중요] Global Ticker 가져오기
 
 class DiceGameRoom:
     """
-    개별 게임 방 클래스
-    - 게임 상태(Logic)와 연결된 플레이어(Socket)를 관리
-    - 자체적인 틱(Tick) 루프를 돌림
+    게임 방 (Session)
+    - GlobalTicker에 의해 주기적으로 update()가 호출됨.
+    - 입력(WebSocket)은 비동기로 받고, 처리는 update()에서 동기로 수행.
     """
     def __init__(self, room_code: str, mode: str):
         self.room_code = room_code
-        self.mode = mode
-        self.active_connections: List[WebSocket] = []  # 이 방에 접속한 소켓들
-        self.players: Dict[str, dict] = {} # user_id -> player_info (spectator 여부 등)
-        self.game_logic = None  # TODO: SoloGameLogic() 등으로 초기화
-        self.is_running = False
-        self._task = None
+        self.mode = mode  # 'solo', 'coop', 'pvp'
+        self.active_connections: List[WebSocket] = []
+        self.players: Dict[str, dict] = {} 
+        
+        # 게임 상태 관리
+        self.game_state = {
+            "tick": 0,
+            "wave": 1,
+            "enemies": [],
+            # 추후 여기에 map, dice_towers 등 추가
+        }
+        
+        self.input_queue = asyncio.Queue() # 유저 입력을 쌓아두는 큐
 
     async def connect(self, websocket: WebSocket, user_id: str):
         await websocket.accept()
         self.active_connections.append(websocket)
-        self.players[user_id] = {"id": user_id, "is_spectator": False}
-        print(f"[{self.room_code}] User {user_id} Connected. Total: {len(self.active_connections)}")
+        
+        # 플레이어 정보 등록
+        self.players[user_id] = {
+            "id": user_id, 
+            "conn": websocket,
+            "sp": 100,
+            "deck": [] # 추후 DB에서 로드
+        }
+        print(f"[{self.room_code}] User {user_id} Connected. (Mode: {self.mode})")
+
+        # [멀티플레이 대응] 2명이 다 차면 게임 시작 신호 등을 보낼 수 있음
+        if self.mode == 'pvp' and len(self.players) == 2:
+             await self.broadcast({"type": "NOTICE", "msg": "모든 플레이어가 입장했습니다. 게임 준비!"})
 
     def disconnect(self, websocket: WebSocket, user_id: str):
         if websocket in self.active_connections:
@@ -37,66 +53,82 @@ class DiceGameRoom:
         print(f"[{self.room_code}] User {user_id} Disconnected.")
 
     async def broadcast(self, message: dict):
-        """방에 있는 모든 사람에게 메시지 전송 (관전/플레이어 공통)"""
+        """접속된 모든 클라이언트에게 메시지 전송"""
         if not self.active_connections:
             return
             
+        # JSON 직렬화 최소화 (성능 최적화)
         json_msg = json.dumps(message)
+        to_remove = []
+        
         for connection in self.active_connections:
             try:
                 await connection.send_text(json_msg)
             except Exception:
-                # 연결 끊긴 소켓은 추후 정리됨
-                pass
+                to_remove.append(connection)
+        
+        # 죽은 연결 정리
+        for dead_conn in to_remove:
+            if dead_conn in self.active_connections:
+                self.active_connections.remove(dead_conn)
 
-    async def start_game_loop(self):
-        """이 방만의 독립적인 게임 루프 시작 (30FPS)"""
-        self.is_running = True
-        self._task = asyncio.create_task(self._game_loop())
+    async def push_action(self, user_id: str, action: dict):
+        """유저의 행동(소환, 합성 등)을 큐에 넣음 (비동기 -> 동기 변환용)"""
+        await self.input_queue.put({"user_id": user_id, "action": action})
 
-    async def _game_loop(self):
-        print(f"[{self.room_code}] Game Loop Started.")
-        try:
-            while self.is_running:
-                # 1. 게임 로직 업데이트 (예: 몬스터 이동, 타워 공격)
-                # if self.game_logic:
-                #     self.game_logic.update()
-                #     state = self.game_logic.get_state()
-                #     await self.broadcast({"type": "GAME_STATE", "data": state})
+    async def update(self):
+        """
+        [GlobalTicker에 의해 30Hz로 호출됨]
+        1. 쌓인 유저 입력 처리
+        2. 게임 로직 업데이트 (이동, 충돌, 공격)
+        3. 변경된 상태 브로드캐스트
+        """
+        self.game_state["tick"] += 1
+        
+        # 1. 입력 처리 (이번 틱에 들어온 요청들 처리)
+        while not self.input_queue.empty():
+            item = await self.input_queue.get()
+            uid = item['user_id']
+            act = item['action']
+            
+            # 예: 소환 요청 처리
+            if act.get('type') == 'SPAWN':
+                # TODO: SP 체크 및 주사위 생성 로직
+                print(f"[{self.game_state['tick']}] {uid} 소환 요청 처리")
+                await self.broadcast({"type": "EFFECT", "name": "spawn", "user": uid})
 
-                # (임시) 테스트용 틱 전송
-                # await self.broadcast({"type": "TICK", "timestamp": asyncio.get_event_loop().time()})
+        # 2. 게임 로직 (몬스터 이동, 타워 공격 등)
+        # if self.game_logic:
+        #     self.game_logic.tick()
 
-                await asyncio.sleep(0.033)  # 약 30 FPS
-        except asyncio.CancelledError:
-            print(f"[{self.room_code}] Game Loop Cancelled.")
-        finally:
-            print(f"[{self.room_code}] Game Loop Stopped.")
-
-    def stop(self):
-        self.is_running = False
-        if self._task:
-            self._task.cancel()
+        # 3. 상태 전송 (최적화를 위해 매 틱마다 보내지 않고, 중요 이벤트나 0.1초마다 보낼 수도 있음)
+        # 지금은 테스트를 위해 30틱(1초)마다 전송
+        if self.game_state["tick"] % 30 == 0:
+            await self.broadcast({
+                "type": "TICK",
+                "tick": self.game_state["tick"],
+                "wave": self.game_state["wave"]
+            })
 
 class DiceRoomManager:
-    """
-    모든 주사위 게임 방을 관리하는 매니저 (Singleton)
-    """
     def __init__(self):
         self._rooms: Dict[str, DiceGameRoom] = {}
 
     def create_room(self, mode: str = "solo") -> str:
-        # 6자리 랜덤 대문자/숫자 코드 생성
+        # 1. 방 코드 생성
         while True:
             chars = string.ascii_uppercase + string.digits
             code = ''.join(secrets.choice(chars) for _ in range(6))
             if code not in self._rooms:
-                new_room = DiceGameRoom(code, mode)
-                self._rooms[code] = new_room
-                # 방 생성과 동시에 게임 루프 시작 (또는 플레이어 입장 시 시작하도록 변경 가능)
-                asyncio.create_task(new_room.start_game_loop())
-                print(f"=== Dice Room Created: {code} ===")
-                return code
+                break
+        
+        # 2. 방 생성 및 GlobalTicker에 등록
+        new_room = DiceGameRoom(code, mode)
+        self._rooms[code] = new_room
+        ticker.subscribe(new_room)  # <--- [핵심] 티커에 구독!
+        
+        print(f"=== Room Created: {code} (Mode: {mode}) ===")
+        return code
 
     def get_room(self, room_code: str) -> Optional[DiceGameRoom]:
         return self._rooms.get(room_code)
@@ -104,9 +136,8 @@ class DiceRoomManager:
     def remove_room(self, room_code: str):
         if room_code in self._rooms:
             room = self._rooms[room_code]
-            room.stop() # 루프 정지
+            ticker.unsubscribe(room) # <--- [핵심] 티커 구독 해제!
             del self._rooms[room_code]
-            print(f"=== Dice Room Deleted: {room_code} ===")
+            print(f"=== Room Deleted: {room_code} ===")
 
-# 전역 인스턴스 (API에서 import해서 사용)
 room_manager = DiceRoomManager()
