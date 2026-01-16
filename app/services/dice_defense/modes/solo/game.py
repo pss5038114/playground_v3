@@ -11,46 +11,54 @@ class SoloGameSession:
         # 여유를 두고 140px로 설정
         self.unit = 140
         
-        # 맵 시작점 (화면 중앙 정렬을 위한 오프셋)
-        # 전체 맵 높이(약 4.5유닛)를 고려하여 세로 중앙 배치
-        self.offset_x = (self.width - (7 * self.unit)) // 2  # 가로 중앙
-        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙 (약간 위쪽?)
+        # 보드 행 개수 (세로 4칸 기준) - 좌표 반전을 위해 필요
+        self.board_rows = 4
         
-        # 1. 몬스터 이동 경로 (U자 형태)
-        # (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
+        # 맵 시작점 (화면 중앙 정렬을 위한 오프셋)
+        self.offset_x = (self.width - (7 * self.unit)) // 2 
+        self.offset_y = (self.height - (self.board_rows * self.unit)) // 2 
+        
+        # 1. 몬스터 이동 경로 (역 U자 / n자 형태)
+        # 좌표계 기준: 좌하단이 (0,0)
+        # Start(0.5, 0) -> Up(0.5, 3.5) -> Right(6.5, 3.5) -> Down(6.5, 0)
         self.path = [
-            {'x': 0.5, 'y': -1.0}, # Start (화면 위)
-            {'x': 0.5, 'y': 3.5},  # 좌측 하단 코너
-            {'x': 6.5, 'y': 3.5},  # 우측 하단 코너
-            {'x': 6.5, 'y': -1.0}, # End (방어선)
+            {'x': 0.5, 'y': 0.0}, 
+            {'x': 0.5, 'y': 3.5},  
+            {'x': 6.5, 'y': 3.5},  
+            {'x': 6.5, 'y': 0.0}, 
         ]
         # 실제 픽셀 좌표로 변환하여 저장
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
         
         # 2. 주사위 배치 그리드 (5x3)
-        # x: 1.5 ~ 5.5, y: 0.5 ~ 2.5
         self.grid = []
         self._init_grid()
 
     def _to_pixel(self, ux, uy):
+        """
+        논리 좌표(ux, uy)를 픽셀 좌표로 변환
+        - ux: 0 ~ 7 (Left -> Right)
+        - uy: 0 ~ 4 (Bottom -> Top)
+        """
         return {
             'x': self.offset_x + ux * self.unit,
-            'y': self.offset_y + uy * self.unit
+            # Y축 반전: Canvas는 위쪽이 0이므로, (전체높이 - uy)로 계산
+            'y': self.offset_y + (self.board_rows - uy) * self.unit
         }
 
     def _init_grid(self):
         rows = 3
         cols = 5
         
-        # 그리드 셀 크기 (유닛보다 약간 작게 해서 간격 둠)
+        # 그리드 셀 크기
         cell_size = int(self.unit * 0.9)
         
         for r in range(rows):
             for c in range(cols):
-                # 논리적 좌표 (1.5, 0.5) 부터 시작
-                # Col 1 center = 1.5, Row 1 center = 0.5
-                logic_x = 1.5 + c
-                logic_y = 0.5 + r
+                # 논리적 좌표 계산
+                # Grid 시작점 (1, 0) + 셀 중심(0.5)
+                logic_x = 1.0 + c + 0.5
+                logic_y = 0.0 + r + 0.5
                 
                 center_pos = self._to_pixel(logic_x, logic_y)
                 

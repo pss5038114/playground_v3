@@ -152,38 +152,51 @@ function sleep(ms) {
     return new Promise(r => setTimeout(r, ms)); 
 }
 
+// [수정됨] 맵 데이터 생성 로직 (좌표계 변경: 좌하단 0,0 기준)
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
     const unit = 140; // 1 단위 크기
     
-    // 중앙 정렬 오프셋
+    // 보드 전체 크기 (가로 7칸, 세로 4칸 기준 가정)
+    const boardRows = 4; 
+    
+    // 중앙 정렬 오프셋 계산
     const offsetX = (width - (7 * unit)) / 2;
-    const offsetY = (height - (5 * unit)) / 2;
+    const offsetY = (height - (boardRows * unit)) / 2;
 
+    // 좌표 변환 함수 (Logical -> Pixel)
+    // ux: 0 ~ 7 (Left -> Right)
+    // uy: 0 ~ 4 (Bottom -> Top) ** Y축 반전 적용 **
     const toPixel = (ux, uy) => ({
         x: offsetX + ux * unit,
-        y: offsetY + uy * unit
+        y: offsetY + (boardRows - uy) * unit // Y축 뒤집기 (Canvas는 상단이 0이므로)
     });
 
-    // 1. Path (U자 형태)
+    // 1. Path (역 U자 / n자 형태)
+    // 시작(0.5, 0) -> 위(0.5, 3.5) -> 오른쪽(6.5, 3.5) -> 아래(6.5, 0)
     const logicPath = [
-        {x: 0.5, y: -1.0},
+        {x: 0.5, y: 0.0},
         {x: 0.5, y: 3.5},
         {x: 6.5, y: 3.5},
-        {x: 6.5, y: -1.0}
+        {x: 6.5, y: 0.0}
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
 
     // 2. Grid (5x3)
+    // Dice Grid 시작점: (1, 0) -> 즉 x는 1~6 범위, y는 0~3 범위
     const grid = [];
-    const rows = 3, cols = 5;
+    const rows = 3; // 주사위 놓을 공간 세로 3칸
+    const cols = 5; // 주사위 놓을 공간 가로 5칸
     const cellSize = unit * 0.9; 
 
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
-            const lx = 1.5 + c;
-            const ly = 0.5 + r;
+            // 주사위 그리드 시작점 (1, 0) 기준
+            // 각 칸의 중심 좌표 계산 (x: 1.5 ~ 5.5, y: 0.5 ~ 2.5)
+            const lx = 1.0 + c + 0.5; 
+            const ly = 0.0 + r + 0.5;
+            
             const pos = toPixel(lx, ly);
             
             grid.push({
