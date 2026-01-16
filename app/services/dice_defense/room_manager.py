@@ -1,3 +1,4 @@
+# app/services/dice_defense/room_manager.py
 import asyncio
 import secrets
 import string
@@ -5,7 +6,7 @@ import json
 from typing import Dict, List, Optional
 from fastapi import WebSocket
 
-# 게임 로직 클래스 import
+# Game Logic Import
 from app.services.dice_defense.modes.solo.game import SoloGameLogic
 
 class DiceGameRoom:
@@ -15,7 +16,7 @@ class DiceGameRoom:
         self.active_connections: List[WebSocket] = []
         self.players: Dict[str, dict] = {}
         
-        # 게임 로직 인스턴스 생성
+        # 게임 로직 인스턴스
         self.game_logic = SoloGameLogic()
         
         self.is_running = False
@@ -26,12 +27,13 @@ class DiceGameRoom:
         self.active_connections.append(websocket)
         self.players[user_id] = {"id": user_id}
         
+        print(f"[{self.room_code}] User {user_id} Connected.")
+        
         # 접속 시 현재 게임 상태 전송
         await websocket.send_json({
             "type": "GAME_STATE", 
             "data": self.game_logic.get_state()
         })
-        print(f"[{self.room_code}] User {user_id} Connected.")
 
     def disconnect(self, websocket: WebSocket, user_id: str):
         if websocket in self.active_connections:
@@ -44,6 +46,7 @@ class DiceGameRoom:
         if not self.active_connections:
             return
         json_msg = json.dumps(message)
+        # 연결된 모든 클라이언트에게 전송
         for connection in self.active_connections:
             try:
                 await connection.send_text(json_msg)
@@ -85,7 +88,6 @@ class DiceRoomManager:
 
     def create_room(self, mode: str = "solo") -> str:
         while True:
-            # 6자리 랜덤 코드 생성
             chars = string.ascii_uppercase + string.digits
             code = ''.join(secrets.choice(chars) for _ in range(6))
             if code not in self._rooms:
@@ -103,6 +105,7 @@ class DiceRoomManager:
         if room_code in self._rooms:
             self._rooms[room_code].stop()
             del self._rooms[room_code]
+            # [수정] code -> room_code로 변수명 수정 완료
             print(f"=== Room Removed: {room_code} ===")
 
 # 전역 인스턴스
