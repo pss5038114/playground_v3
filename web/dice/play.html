@@ -11,93 +11,95 @@
         body { user-select: none; touch-action: none; overflow: hidden; }
         .power-btn { transition: all 0.1s; }
         .power-btn:active { transform: scale(0.95); }
-        .glass-panel { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        /* 캔버스 컨테이너: 항상 중앙 정렬 및 비율 유지 */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #0f172a; /* slate-900 */
+            overflow: hidden;
+        }
+        canvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); }
     </style>
 </head>
-<body class="bg-slate-900 h-screen w-screen flex flex-col overflow-hidden relative">
+<body class="bg-slate-900 h-screen w-screen flex flex-col overflow-hidden">
 
-    <div id="game-loading" class="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-500">
-        <h2 class="text-2xl font-black text-white mb-2">LOADING</h2>
-        <div class="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-            <div id="loading-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
-        </div>
-        <p id="loading-text" class="text-xs text-slate-500 mt-2">Preparing Battle...</p>
-    </div>
-
-    <div id="ui-top" class="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none hidden">
-        
-        <div class="glass-panel rounded-xl px-4 py-2 pointer-events-auto flex items-center gap-2">
-            <i class="ri-time-line text-slate-400"></i>
+    <header class="bg-white/95 backdrop-blur shadow-md z-30 h-16 flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center gap-4">
             <div class="flex flex-col">
-                <span class="text-[9px] text-slate-400 font-bold leading-none">BOSS IN</span>
-                <span id="boss-timer" class="text-lg font-black text-white leading-none font-mono">02:00</span>
+                <span class="text-[10px] text-slate-500 font-bold leading-none">NEXT BOSS</span>
+                <span id="boss-timer" class="text-xl font-black text-slate-800 font-mono leading-none">02:00</span>
             </div>
-        </div>
-
-        <div class="glass-panel rounded-xl px-6 py-2 pointer-events-auto flex flex-col items-center shadow-lg transform translate-y-[-5px]">
-            <div class="flex items-center gap-2 mb-1">
-                <i class="ri-sword-fill text-yellow-400 animate-pulse"></i> <span class="text-[10px] text-yellow-400 font-bold tracking-widest">WAVE</span>
-            </div>
-            <span id="game-wave" class="text-3xl font-black text-white leading-none drop-shadow-md">1</span>
-        </div>
-
-        <div class="flex flex-col items-end gap-2 pointer-events-auto">
-            
-            <div class="glass-panel rounded-xl px-3 py-2 flex items-center gap-3 bg-red-500/10 border-red-500/30">
-                <i class="ri-heart-3-fill text-red-500 text-xl drop-shadow-sm"></i>
-                <div class="w-px h-6 bg-red-500/20"></div>
-                <span id="game-lives" class="text-xl font-black text-red-100">3</span>
-            </div>
-
-            <div class="flex gap-2 mt-1">
-                <button onclick="toggleDebug()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-colors">
-                    <i class="ri-bug-2-line"></i>
-                </button>
-                <button onclick="confirmSurrender()" class="w-8 h-8 rounded-lg bg-slate-800 text-red-400 border border-slate-700 hover:bg-red-500 hover:text-white hover:border-red-500 flex items-center justify-center transition-all">
-                    <i class="ri-logout-box-r-line"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div class="flex-1 flex items-center justify-center relative">
-        <canvas id="game-canvas" class="shadow-2xl"></canvas>
-    </div>
-
-    <div id="ui-bottom" class="w-full bg-slate-900 border-t border-slate-800 flex flex-col pb-safe z-20 hidden">
-        
-        <div class="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-800/50">
+            <div class="h-8 w-px bg-slate-200"></div>
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center border border-yellow-500/30">
-                    <i class="ri-flashlight-fill"></i>
+                <i class="ri-sword-fill text-yellow-500"></i>
+                <span class="text-slate-600 font-bold text-sm">WAVE</span>
+                <span id="game-wave" class="text-2xl font-black text-slate-900">1</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="bg-red-50 px-3 py-1 rounded-full border border-red-100 flex items-center gap-2">
+                <i class="ri-heart-3-fill text-red-500"></i>
+                <span id="game-lives" class="text-lg font-black text-red-600">3</span>
+            </div>
+            <button onclick="window.location.href='index.html'" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-red-500 transition-colors flex items-center justify-center">
+                <i class="ri-logout-box-r-line"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden bg-slate-900">
+        <div id="game-container">
+            <canvas id="game-canvas"></canvas>
+            
+            <div id="game-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-40 transition-opacity duration-500">
+                <h2 class="text-white font-black text-2xl mb-2">LOADING</h2>
+                <div class="w-48 h-1 bg-slate-800 rounded overflow-hidden">
+                    <div id="loading-bar" class="h-full bg-blue-500 w-0 transition-all"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 pb-safe z-30 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+        <div class="flex items-center justify-between px-4 py-3 bg-slate-800/50 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/20">
+                    <i class="ri-flashlight-fill text-white"></i>
                 </div>
                 <span id="game-sp" class="text-2xl font-black text-white tracking-tight">100</span>
             </div>
             
-            <button onclick="window.spawnDice()" class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2 rounded-xl text-white font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform flex items-center gap-2">
-                <i class="ri-add-circle-fill"></i>
-                <span>소환</span>
-                <span id="spawn-cost" class="text-xs bg-black/20 px-2 py-0.5 rounded ml-1">10</span>
+            <button onclick="window.spawnDice()" class="group relative overflow-hidden bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all px-8 py-2 rounded-xl shadow-lg shadow-blue-600/30">
+                <div class="flex items-center gap-2 relative z-10">
+                    <span class="text-white font-bold text-lg">소환</span>
+                    <span id="spawn-cost" class="bg-black/20 text-blue-100 text-xs px-2 py-0.5 rounded font-mono font-bold">10 SP</span>
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
             </button>
         </div>
 
-        <div class="grid grid-cols-5 gap-1 p-2 h-28">
-            <div class="flex flex-col gap-1 h-full">
-                <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 relative dice-slot" data-index="0">
-                    <i class="ri-question-mark text-slate-600"></i> </div>
-                <button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700 flex flex-col items-center justify-center leading-none" onclick="powerUp(0)">
-                    <span class="text-[9px] text-slate-400 font-bold">Lv.1</span>
-                    <span class="text-[8px] text-yellow-500">100</span>
+        <div class="p-2 grid grid-cols-5 gap-1.5 h-auto">
+            <div class="flex flex-col gap-1">
+                <div class="aspect-square bg-slate-800 rounded-lg border border-slate-700 relative dice-slot flex items-center justify-center group" data-index="0">
+                    </div>
+                <button class="power-btn bg-slate-800 py-1.5 rounded-md border border-slate-700 flex flex-col items-center justify-center leading-none" onclick="powerUp(0)">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5">Lv.1</span>
+                    <span class="text-[9px] text-yellow-500 font-mono">100</span>
                 </button>
             </div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="1"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(1)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="2"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(2)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="3"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(3)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="4"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(4)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1"><div class="aspect-square bg-slate-800 rounded-lg border border-slate-700 dice-slot" data-index="1"></div><button class="power-btn bg-slate-800 py-1.5 rounded-md border border-slate-700" onclick="powerUp(1)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1"><div class="aspect-square bg-slate-800 rounded-lg border border-slate-700 dice-slot" data-index="2"></div><button class="power-btn bg-slate-800 py-1.5 rounded-md border border-slate-700" onclick="powerUp(2)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1"><div class="aspect-square bg-slate-800 rounded-lg border border-slate-700 dice-slot" data-index="3"></div><button class="power-btn bg-slate-800 py-1.5 rounded-md border border-slate-700" onclick="powerUp(3)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1"><div class="aspect-square bg-slate-800 rounded-lg border border-slate-700 dice-slot" data-index="4"></div><button class="power-btn bg-slate-800 py-1.5 rounded-md border border-slate-700" onclick="powerUp(4)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
         </div>
-    </div>
-
+    </footer>
+    
     <script src="js/utils.js"></script>
-    <script src="js/game.js?v=1.7"></script>
+    <script src="js/game.js?v=2.0"></script>
 </body>
 </html>

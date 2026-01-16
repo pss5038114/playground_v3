@@ -94,34 +94,37 @@ function updateLoading(percent, text) {
 // 4. 캔버스 설정 (반응형)
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
-    if(!canvas) return;
+    const container = document.getElementById('game-container'); // 변경점: 컨테이너 기준
+    
+    if(!canvas || !container) return;
     ctx = canvas.getContext('2d');
 
-    // 화면 꽉 채우기 (여백 없이)
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // 컨테이너의 현재 크기 가져오기
+    const w = container.clientWidth;
+    const h = container.clientHeight;
 
-    // 게임 내부 해상도 (1080x1920) 비율 유지
-    const targetAspect = 1080 / 1920;
-    const currentAspect = w / h;
+    // 게임 내부 해상도 (9:16 비율)
+    const targetRatio = 1080 / 1920;
+    const containerRatio = w / h;
 
     let finalW, finalH;
 
-    if (currentAspect > targetAspect) {
-        // 화면이 더 넓음 -> 높이에 맞춤
+    // 비율에 맞춰 꽉 차게 계산 (Letterboxing)
+    if (containerRatio > targetRatio) {
+        // 컨테이너가 더 납작함 -> 높이에 맞춤
         finalH = h;
-        finalW = h * targetAspect;
+        finalW = h * targetRatio;
     } else {
-        // 화면이 더 좁음 -> 너비에 맞춤
+        // 컨테이너가 더 길쭉함 -> 너비에 맞춤
         finalW = w;
-        finalH = w / targetAspect;
+        finalH = w / targetRatio;
     }
 
-    // 캔버스 내부 해상도 고정
+    // 캔버스 내부 해상도는 고정 (선명도 유지)
     canvas.width = 1080;  
     canvas.height = 1920; 
     
-    // CSS로 화면 표출 크기 조정
+    // 화면 표시 크기 (CSS)
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
 }
