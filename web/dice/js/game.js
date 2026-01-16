@@ -129,13 +129,15 @@ function setupCanvas() {
     canvas.style.height = `${finalH}px`;
 }
 
-// 5. 게임 루프 (그리기)
+// 5. 게임 루프 (그리기) - 색상 변경됨
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 클리어
+    // 배경 클리어 & 다시 그리기
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; // slate-800
+    
+    // [수정됨] 배경색: 약간 밝은 회색 (Gray-100 / Slate-50)
+    ctx.fillStyle = "#f3f4f6"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
     // 맵 그리기
@@ -143,6 +145,8 @@ function gameLoop() {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
+    
+    // (여기에 나중에 몬스터, 주사위 그리기 추가됨)
 
     animationFrameId = requestAnimationFrame(gameLoop);
 }
@@ -203,14 +207,12 @@ function getMockMapData() {
 function drawPath(ctx, path) {
     if(path.length < 2) return;
 
+    // 1. 도로 (Road)
     ctx.beginPath();
     ctx.lineWidth = 100; // 길 너비
-    ctx.strokeStyle = "#334155"; // slate-700
-    ctx.lineCap = "round"; // 끝부분 둥글게 (튀어나옴 방지) -> butt으로 변경 고려했으나 round가 더 자연스러움
-    // * Start/End가 Grid에 딱 맞으려면 butt을 써야 하는데, 
-    //   path 좌표 자체를 grid center와 맞췄으므로 round로 하면 약간 튀어나옵니다.
-    //   요청하신 '튀어나오지 않게'를 위해 lineCap을 'butt'으로 변경합니다.
-    ctx.lineCap = "butt"; 
+    // [수정됨] 도로 색상: 회색 (Gray-300) - 배경보다 조금 더 어둡게
+    ctx.strokeStyle = "#d1d5db"; 
+    ctx.lineCap = "butt"; // 튀어나옴 방지 유지
     ctx.lineJoin = "round"; 
 
     ctx.moveTo(path[0].x, path[0].y);
@@ -219,27 +221,30 @@ function drawPath(ctx, path) {
     }
     ctx.stroke();
     
-    // 점선 중앙선
+    // 2. 중앙선 (Center Line)
     ctx.beginPath();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "#475569";
-    ctx.setLineDash([20, 30]);
+    // [수정됨] 선 색상: 파란색 (Blue-500)
+    ctx.strokeStyle = "#3b82f6";
+    // [수정됨] 실선으로 변경 (점선 해제)
+    ctx.setLineDash([]); 
+    
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
         ctx.lineTo(path[i].x, path[i].y);
     }
     ctx.stroke();
-    ctx.setLineDash([]);
 }
 
 function drawGrid(ctx, grid) {
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2; // 선 두께 약간 줄임
     grid.forEach((cell, idx) => {
-        // 배경
-        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        // [수정됨] 슬롯 배경: 밝은 흰색
+        ctx.fillStyle = "#ffffff";
+        // [수정됨] 슬롯 테두리: 연한 회색
+        ctx.strokeStyle = "#e5e7eb";
         
-        // 둥근 사각형 그리기 (간단 구현)
+        // 둥근 사각형 그리기
         const r = 16; 
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
         
@@ -251,7 +256,15 @@ function drawGrid(ctx, grid) {
         ctx.arcTo(x, y, x + w, y, r);
         ctx.closePath();
         
+        // 그림자 효과 살짝 (선택사항)
+        ctx.shadowColor = "rgba(0,0,0,0.05)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+        
         ctx.fill();
+        
+        // 그림자 끄고 테두리 그리기
+        ctx.shadowColor = "transparent";
         ctx.stroke();
     });
 }
