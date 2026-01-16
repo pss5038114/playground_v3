@@ -12,23 +12,24 @@ class SoloGameSession:
         self.unit = 140
         
         # 맵 시작점 (화면 중앙 정렬을 위한 오프셋)
-        # 전체 맵 높이(약 4.5유닛)를 고려하여 세로 중앙 배치
         self.offset_x = (self.width - (7 * self.unit)) // 2  # 가로 중앙
-        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙 (약간 위쪽?)
+        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙
         
-        # 1. 몬스터 이동 경로 (U자 형태)
-        # (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
+        # [수정] 몬스터 이동 경로 (역 U자 형태 '∩')
+        # Grid Y범위: 0.5 ~ 2.5 (총 3칸)
+        # 경로: 왼쪽 아래(Start) -> 왼쪽 위 -> 오른쪽 위 -> 오른쪽 아래(End)
+        # 시작/끝 점을 Grid 하단(Y=2.5)과 시각적으로 맞추기 위해 Y=2.5로 설정
         self.path = [
-            {'x': 0.5, 'y': -1.0}, # Start (화면 위)
-            {'x': 0.5, 'y': 3.5},  # 좌측 하단 코너
-            {'x': 6.5, 'y': 3.5},  # 우측 하단 코너
-            {'x': 6.5, 'y': -1.0}, # End (방어선)
+            {'x': 0.5, 'y': 2.5},  # Start (왼쪽 하단, 그리드 높이와 일치)
+            {'x': 0.5, 'y': -0.5}, # Corner 1 (왼쪽 상단, 그리드 위로 돌아감)
+            {'x': 6.5, 'y': -0.5}, # Corner 2 (오른쪽 상단)
+            {'x': 6.5, 'y': 2.5},  # End (오른쪽 하단)
         ]
+        
         # 실제 픽셀 좌표로 변환하여 저장
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
         
-        # 2. 주사위 배치 그리드 (5x3)
-        # x: 1.5 ~ 5.5, y: 0.5 ~ 2.5
+        # 주사위 배치 그리드 (5x3)
         self.grid = []
         self._init_grid()
 
@@ -42,7 +43,7 @@ class SoloGameSession:
         rows = 3
         cols = 5
         
-        # 그리드 셀 크기 (유닛보다 약간 작게 해서 간격 둠)
+        # 그리드 셀 크기
         cell_size = int(self.unit * 0.9)
         
         for r in range(rows):

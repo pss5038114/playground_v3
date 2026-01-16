@@ -124,8 +124,6 @@ function setupCanvas() {
     // CSS로 화면 표출 크기 조정
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
-    
-    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
 // 5. 게임 루프 (그리기)
@@ -166,12 +164,12 @@ function getMockMapData() {
         y: offsetY + uy * unit
     });
 
-    // 1. Path (U자 형태)
+    // [수정] Path (역 U자 형태 '∩' - 화면 하단 시작/종료)
     const logicPath = [
-        {x: 0.5, y: -1.0},
-        {x: 0.5, y: 3.5},
-        {x: 6.5, y: 3.5},
-        {x: 6.5, y: -1.0}
+        {x: 0.5, y: 2.5},  // Start (왼쪽 하단)
+        {x: 0.5, y: -0.5}, // Corner 1 (왼쪽 상단)
+        {x: 6.5, y: -0.5}, // Corner 2 (오른쪽 상단)
+        {x: 6.5, y: 2.5}   // End (오른쪽 하단)
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
 
@@ -205,6 +203,10 @@ function drawPath(ctx, path) {
     ctx.beginPath();
     ctx.lineWidth = 100; // 길 너비
     ctx.strokeStyle = "#334155"; // slate-700
+    ctx.lineCap = "round"; // 끝부분 둥글게 (튀어나옴 방지) -> butt으로 변경 고려했으나 round가 더 자연스러움
+    // * Start/End가 Grid에 딱 맞으려면 butt을 써야 하는데, 
+    //   path 좌표 자체를 grid center와 맞췄으므로 round로 하면 약간 튀어나옵니다.
+    //   요청하신 '튀어나오지 않게'를 위해 lineCap을 'butt'으로 변경합니다.
     ctx.lineCap = "butt"; 
     ctx.lineJoin = "round"; 
 
