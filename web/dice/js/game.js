@@ -1,260 +1,151 @@
-// web/dice/js/game.js
-
-// 전역 변수
-let canvas, ctx;
-let gameMap = null;
-let currentMode = 'solo';
-let animationFrameId;
-
-// 1. 페이지 로드 시 초기화
-window.onload = async function() {
-    console.log("Game Script Loaded.");
-    
-    // URL 파라미터 확인 (mode)
-    const urlParams = new URLSearchParams(window.location.search);
-    currentMode = urlParams.get('mode') || 'solo';
-    console.log(`Initializing game in [${currentMode}] mode...`);
-
-    // 이탈 방지 이벤트 등록
-    setupLeaveWarning();
-
-    // 캔버스 크기 설정
-    setupCanvas();
-    window.addEventListener('resize', setupCanvas);
-
-    // 로딩 시퀀스 시작
-    await runLoadingSequence();
+// 전역 게임 상태
+const gameState = {
+    grid: Array(15).fill(null), // 15칸 그리드
+    sp: 100,
+    spCost: 10,
+    wave: 1,
+    isPlaying: false
 };
 
-// 2. 이탈 방지 (뒤로가기/새로고침 경고)
-function setupLeaveWarning() {
-    window.addEventListener('beforeunload', (event) => {
-        event.preventDefault();
-        event.returnValue = ''; 
-        return '';
-    });
-}
+let socket = null;
 
-// 3. 로딩 시뮬레이션
-async function runLoadingSequence() {
-    const loadingScreen = document.getElementById('game-loading');
-    const uiTop = document.getElementById('ui-top');
-    const uiBottom = document.getElementById('ui-bottom');
+// [1] 초기화 및 연결
+async function initGame() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+
+    if (!sessionId) {
+        alert("세션 ID가 없습니다. 로비로 돌아갑니다.");
+        window.location.href = 'home.html';
+        return;
+    }
+
+    // WebSocket 연결
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/dice/ws/${sessionId}`;
     
-    try {
-        updateLoading(10, "Connecting to server...");
-        // TODO: 웹소켓 연결 로직
-        await sleep(500);
+    socket = new WebSocket(wsUrl);
 
-        updateLoading(40, "Fetching map data...");
-        // 서버 데이터 모의 (여기서 맵 데이터 생성)
-        gameMap = getMockMapData(); 
-        await sleep(500);
+    socket.onopen = () => {
+        console.log("서버 연결 성공!");
+        // runLoadingSequence(); // 로딩 바 완료 처리 등
+    };
 
-        updateLoading(70, "Loading resources...");
-        // TODO: 이미지 프리로딩
-        await sleep(800);
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleServerMessage(data);
+    };
 
-        updateLoading(100, "Ready to Battle!");
-        await sleep(300);
+    socket.onclose = () => {
+        alert("서버와의 연결이 끊어졌습니다.");
+    };
 
-        // 로딩 화면 제거 & UI 표시
-        loadingScreen.style.opacity = '0';
-        loadingScreen.style.pointerEvents = 'none';
-        
-        setTimeout(() => {
-            loadingScreen.style.display = 'none'; // 완전히 가리기
-        }, 500);
-
-        // 인게임 UI 보이기
-        if(uiTop) uiTop.classList.remove('hidden');
-        if(uiBottom) {
-            uiBottom.classList.remove('hidden');
-            uiBottom.classList.add('flex');
+    // 소환 버튼 이벤트 연결 (DOM ID 확인 필요: ui_summon.js에서 렌더링하는 버튼)
+    document.addEventListener('click', (e) => {
+        // ui_summon.js에 있는 버튼의 id가 'btn-summon'이라고 가정
+        // 혹은 utils.js 의 renderDiceIcon 등을 통해 생성된 버튼
+        if (e.target.closest('#btn-summon')) { 
+            spawnDice();
         }
-
-        console.log("Game Loop Starting...");
-        // 게임 루프 시작
-        requestAnimationFrame(gameLoop);
-
-    } catch (e) {
-        console.error("Loading Failed:", e);
-        alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
-        window.location.href = 'index.html'; // 로비로 강제 이동
-    }
-}
-
-function updateLoading(percent, text) {
-    const bar = document.getElementById('loading-bar');
-    const txt = document.getElementById('loading-text');
-    if(bar) bar.style.width = `${percent}%`;
-    if(txt) txt.innerText = text;
-}
-
-// 4. 캔버스 설정 (반응형)
-function setupCanvas() {
-    canvas = document.getElementById('game-canvas');
-    if(!canvas) return;
-    ctx = canvas.getContext('2d');
-
-    // 화면 꽉 채우기 (여백 없이)
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    // 게임 내부 해상도 (1080x1920) 비율 유지
-    const targetAspect = 1080 / 1920;
-    const currentAspect = w / h;
-
-    let finalW, finalH;
-
-    if (currentAspect > targetAspect) {
-        // 화면이 더 넓음 -> 높이에 맞춤
-        finalH = h;
-        finalW = h * targetAspect;
-    } else {
-        // 화면이 더 좁음 -> 너비에 맞춤
-        finalW = w;
-        finalH = w / targetAspect;
-    }
-
-    // 캔버스 내부 해상도 고정
-    canvas.width = 1080;  
-    canvas.height = 1920; 
-    
-    // CSS로 화면 표출 크기 조정
-    canvas.style.width = `${finalW}px`;
-    canvas.style.height = `${finalH}px`;
-    
-    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
-}
-
-// 5. 게임 루프 (그리기)
-function gameLoop() {
-    if(!ctx) return;
-
-    // 배경 클리어
-    ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; // slate-800
-    ctx.fillRect(0, 0, 1080, 1920);
-
-    // 맵 그리기
-    if(gameMap) {
-        drawPath(ctx, gameMap.path);
-        drawGrid(ctx, gameMap.grid);
-    }
-
-    animationFrameId = requestAnimationFrame(gameLoop);
-}
-
-// --- Helper Functions (자체 내장) ---
-
-function sleep(ms) { 
-    return new Promise(r => setTimeout(r, ms)); 
-}
-
-function getMockMapData() {
-    const width = 1080;
-    const height = 1920;
-    const unit = 140; // 1 단위 크기
-    
-    // 중앙 정렬 오프셋
-    const offsetX = (width - (7 * unit)) / 2;
-    const offsetY = (height - (5 * unit)) / 2;
-
-    const toPixel = (ux, uy) => ({
-        x: offsetX + ux * unit,
-        y: offsetY + uy * unit
     });
+}
 
-    // 1. Path (U자 형태)
-    const logicPath = [
-        {x: 0.5, y: -1.0},
-        {x: 0.5, y: 3.5},
-        {x: 6.5, y: 3.5},
-        {x: 6.5, y: -1.0}
-    ];
-    const path = logicPath.map(p => toPixel(p.x, p.y));
+// [2] 서버 메시지 처리 핸들러
+function handleServerMessage(data) {
+    if (data.type === 'GRID_UPDATE') {
+        // 서버에서 온 데이터로 상태 동기화
+        gameState.grid = data.grid;
+        gameState.sp = data.sp;
+        gameState.spCost = data.sp_cost;
+        
+        // 화면 갱신
+        renderBoard();
+        updateUI();
+    }
+    else if (data.message) {
+        // 알림 메시지 (ex: SP 부족)
+        console.log("Server:", data.message);
+    }
+}
 
-    // 2. Grid (5x3)
-    const grid = [];
-    const rows = 3, cols = 5;
-    const cellSize = unit * 0.9; 
+// [3] 액션: 주사위 소환 요청
+function spawnDice() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    
+    // 서버로 SPAWN 명령 전송
+    socket.send(JSON.stringify({
+        type: "SPAWN"
+    }));
+}
 
-    for(let r=0; r<rows; r++){
-        for(let c=0; c<cols; c++){
-            const lx = 1.5 + c;
-            const ly = 0.5 + r;
-            const pos = toPixel(lx, ly);
-            
-            grid.push({
-                index: r*cols + c,
-                x: pos.x - cellSize/2,
-                y: pos.y - cellSize/2,
-                w: cellSize, h: cellSize,
-                cx: pos.x, cy: pos.y
-            });
+// [4] 렌더링: 그리드 그리기
+function renderBoard() {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // 캔버스 초기화 (배경)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 맵 경로 그리기 (배경 이미지 혹은 선)
+    // ... (map rendering logic) ...
+
+    // 그리드 및 주사위 그리기
+    // 서버 좌표: 200 + c * 150, 1000 + r * 150 (SoloGameLogic 참조)
+    const startX = 200;
+    const startY = 1000;
+    const cellSize = 140; // 간격 150이므로 크기는 약간 작게
+    
+    gameState.grid.forEach((dice, index) => {
+        const col = index % 5;
+        const row = Math.floor(index / 5);
+        
+        const x = startX + col * 150;
+        const y = startY + row * 150;
+
+        // 빈 칸 슬롯 그리기 (테두리)
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cellSize, cellSize);
+
+        // 주사위가 있으면 그리기
+        if (dice) {
+            drawDice(ctx, x, y, cellSize, dice);
         }
-    }
-
-    return { width, height, path, grid };
-}
-
-function drawPath(ctx, path) {
-    if(path.length < 2) return;
-
-    ctx.beginPath();
-    ctx.lineWidth = 100; // 길 너비
-    ctx.strokeStyle = "#334155"; // slate-700
-    ctx.lineCap = "butt"; 
-    ctx.lineJoin = "round"; 
-
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(path[i].x, path[i].y);
-    }
-    ctx.stroke();
-    
-    // 점선 중앙선
-    ctx.beginPath();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#475569";
-    ctx.setLineDash([20, 30]);
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(path[i].x, path[i].y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-}
-
-function drawGrid(ctx, grid) {
-    ctx.lineWidth = 4;
-    grid.forEach((cell, idx) => {
-        // 배경
-        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        
-        // 둥근 사각형 그리기 (간단 구현)
-        const r = 16; 
-        const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
-        
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
-        
-        ctx.fill();
-        ctx.stroke();
     });
 }
 
-// UI 함수들
-window.toggleDebug = function() { alert("디버그 모드 준비중"); };
-window.confirmSurrender = function() {
-    if(confirm("정말 포기하시겠습니까?")) window.location.href = 'index.html';
-};
-window.spawnDice = function() { console.log("Spawn Request"); };
-window.powerUp = function(idx) { console.log("Power Up:", idx); };
+// [Helper] 주사위 그리기
+function drawDice(ctx, x, y, size, diceData) {
+    // 1. 배경 (등급/속성에 따른 색상)
+    ctx.fillStyle = getDiceColor(diceData.id); // utils.js 등에서 가져오거나 임시 구현
+    ctx.fillRect(x + 5, y + 5, size - 10, size - 10);
+    
+    // 2. 텍스트 (이름/ID) - 임시
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText(diceData.id, x + 20, y + 40);
+
+    // 3. 눈금 (Dot) - diceData.level 에 따라
+    ctx.fillStyle = "white";
+    ctx.fillText(`Lv.${diceData.level}`, x + 20, y + 80);
+}
+
+function getDiceColor(id) {
+    // 임시 색상 매핑
+    if (id === '1001') return '#ff4444'; // Fire
+    if (id === '1002') return '#4444ff'; // Ice
+    return '#888888';
+}
+
+function updateUI() {
+    // SP 및 소환 비용 텍스트 갱신
+    const spEl = document.getElementById('ui-sp');
+    const costEl = document.getElementById('ui-summon-cost');
+    
+    if (spEl) spEl.innerText = gameState.sp;
+    if (costEl) costEl.innerText = `${gameState.spCost} SP`;
+}
+
+// 게임 시작
+window.onload = initGame;

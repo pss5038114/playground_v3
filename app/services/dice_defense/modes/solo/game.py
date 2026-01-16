@@ -1,74 +1,100 @@
-# app/services/dice_defense/modes/solo/game.py
+import random
+from app.services.dice_defense.game_data import DICE_DATA
 
-class SoloGameSession:
+# 맵 경로 데이터 (기존 데이터 유지)
+SOLO_MAP_PATH = [
+    {"x": 100, "y": 100}, {"x": 100, "y": 500}, 
+    {"x": 500, "y": 500}, {"x": 500, "y": 100},
+    {"x": 900, "y": 100}, {"x": 900, "y": 800}
+]
+
+# 그리드 좌표 (기존 데이터 유지 - 5x3 예시)
+GRID_POSITIONS = []
+for r in range(3):
+    for c in range(5):
+        GRID_POSITIONS.append({"x": 200 + c * 150, "y": 1000 + r * 150})
+
+class SoloGameLogic:
+    """
+    솔로 모드의 게임 상태(State)를 관리하는 순수 로직 클래스.
+    WebSocket 연결 여부와 관계없이 게임 데이터만 처리합니다.
+    """
     def __init__(self):
-        # 맵 해상도 (1080x1920)
-        self.width = 1080
-        self.height = 1920
+        # 15칸의 그리드 (0~14 인덱스), None이면 빈칸
+        # 포맷: {"id": "1001", "level": 1, "power": 0}
+        self.grid = [None] * 15 
         
-        # 단위 크기 (Unit Size)
-        # 가로폭 7유닛 (0~7) -> 1080 / 7 = 약 154px
-        # 여유를 두고 140px로 설정
-        self.unit = 140
+        # 재화 및 비용
+        self.sp = 100         # 초기 SP
+        self.sp_cost = 10     # 초기 소환 비용
         
-        # 맵 시작점 (화면 중앙 정렬을 위한 오프셋)
-        # 전체 맵 높이(약 4.5유닛)를 고려하여 세로 중앙 배치
-        self.offset_x = (self.width - (7 * self.unit)) // 2  # 가로 중앙
-        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙 (약간 위쪽?)
-        
-        # 1. 몬스터 이동 경로 (U자 형태)
-        # (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
-        self.path = [
-            {'x': 0.5, 'y': -1.0}, # Start (화면 위)
-            {'x': 0.5, 'y': 3.5},  # 좌측 하단 코너
-            {'x': 6.5, 'y': 3.5},  # 우측 하단 코너
-            {'x': 6.5, 'y': -1.0}, # End (방어선)
-        ]
-        # 실제 픽셀 좌표로 변환하여 저장
-        self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
-        
-        # 2. 주사위 배치 그리드 (5x3)
-        # x: 1.5 ~ 5.5, y: 0.5 ~ 2.5
-        self.grid = []
-        self._init_grid()
+        # 웨이브 정보
+        self.wave = 1
+        self.monsters = []    # 현재 필드에 있는 몬스터 목록
 
-    def _to_pixel(self, ux, uy):
+    def spawn_dice(self, user_id: str):
+        """
+        주사위 소환 로직
+        1. SP 확인
+        2. 빈칸 확인
+        3. 랜덤 주사위 선택
+        4. 그리드 배치 및 SP 차감
+        """
+        # 1. SP 부족 체크
+        if self.sp < self.sp_cost:
+            return {"success": False, "message": "SP가 부족합니다."}
+
+        # 2. 빈칸 찾기
+        empty_indices = [i for i, cell in enumerate(self.grid) if cell is None]
+        if not empty_indices:
+            return {"success": False, "message": "빈 공간이 없습니다."}
+
+        # 3. 비용 차감 및 비용 증가 (선형 증가 예시 +10)
+        self.sp -= self.sp_cost
+        self.sp_cost += 10
+
+        # 4. 랜덤 위치 및 주사위 결정
+        target_idx = random.choice(empty_indices)
+        
+        # 구현된 주사위 ID 목록 (game_data.py의 키값 활용)
+        available_dice_ids = list(DICE_DATA.keys())
+        if not available_dice_ids:
+            return {"success": False, "message": "데이터 오류: 소환 가능한 주사위가 없습니다."}
+            
+        selected_dice_id = random.choice(available_dice_ids)
+
+        # 5. 그리드 업데이트
+        new_dice = {
+            "id": selected_dice_id,
+            "level": 1,       # 눈금 (Dot count)
+            "power": 0,       # 인게임 강화 레벨
+            "target_idx": target_idx
+        }
+        self.grid[target_idx] = new_dice
+
+        # 6. 변경된 상태 리턴 (브로드캐스팅용)
         return {
-            'x': self.offset_x + ux * self.unit,
-            'y': self.offset_y + uy * self.unit
+            "type": "GRID_UPDATE",
+            "success": True,
+            "grid": self.grid,
+            "sp": self.sp,
+            "sp_cost": self.sp_cost
         }
 
-    def _init_grid(self):
-        rows = 3
-        cols = 5
-        
-        # 그리드 셀 크기 (유닛보다 약간 작게 해서 간격 둠)
-        cell_size = int(self.unit * 0.9)
-        
-        for r in range(rows):
-            for c in range(cols):
-                # 논리적 좌표 (1.5, 0.5) 부터 시작
-                # Col 1 center = 1.5, Row 1 center = 0.5
-                logic_x = 1.5 + c
-                logic_y = 0.5 + r
-                
-                center_pos = self._to_pixel(logic_x, logic_y)
-                
-                self.grid.append({
-                    'index': r * cols + c,
-                    'x': center_pos['x'] - cell_size // 2,
-                    'y': center_pos['y'] - cell_size // 2,
-                    'w': cell_size,
-                    'h': cell_size,
-                    'cx': center_pos['x'], # 중심좌표 (타게팅용)
-                    'cy': center_pos['y'],
-                    'dice': None
-                })
+    def update(self):
+        """
+        매 틱(Tick)마다 호출되는 게임 루프.
+        몬스터 이동, 공격 쿨타임 감소 등을 처리.
+        """
+        # TODO: 몬스터 이동 및 공격 로직 구현 예정
+        pass
 
-    def get_map_data(self):
+    def get_state(self):
+        """현재 전체 게임 상태 반환 (중도 난입 유저 동기화용)"""
         return {
-            "width": self.width,
-            "height": self.height,
-            "path": self.pixel_path,
-            "grid": self.grid
+            "type": "GRID_UPDATE",
+            "grid": self.grid,
+            "sp": self.sp,
+            "sp_cost": self.sp_cost,
+            "wave": self.wave
         }
