@@ -1,38 +1,48 @@
 # app/services/dice_defense/modes/solo/game.py
 import random
-from app.services.dice_defense.game_data import DICE_DATA
+import logging
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
+
+# game_data.py에서 데이터를 가져오되, 실패 시 기본값 사용 (안전장치)
+try:
+    from app.services.dice_defense.game_data import DICE_DATA
+except ImportError:
+    logger.warning("DICE_DATA import failed. Using fallback data.")
+    DICE_DATA = {
+        'fire': {'rarity': 'Common'},
+        'electric': {'rarity': 'Common'},
+        'wind': {'rarity': 'Common'},
+        'ice': {'rarity': 'Rare'},
+        'poison': {'rarity': 'Epic'}
+    }
 
 class SoloGameSession:
     def __init__(self):
         # 맵 해상도 (1080x1920)
         self.width = 1080
         self.height = 1920
-        
-        # 단위 크기 (Unit Size)
         self.unit = 140
         
         # 맵 시작점 (화면 중앙 정렬)
         self.offset_x = (self.width - (7 * self.unit)) // 2
         self.offset_y = (self.height - (5 * self.unit)) // 2
         
-        # [변경] 1. 몬스터 이동 경로 (n자 형태)
-        # 시작(좌측하단) -> 위 -> 오른쪽 -> 아래(우측하단)
-        # Grid Y range: 0.5 ~ 2.5 (3 rows)
+        # 1. 몬스터 이동 경로 (n자 형태)
         self.path = [
-            {'x': 0.5, 'y': 4.0},  # Start (좌측 하단 외부)
-            {'x': 0.5, 'y': -0.5}, # 좌측 상단 코너
-            {'x': 6.5, 'y': -0.5}, # 우측 상단 코너
-            {'x': 6.5, 'y': 4.0},  # End (우측 하단 외부)
+            {'x': 0.5, 'y': 4.0},  # Start (좌측 하단)
+            {'x': 0.5, 'y': -0.5}, # 좌측 상단으로 이동
+            {'x': 6.5, 'y': -0.5}, # 우측 상단으로 이동
+            {'x': 6.5, 'y': 4.0},  # 우측 하단 (End)
         ]
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
         
         # 2. 게임 상태 데이터
-        self.sp = 100            # 초기 SP
-        self.spawn_cost = 10     # 초기 소환 비용
+        self.sp = 100
+        self.spawn_cost = 10
         self.wave = 1
         self.lives = 3
-        
-        # 임시 덱 (추후 유저 덱 연동 필요)
         self.deck = ['fire', 'electric', 'wind', 'ice', 'poison']
         
         # 3. 주사위 배치 그리드 (5x3)
@@ -41,8 +51,8 @@ class SoloGameSession:
 
     def _to_pixel(self, ux, uy):
         return {
-            'x': self.offset_x + ux * self.unit,
-            'y': self.offset_y + uy * self.unit
+            'x': int(self.offset_x + ux * self.unit),
+            'y': int(self.offset_y + uy * self.unit)
         }
 
     def _init_grid(self):
@@ -52,7 +62,7 @@ class SoloGameSession:
         
         for r in range(rows):
             for c in range(cols):
-                # 논리적 좌표 (1.5, 0.5) 부터 시작
+                # 논리적 좌표 (1.5, 0.5) 부터 시작 (경로 안쪽)
                 logic_x = 1.5 + c
                 logic_y = 0.5 + r
                 
@@ -64,13 +74,10 @@ class SoloGameSession:
                     'y': center_pos['y'] - cell_size // 2,
                     'w': cell_size,
                     'h': cell_size,
-                    'cx': center_pos['x'],
-                    'cy': center_pos['y'],
-                    'dice': None # {id: 'fire', class: 1, power: 1} 형태
+                    'dice': None
                 })
 
     def get_map_data(self):
-        """클라이언트 초기화용 맵 데이터"""
         return {
             "width": self.width,
             "height": self.height,
@@ -79,48 +86,44 @@ class SoloGameSession:
         }
 
     def get_game_state(self):
-        """실시간 동기화용 게임 상태"""
         return {
             "sp": self.sp,
             "spawn_cost": self.spawn_cost,
             "lives": self.lives,
             "wave": self.wave,
-            "grid": self.grid # 주사위 배치 상태 포함
+            "grid": self.grid
         }
 
     def process_command(self, cmd_type: str, data: dict = None):
-        """클라이언트 명령 처리"""
         if cmd_type == "SPAWN":
             return self._spawn_dice()
         return None
 
     def _spawn_dice(self):
-        # 1. 비용 체크
         if self.sp < self.spawn_cost:
-            return {"success": False, "message": "SP 부족"}
+            return
         
-        # 2. 빈 슬롯 찾기
         empty_slots = [cell for cell in self.grid if cell['dice'] is None]
         if not empty_slots:
-            return {"success": False, "message": "공간 부족"}
+            return
         
-        # 3. SP 차감 및 비용 증가
         self.sp -= self.spawn_cost
-        self.spawn_cost += 10 # 소환할 때마다 비용 10 증가
+        self.spawn_cost += 10
         
-        # 4. 랜덤 주사위 선택 및 배치
         target_slot = random.choice(empty_slots)
         dice_id = random.choice(self.deck)
         
+        # 안전한 데이터 접근
+        rarity = "Common"
+        if DICE_DATA and dice_id in DICE_DATA:
+            rarity = DICE_DATA[dice_id].get("rarity", "Common")
+
         target_slot['dice'] = {
             "id": dice_id,
-            "level": 1, # 인게임 눈금 (dot count)
-            "power": 1, # 파워업 레벨
-            "rarity": DICE_DATA.get(dice_id, {}).get("rarity", "Common") # 렌더링용
+            "level": 1,
+            "power": 1,
+            "rarity": rarity
         }
-        
-        return {"success": True, "sp": self.sp, "spawn_cost": self.spawn_cost}
 
     def update(self):
-        # 게임 루프 (몬스터 이동, 공격 등 추후 구현)
         pass
