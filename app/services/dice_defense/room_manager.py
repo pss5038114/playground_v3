@@ -1,63 +1,58 @@
-# app/services/dice_defense/room_manager.py
-
 import asyncio
 import secrets
 import string
 import json
 import time
+import math
 from typing import Dict, List, Optional
 from fastapi import WebSocket
 
-# [핵심] 서버 전체를 관장하는 심장 (Global Ticker) 가져오기
+# [중요] 서버 심장박동 (Global Ticker)
 from app.core.global_ticker import ticker
 
 class DiceGameRoom:
-    """
-    [게임 방 객체]
-    - 개별 무한 루프(while True)를 돌지 않습니다.
-    - GlobalTicker가 0.033초마다 update()를 '콕' 찔러주는 방식입니다.
-    - 따라서 서버 자원을 훨씬 효율적으로 쓰고, 모든 방의 시간이 동기화됩니다.
-    """
     def __init__(self, room_code: str, mode: str):
         self.room_code = room_code
-        self.mode = mode  # 'solo', 'coop', 'pvp'
+        self.mode = mode
         self.active_connections: List[WebSocket] = []
         self.players: Dict[str, dict] = {} 
         
-        # [상태 관리] 게임의 모든 데이터는 여기에 저장됩니다.
+        # [게임 상태]
         self.game_state = {
             "tick": 0,
-            "status": "waiting", # waiting, playing, ended
             "wave": 1,
-            "sp": 100, # (임시) 공용 SP, 멀티면 player별로 분리 필요
-            "monsters": [], 
-            "dices": {} # 위치별 주사위 정보
+            "sp": 100,
+            "monsters": [], # 현재 맵에 있는 몬스터들
+            
+            # [임시 경로 데이터] 
+            # 사용자 요청: (0.5, 0) 시작 -> 길 따라 이동 -> 마지막 방어선
+            # 예시로 'ㄷ'자 비슷하게 꺾이는 경로를 넣어둠. 좌표 수정해서 쓰세요!
+            "path": [
+                {"x": 0.5, "y": 0},   # [0] 시작점
+                {"x": 0.5, "y": 2.5}, # [1] 아래로 이동
+                {"x": 4.5, "y": 2.5}, # [2] 오른쪽으로 이동
+                {"x": 4.5, "y": 0}    # [3] 위로 이동 (도착 시 소멸)
+            ]
         }
         
-        # [비동기 입력 큐]
-        # 유저들의 입력(소환, 합성 등)이 빗발칠 때, 바로 처리하지 않고 여기에 쌓아둡니다.
-        # 그리고 틱(Tick)이 돌 때 한꺼번에 순서대로 처리합니다. (동기화 핵심)
         self.input_queue = asyncio.Queue()
+        self.monster_id_counter = 0
 
     async def connect(self, websocket: WebSocket, user_id: str):
-        """유저 접속 처리"""
         await websocket.accept()
         self.active_connections.append(websocket)
         
-        # 플레이어 정보 등록
         self.players[user_id] = {
             "id": user_id, 
             "conn": websocket,
             "entered_at": time.time()
         }
-        print(f"[{self.room_code}] User {user_id} Connected. (Total: {len(self.active_connections)})")
+        print(f"[{self.room_code}] User {user_id} Connected.")
 
-        # [멀티 테스트용] 2명이 모이면 자동 시작 알림
         if self.mode == 'pvp' and len(self.players) == 2:
-             await self.broadcast({"type": "NOTICE", "msg": "플레이어 2명 입장 완료! 게임 준비!"})
+             await self.broadcast({"type": "NOTICE", "msg": "Game Start!"})
 
     def disconnect(self, websocket: WebSocket, user_id: str):
-        """유저 연결 해제 처리"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         if user_id in self.players:
@@ -65,93 +60,123 @@ class DiceGameRoom:
         print(f"[{self.room_code}] User {user_id} Disconnected.")
 
     async def broadcast(self, message: dict):
-        """방에 있는 모든 사람에게 메시지 전송"""
         if not self.active_connections:
             return
-            
         json_msg = json.dumps(message)
         to_remove = []
-        
         for connection in self.active_connections:
             try:
-                # 텍스트 모드로 전송 (JSON)
                 await connection.send_text(json_msg)
             except Exception:
                 to_remove.append(connection)
-        
-        # 전송 실패한 죽은 연결 정리
-        for dead_conn in to_remove:
-            if dead_conn in self.active_connections:
-                self.active_connections.remove(dead_conn)
+        for dead in to_remove:
+            if dead in self.active_connections: self.active_connections.remove(dead)
 
     async def push_action(self, user_id: str, action: dict):
-        """
-        [외부 호출용] 유저의 행동을 큐에 넣습니다.
-        WebSocket 라우터에서 이 함수를 호출합니다.
-        """
         await self.input_queue.put({"user_id": user_id, "action": action})
 
+    # =================================================================
+    # [핵심 로직] GlobalTicker에 의해 1초에 30번 호출됨
+    # =================================================================
     async def update(self):
-        """
-        [심장 박동] GlobalTicker에 의해 1초에 30번 호출됩니다.
-        """
         self.game_state["tick"] += 1
         
-        # 1. [입력 처리] 쌓여있는 유저 행동 처리
+        # 1. 유저 입력 처리
         while not self.input_queue.empty():
             item = await self.input_queue.get()
-            uid = item['user_id']
-            act = item['action']
-            
-            # (예시) 소환 요청이 들어왔다면?
-            if act.get('type') == 'SPAWN':
-                print(f"[{self.room_code}] Tick {self.game_state['tick']}: {uid} 소환 시도")
-                # 실제 로직: SP 확인 -> 주사위 생성 -> 상태 업데이트
-                # 여기서는 테스트용으로 브로드캐스트만
-                await self.broadcast({
-                    "type": "EFFECT", 
-                    "effect": "spawn_motion", 
-                    "user_id": uid
-                })
+            # (소환, 합성 로직 등 추후 구현)
 
-        # 2. [게임 로직] (몬스터 이동, 타워 공격 등)
-        # TODO: self.game_logic.update(self.game_state)
-        
-        # 3. [상태 전송] 클라이언트 화면 갱신을 위한 데이터 전송
-        # 매 틱마다 보내면 대역폭이 너무 크니, 중요한 변경이나 1초(30틱)마다 동기화
+        # 2. [몬스터 스폰] 1초(30틱)마다 생성
         if self.game_state["tick"] % 30 == 0:
-            await self.broadcast({
-                "type": "TICK",
-                "tick": self.game_state["tick"],
-                "wave": self.game_state["wave"],
-                "sp": self.game_state["sp"]
-            })
+            self.spawn_monster()
+
+        # 3. [몬스터 이동]
+        self.move_monsters()
+        
+        # 4. [상태 전송] 매 틱마다 위치 정보를 줍니다 (부드러운 이동을 위해)
+        # 데이터량이 많아지면 "tick % 3 == 0" 등으로 조절 가능
+        await self.broadcast({
+            "type": "TICK",
+            "tick": self.game_state["tick"],
+            "monsters": self.game_state["monsters"]
+        })
+
+    def spawn_monster(self):
+        """몬스터 한 마리를 시작점에 소환"""
+        path = self.game_state["path"]
+        if not path: return
+
+        self.monster_id_counter += 1
+        start_node = path[0]
+
+        new_monster = {
+            "id": self.monster_id_counter,
+            "x": start_node["x"],
+            "y": start_node["y"],
+            "hp": 100,
+            "max_hp": 100,
+            "speed": 0.05, # 이동 속도 (틱당 0.05칸 이동)
+            "path_idx": 0, # 현재 출발한 웨이포인트 인덱스
+            "finished": False
+        }
+        self.game_state["monsters"].append(new_monster)
+        # print(f"[{self.room_code}] Monster {new_monster['id']} Spawned!")
+
+    def move_monsters(self):
+        """모든 몬스터를 경로 따라 이동시킴"""
+        path = self.game_state["path"]
+        alive_monsters = []
+
+        for mon in self.game_state["monsters"]:
+            # 이미 도착한 놈은 패스
+            if mon["finished"]:
+                continue
+
+            # 다음 목표 지점 찾기
+            target_idx = mon["path_idx"] + 1
+            
+            # 더 이상 갈 곳이 없으면(마지막 지점 도달) -> 삭제 대상
+            if target_idx >= len(path):
+                mon["finished"] = True # 여기서 라이프 깎는 로직 추가 가능
+                continue
+
+            target = path[target_idx]
+            
+            # 목표까지의 거리와 방향 계산
+            dx = target["x"] - mon["x"]
+            dy = target["y"] - mon["y"]
+            dist = math.sqrt(dx*dx + dy*dy)
+            
+            if dist <= mon["speed"]:
+                # 1틱 안에 도착 가능한 거리면 -> 목표 점으로 강제 이동 후, 다음 경로로 설정
+                mon["x"] = target["x"]
+                mon["y"] = target["y"]
+                mon["path_idx"] += 1
+            else:
+                # 목표 방향으로 speed만큼 이동
+                ratio = mon["speed"] / dist
+                mon["x"] += dx * ratio
+                mon["y"] += dy * ratio
+            
+            alive_monsters.append(mon)
+
+        # 살아있는 몬스터만 남김 (도착한 애들 삭제)
+        self.game_state["monsters"] = alive_monsters
 
 class DiceRoomManager:
-    """
-    방 관리자 (Singleton)
-    방을 만들 때 Ticker에 구독시키고, 없앨 때 구독 해제하는 역할이 중요합니다.
-    """
     def __init__(self):
         self._rooms: Dict[str, DiceGameRoom] = {}
 
     def create_room(self, mode: str = "solo") -> str:
-        # 1. 중복되지 않는 방 코드 생성
         while True:
-            chars = string.ascii_uppercase + string.digits
-            code = ''.join(secrets.choice(chars) for _ in range(6))
-            if code not in self._rooms:
-                break
+            code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            if code not in self._rooms: break
         
-        # 2. 방 생성
         new_room = DiceGameRoom(code, mode)
         self._rooms[code] = new_room
+        ticker.subscribe(new_room) # 구독!
         
-        # 3. [핵심] Global Ticker에 구독 신청!
-        # 이제 Ticker가 알아서 이 방의 update()를 주기적으로 호출해줍니다.
-        ticker.subscribe(new_room)
-        
-        print(f"=== [RoomManager] Created Room: {code} (Mode: {mode}) ===")
+        print(f"=== Room Created: {code} ===")
         return code
 
     def get_room(self, room_code: str) -> Optional[DiceGameRoom]:
@@ -159,13 +184,7 @@ class DiceRoomManager:
 
     def remove_room(self, room_code: str):
         if room_code in self._rooms:
-            room = self._rooms[room_code]
-            
-            # [핵심] Ticker 구독 해제 (더 이상 update 호출 안 함)
-            ticker.unsubscribe(room)
-            
+            ticker.unsubscribe(self._rooms[room_code]) # 구독 해제!
             del self._rooms[room_code]
-            print(f"=== [RoomManager] Removed Room: {room_code} ===")
 
-# 전역 인스턴스
 room_manager = DiceRoomManager()
