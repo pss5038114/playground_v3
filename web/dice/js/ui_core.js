@@ -118,26 +118,39 @@ function closeGameModePopup() {
 }
 window.closeGameModePopup = closeGameModePopup;
 
-// [NEW] 모드 선택 처리
+// [수정됨] 모드 선택 처리 (4가지 모드 대응)
 function selectMode(mode) {
     console.log("Selected Game Mode:", mode);
     
     // 팝업 닫기
     closeGameModePopup();
     
-    // 모드에 따른 게임 시작 (추후 구현될 game.js의 로직으로 연결)
-    if (mode === 'solo') {
-        // 개인전 시작
-        if (typeof startGame === 'function') startGame('solo');
-        else alert("개인전 준비 중입니다!");
-    } 
-    else if (mode === 'coop_random') {
-        // 랜덤 매칭
-        alert("랜덤 매칭을 시작합니다... (구현 예정)");
-    } 
-    else if (mode === 'coop_friend') {
-        // 친구 대전
-        alert("친구 코드를 입력하세요... (구현 예정)");
+    // 모드별 분기 처리
+    switch(mode) {
+        case 'pvp': // 1v1 경쟁전
+            alert("⚔️ 1v1 매칭을 시작합니다! (구현 예정)");
+            // startGame('pvp'); 
+            break;
+            
+        case 'coop': // 랜덤 협동전
+            alert("🤝 협동전 파트너를 찾습니다... (구현 예정)");
+            // startGame('coop');
+            break;
+            
+        case 'solo': // 솔로 플레이
+            // startGame('solo'); // 바로 시작 가능하면 호출
+            alert("🎯 솔로 모드로 연습을 시작합니다.");
+            break;
+            
+        case 'friend': // 친선전
+            const roomCode = prompt("참가할 방 코드를 입력하세요 (생성하려면 빈칸):");
+            if (roomCode !== null) {
+                alert(`방 [${roomCode || '신규 생성'}]에 입장 시도...`);
+            }
+            break;
+            
+        default:
+            console.error("Unknown mode:", mode);
     }
 }
 window.selectMode = selectMode;

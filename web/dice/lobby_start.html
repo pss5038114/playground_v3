@@ -37,47 +37,50 @@
     </div>
 
     <div id="gamemode-popup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden" onclick="if(event.target === this) closeGameModePopup()">
-        <div class="bg-white rounded-3xl p-6 w-[90%] max-w-sm shadow-2xl animate-scale-up relative">
-            
-            <button onclick="closeGameModePopup()" class="absolute top-4 right-4 text-slate-300 hover:text-slate-500 transition-colors">
-                <i class="ri-close-circle-fill text-2xl"></i>
-            </button>
-
-            <h2 class="text-2xl font-black text-center text-slate-800 mb-6 italic tracking-tight">
-                SELECT MODE
-            </h2>
-
-            <div class="grid grid-cols-2 gap-3 h-48">
+            <div class="bg-white rounded-[2rem] p-6 w-[90%] max-w-sm shadow-2xl animate-scale-up relative">
                 
-                <button onclick="selectMode('solo')" class="row-span-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl text-white flex flex-col items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform relative overflow-hidden group">
-                    <div class="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                    <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-1 backdrop-blur-sm">
-                        <i class="ri-user-3-fill text-2xl"></i>
-                    </div>
-                    <span class="font-black text-xl tracking-wide">SOLO</span>
-                    <span class="text-[10px] font-bold opacity-70 bg-black/10 px-2 py-0.5 rounded-full">개인전</span>
-                </button>
-                
-                <button onclick="selectMode('coop_random')" class="bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform relative overflow-hidden group">
-                    <div class="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <div class="flex items-center gap-1.5">
-                        <i class="ri-earth-fill text-lg"></i>
-                        <span class="font-black text-sm tracking-wide">RANDOM</span>
-                    </div>
-                    <span class="text-[9px] font-bold opacity-80 mt-0.5">협동전 (랜덤)</span>
-                </button>
-                
-                <button onclick="selectMode('coop_friend')" class="bg-gradient-to-r from-green-400 to-emerald-500 rounded-2xl text-white flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform relative overflow-hidden group">
-                    <div class="absolute inset-0 bg-white/10 translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <div class="flex items-center gap-1.5">
-                        <i class="ri-group-fill text-lg"></i>
-                        <span class="font-black text-sm tracking-wide">FRIEND</span>
-                    </div>
-                    <span class="text-[9px] font-bold opacity-80 mt-0.5">친구 대전</span>
+                <button onclick="closeGameModePopup()" class="absolute top-5 right-5 text-slate-300 hover:text-slate-500 transition-colors z-10">
+                    <i class="ri-close-circle-fill text-2xl"></i>
                 </button>
 
+                <h2 class="text-2xl font-black text-center text-slate-800 mb-6 italic tracking-tight">
+                    SELECT MODE
+                </h2>
+
+                <div class="grid grid-cols-2 gap-3">
+                    
+                    <button onclick="selectMode('pvp')" class="col-span-2 h-20 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl text-white flex items-center justify-between px-6 shadow-lg shadow-indigo-200 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                        <div class="flex flex-col items-start">
+                            <span class="font-black text-xl italic tracking-wider">1v1 BATTLE</span>
+                            <span class="text-[10px] font-bold opacity-80 bg-black/20 px-2 py-0.5 rounded-full mt-1">경쟁전</span>
+                        </div>
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <i class="ri-swords-fill text-2xl"></i>
+                        </div>
+                    </button>
+                    
+                    <button onclick="selectMode('coop')" class="h-28 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-orange-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-earth-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">CO-OP</span>
+                        <span class="text-[9px] opacity-80">랜덤 협동</span>
+                    </button>
+                    
+                    <button onclick="selectMode('solo')" class="h-28 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-user-3-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">SOLO</span>
+                        <span class="text-[9px] opacity-80">혼자 하기</span>
+                    </button>
+
+                    <button onclick="selectMode('friend')" class="col-span-2 h-14 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
+                        <i class="ri-shake-hands-fill text-lg"></i>
+                        <span class="font-bold text-sm">FRIENDLY MATCH</span>
+                        <span class="bg-white/20 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1">친구</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-
 </div>
