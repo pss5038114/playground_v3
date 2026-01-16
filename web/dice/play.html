@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dice Defense - Battle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 텍스트 드래그 방지 및 터치 최적화 */
+        body { user-select: none; -webkit-user-select: none; touch-action: none; overflow: hidden; }
+        canvas { touch-action: none; }
+    </style>
+</head>
+<body class="bg-slate-900 h-screen w-screen flex flex-col justify-center items-center overflow-hidden">
+
+    <div id="game-loading" class="absolute inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="mb-8 relative animate-bounce">
+            <i class="ri-dice-line text-6xl text-blue-500"></i>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <i class="ri-flashlight-fill text-2xl text-yellow-400 animate-pulse"></i>
+            </div>
+        </div>
+        <h2 class="text-2xl font-black text-white mb-2 tracking-widest">LOADING</h2>
+        <div class="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="loading-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
+        </div>
+        <p id="loading-text" class="text-xs text-slate-500 mt-2 font-mono">Initializing...</p>
+    </div>
+
+    <canvas id="game-canvas" class="bg-slate-800 shadow-2xl"></canvas>
+
+    <div id="ui-layer" class="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between hidden">
+        <div class="flex justify-between text-white">
+            <div class="flex flex-col">
+                <span class="text-xs text-slate-400 font-bold shadow-black drop-shadow-md">WAVE</span>
+                <span id="game-wave" class="text-3xl font-black drop-shadow-lg">1</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-xs text-slate-400 font-bold shadow-black drop-shadow-md">LIFE</span>
+                <div id="game-lives" class="flex gap-1 text-red-500 text-xl drop-shadow-lg">
+                    <i class="ri-heart-fill"></i><i class="ri-heart-fill"></i><i class="ri-heart-fill"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="pointer-events-auto flex items-center gap-4 mb-2">
+            <div class="flex flex-col items-center w-16 bg-black/40 rounded-xl p-2 backdrop-blur-sm border border-white/10">
+                <span class="text-[10px] text-slate-300 font-bold">SP</span>
+                <span id="game-sp" class="text-xl font-black text-yellow-400">100</span>
+            </div>
+            <button id="btn-spawn" onclick="window.spawnDice()" class="flex-1 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3 border-b-4 border-blue-800 active:border-b-0 active:translate-y-1">
+                <i class="ri-add-circle-fill text-3xl"></i>
+                <div class="flex flex-col items-start leading-none">
+                    <span class="text-lg font-black">소환</span>
+                    <span id="spawn-cost" class="text-xs opacity-80 font-mono">10 SP</span>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

@@ -124,6 +124,10 @@ function selectMode(mode) {
     
     // 팝업 닫기
     closeGameModePopup();
+
+    // 페이지 이동 (새로운 html 파일로)
+    // 예: /dice/play.html?mode=solo
+    window.location.href = `play.html?mode=${mode}`;
     
     // 모드별 분기 처리
     switch(mode) {
