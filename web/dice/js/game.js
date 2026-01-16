@@ -169,10 +169,10 @@ function getMockMapData() {
 
     // [수정] Path (역 U자 형태 '∩' - 화면 하단 시작/종료)
     const logicPath = [
-        {x: 0.5, y: 2.5},  // Start (왼쪽 하단)
+        {x: 0.5, y: 3.0},  // Start (왼쪽 하단)
         {x: 0.5, y: -0.5}, // Corner 1 (왼쪽 상단)
         {x: 6.5, y: -0.5}, // Corner 2 (오른쪽 상단)
-        {x: 6.5, y: 2.5}   // End (오른쪽 하단)
+        {x: 6.5, y: 3.0}   // End (오른쪽 하단)
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
 

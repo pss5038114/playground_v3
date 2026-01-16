@@ -4,25 +4,19 @@ class SoloGameSession:
     def __init__(self):
         self.width = 1080
         self.height = 1920
-        
-        # 맵 그리드 설정 (가로 5칸, 세로 3칸)
-        # 1080px / 7 unit width (여백 포함) = 약 154px -> 140px로 설정
         self.unit = 140
         
-        # 중앙 정렬 오프셋
-        self.offset_x = (self.width - (7 * self.unit)) // 2  # 가로 중앙
-        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙
+        self.offset_x = (self.width - (7 * self.unit)) // 2
+        self.offset_y = (self.height - (5 * self.unit)) // 2 
         
-        # [수정됨] 몬스터 경로 (역 U자 형태 '∩')
-        # Grid Y범위: 0.5 ~ 2.5 (3줄)
-        # Start(왼쪽 아래) -> TopLeft -> TopRight -> End(오른쪽 아래)
-        # 2.5가 그리드 맨 아래 칸의 중심입니다. 
-        # 시작점이 튀어나오지 않게 정확히 그리드 하단 중심(2.5)에서 시작합니다.
+        # [수정됨] 몬스터 경로 (역 U자 형태 '∩' - 하단 연장)
+        # Y=2.5가 그리드 맨 아래 칸의 중심입니다.
+        # 시작/끝 지점을 Y=4.0까지 늘려서 그리드 밖으로 길게 뺍니다.
         self.path = [
-            {'x': 0.5, 'y': 2.5},  # Start (왼쪽 하단)
-            {'x': 0.5, 'y': -0.5}, # 위로 올라감 (그리드 위쪽 여백)
+            {'x': 0.5, 'y': 3.0},  # Start (왼쪽 하단 외부) -> 수정됨(2.5 -> 4.0)
+            {'x': 0.5, 'y': -0.5}, # 위로 올라감
             {'x': 6.5, 'y': -0.5}, # 오른쪽으로 이동
-            {'x': 6.5, 'y': 2.5},  # End (오른쪽 하단)
+            {'x': 6.5, 'y': 3.0},  # End (오른쪽 하단 외부) -> 수정됨(2.5 -> 4.0)
         ]
         
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
