@@ -2,40 +2,40 @@
 
 class SoloGameSession:
     def __init__(self):
+        # 맵 해상도 (1080x1920)
         self.width = 1080
         self.height = 1920
+        
+        # 단위 크기 (Unit Size)
+        # 가로폭 7유닛 (0~7) -> 1080 / 7 = 약 154px
+        # 여유를 두고 140px로 설정
         self.unit = 140
         
-        self.offset_x = (self.width - (7 * self.unit)) // 2  
-        self.offset_y = (self.height - (5 * self.unit)) // 2 
+        # 맵 시작점 (화면 중앙 정렬을 위한 오프셋)
+        # 전체 맵 높이(약 4.5유닛)를 고려하여 세로 중앙 배치
+        self.offset_x = (self.width - (7 * self.unit)) // 2  # 가로 중앙
+        self.offset_y = (self.height - (5 * self.unit)) // 2 # 세로 중앙 (약간 위쪽?)
         
-        # 1. 몬스터 경로 (상하반전 수정됨)
-        # 0.5, 0.5(그리드 첫칸 y)를 기준으로 위쪽이 y가 작아짐
-        # Path: Start(위) -> (0.5, 0.5) [상단좌측] -> (0.5, 3.5) [하단좌측] -> (6.5, 3.5) [하단우측] -> (6.5, 0.5) [상단우측] -> End(위)
-        # 아, 사용자님 요청은: (0.5, 0) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, 0)
-        # 0이 위쪽, 3.5가 아래쪽이라고 가정하면 이게 맞습니다. (Canvas y는 아래로 갈수록 커짐)
-        
-        # Grid Center Y: 0.5, 1.5, 2.5 (3줄)
-        # Path는 Grid(0.5~2.5)를 감싸야 하므로
-        # 좌측 라인 x=0.5, 우측 라인 x=6.5
-        # 상단 y= -1 (시작점), 하단 y=3.5 (도는 구간)
-        
+        # 1. 몬스터 이동 경로 (U자 형태)
+        # (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
         self.path = [
-            {'x': 0.5, 'y': -1.0}, # Start (위에서 시작)
-            {'x': 0.5, 'y': 3.5},  # 좌측 라인 타고 아래로 (Turn Point 1)
-            {'x': 6.5, 'y': 3.5},  # 오른쪽으로 이동 (Turn Point 2)
-            {'x': 6.5, 'y': -1.0}, # 위로 올라가서 끝 (Defense Line)
+            {'x': 0.5, 'y': -1.0}, # Start (화면 위)
+            {'x': 0.5, 'y': 3.5},  # 좌측 하단 코너
+            {'x': 6.5, 'y': 3.5},  # 우측 하단 코너
+            {'x': 6.5, 'y': -1.0}, # End (방어선)
         ]
-        
+        # 실제 픽셀 좌표로 변환하여 저장
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
         
+        # 2. 주사위 배치 그리드 (5x3)
+        # x: 1.5 ~ 5.5, y: 0.5 ~ 2.5
         self.grid = []
         self._init_grid()
 
     def _to_pixel(self, ux, uy):
         return {
-            'x': int(self.offset_x + ux * self.unit),
-            'y': int(self.offset_y + uy * self.unit)
+            'x': self.offset_x + ux * self.unit,
+            'y': self.offset_y + uy * self.unit
         }
 
     def _init_grid(self):

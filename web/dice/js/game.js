@@ -35,54 +35,6 @@ function setupLeaveWarning() {
     });
 }
 
-async function fetchUserDeck() {
-    // URL에서 username 파라미터가 없으면 로컬스토리지나 임시값 사용
-    // 실제로는 세션 관리자가 필요하지만, 일단 API/deck/list 호출 시도
-    // utils.js나 api.js가 없으므로 직접 구현
-    
-    // ★ 주의: 실제 구현 시에는 인증 토큰이나 쿠키를 사용해야 함.
-    // 여기서는 테스트를 위해 'test_user' 또는 로비에서 넘겨준 정보를 쓴다고 가정.
-    // 임시로 하드코딩된 데이터로 테스트 (API 연동 준비 완료)
-    
-    /* const res = await fetch(`/api/dice/list/${userId}`);
-    const data = await res.json();
-    return data;
-    */
-   
-    // [Mock Data] 실제 DB 구조에 맞춘 더미 데이터
-    return [
-        { id: 'fire', name: 'Fire', rarity: 'Common', color: 'bg-red-500', symbol: 'ri-fire-fill', class_level: 3 },
-        { id: 'electric', name: 'Electric', rarity: 'Common', color: 'bg-orange-300', symbol: 'ri-flashlight-fill', class_level: 3 },
-        { id: 'wind', name: 'Wind', rarity: 'Common', color: 'bg-teal-300', symbol: 'ri-windy-fill', class_level: 2 },
-        { id: 'ice', name: 'Ice', rarity: 'Common', color: 'bg-blue-300', symbol: 'ri-snowflake-fill', class_level: 2 },
-        { id: 'poison', name: 'Poison', rarity: 'Common', color: 'bg-green-500', symbol: 'ri-skull-2-fill', class_level: 1 }
-    ];
-}
-
-// [NEW] 하단 덱 렌더링 (utils.js의 renderDiceIcon 활용)
-function renderBottomDeck(deck) {
-    const slots = document.querySelectorAll('.dice-slot');
-    const powerBtns = document.querySelectorAll('.power-btn');
-    
-    deck.forEach((dice, idx) => {
-        if(idx >= slots.length) return;
-        
-        // 1. 주사위 아이콘 그리기
-        const slot = slots[idx];
-        slot.innerHTML = renderDiceIcon(dice, "w-10 h-10"); // utils.js 함수 사용
-        
-        // 2. 파워업 버튼 초기화
-        const btn = powerBtns[idx];
-        if(btn) {
-            btn.innerHTML = `
-                <span class="text-[9px] text-slate-400 font-bold block">Lv.1</span>
-                <span class="text-[8px] text-yellow-500">100</span>
-            `;
-            btn.onclick = () => powerUp(idx, dice.id);
-        }
-    });
-}
-
 // 3. 로딩 시뮬레이션
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
@@ -177,26 +129,15 @@ function setupCanvas() {
 }
 
 // 5. 게임 루프 (그리기)
-// 캔버스 그리기 함수 수정 (배경 밝게)
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 (slate-800)
-    ctx.fillStyle = "#1e293b"; 
+    // 배경 클리어
+    ctx.clearRect(0, 0, 1080, 1920);
+    ctx.fillStyle = "#1e293b"; // slate-800
     ctx.fillRect(0, 0, 1080, 1920);
-    
-    // 그리드 패턴 추가 (모눈종이 효과)
-    ctx.strokeStyle = "rgba(255,255,255,0.03)";
-    ctx.lineWidth = 2;
-    const gridSize = 140;
-    
-    /*
-    ctx.beginPath();
-    for(let x=0; x<=1080; x+=gridSize) { ctx.moveTo(x,0); ctx.lineTo(x,1920); }
-    for(let y=0; y<=1920; y+=gridSize) { ctx.moveTo(0,y); ctx.lineTo(1080,y); }
-    ctx.stroke();
-    */
 
+    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
@@ -211,12 +152,12 @@ function sleep(ms) {
     return new Promise(r => setTimeout(r, ms)); 
 }
 
-// 맵 데이터 (서버 로직과 동기화된 상하반전 수정본)
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
-    const unit = 140; 
+    const unit = 140; // 1 단위 크기
     
+    // 중앙 정렬 오프셋
     const offsetX = (width - (7 * unit)) / 2;
     const offsetY = (height - (5 * unit)) / 2;
 
@@ -225,9 +166,7 @@ function getMockMapData() {
         y: offsetY + uy * unit
     });
 
-    // 1. Path: (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
-    // Canvas y좌표는 아래가 양수이므로, 
-    // -1(상단) -> 3.5(하단) -> 3.5(하단) -> -1(상단) 순서가 맞음.
+    // 1. Path (U자 형태)
     const logicPath = [
         {x: 0.5, y: -1.0},
         {x: 0.5, y: 3.5},
