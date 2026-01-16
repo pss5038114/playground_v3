@@ -97,3 +97,47 @@ function checkIsNew(diceId) {
     const existing = currentDiceList.find(d => d.id === diceId);
     return !existing || existing.class_level === 0;
 }
+
+// [NEW] 게임 모드 팝업 열기
+function openGameModePopup() {
+    const popup = document.getElementById('gamemode-popup');
+    if (popup) {
+        popup.classList.remove('hidden');
+        popup.classList.add('flex');
+    }
+}
+window.openGameModePopup = openGameModePopup;
+
+// [NEW] 게임 모드 팝업 닫기
+function closeGameModePopup() {
+    const popup = document.getElementById('gamemode-popup');
+    if (popup) {
+        popup.classList.add('hidden');
+        popup.classList.remove('flex');
+    }
+}
+window.closeGameModePopup = closeGameModePopup;
+
+// [NEW] 모드 선택 처리
+function selectMode(mode) {
+    console.log("Selected Game Mode:", mode);
+    
+    // 팝업 닫기
+    closeGameModePopup();
+    
+    // 모드에 따른 게임 시작 (추후 구현될 game.js의 로직으로 연결)
+    if (mode === 'solo') {
+        // 개인전 시작
+        if (typeof startGame === 'function') startGame('solo');
+        else alert("개인전 준비 중입니다!");
+    } 
+    else if (mode === 'coop_random') {
+        // 랜덤 매칭
+        alert("랜덤 매칭을 시작합니다... (구현 예정)");
+    } 
+    else if (mode === 'coop_friend') {
+        // 친구 대전
+        alert("친구 코드를 입력하세요... (구현 예정)");
+    }
+}
+window.selectMode = selectMode;
