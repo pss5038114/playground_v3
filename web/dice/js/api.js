@@ -92,26 +92,20 @@ async function fetchMyDeck() {
     } catch(e) { console.error("Deck fetch failed", e); }
 }
 
-// [수정] 현재 프리셋 저장하기
+// [수정됨] 현재 프리셋 저장하기
 async function saveMyDeck() {
     try {
-        // 현재 상태를 myDecks에 반영
+        // 로컬 데이터 최신화
         if (!myDecks[currentPresetIndex]) {
             myDecks[currentPresetIndex] = { name: `Preset ${currentPresetIndex}`, slots: [] };
         }
-        myDecks[currentPresetIndex].slots = myDeck;
-
-        // 이름이 없으면 기본값 사용
-        const deckName = myDecks[currentPresetIndex].name || `Preset ${currentPresetIndex}`;
-        
-        // 덱이 비어있으면 기본값 사용
-        const deckSlots = (myDeck && myDeck.length === 5) ? myDeck : ['fire', 'electric', 'wind', 'ice', 'poison'];
+        myDecks[currentPresetIndex].slots = [...myDeck];
 
         const payload = { 
             username: myId, 
-            preset_index: currentPresetIndex,
-            name: deckName,
-            deck: deckSlots 
+            preset_index: currentPresetIndex, // 정수 형태 보장
+            name: myDecks[currentPresetIndex].name,
+            deck: myDeck 
         };
 
         const res = await fetch(`${API_DICE}/deck/save`, {
@@ -120,11 +114,16 @@ async function saveMyDeck() {
             body: JSON.stringify(payload)
         });
         
+        const data = await res.json();
         if (!res.ok) {
-            const err = await res.json();
-            console.error("Deck save failed:", err);
+            console.error("덱 저장 실패:", data);
+            alert("덱 저장 실패: " + (data.detail || "오류 발생"));
+        } else {
+            console.log("서버에 덱 저장 완료:", payload);
         }
-    } catch(e) { console.error("Deck save error", e); }
+    } catch(e) { 
+        console.error("덱 저장 중 통신 오류:", e);
+    }
 }
 
 // [NEW] 유저 스탯(크리티컬 등) 가져오기

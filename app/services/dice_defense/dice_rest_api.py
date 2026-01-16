@@ -249,19 +249,29 @@ async def get_my_deck(username: str):
 @router.post("/deck/save")
 async def save_my_deck(payload: dict = Body(...)):
     username = payload.get("username")
-    preset_index = payload.get("preset_index") # 1~7
-    deck_name = payload.get("name")
-    deck_slots = payload.get("deck") # ["id1", ...]
+    # [수정] preset_index를 정수형으로 명확히 변환
+    try:
+        preset_index = int(payload.get("preset_index", 1))
+    except (ValueError, TypeError):
+        raise HTTPException(400, "잘못된 프리셋 번호입니다.")
+        
+    deck_name = payload.get("name", f"Preset {preset_index}")
+    deck_slots = payload.get("deck") 
     
-    if not preset_index or not deck_slots or len(deck_slots) != 5:
-        raise HTTPException(400, "Invalid deck format")
+    if not deck_slots or len(deck_slots) != 5:
+        raise HTTPException(400, "덱 형식이 올바르지 않습니다. (5개가 필요합니다)")
         
     conn = get_db_connection()
     try:
-        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if not user: raise HTTPException(404, "User not found")
+        # username 대소문자 구분 없이 검색
+        user = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
+        if not user: 
+            print(f"[ERROR] 사용자를 찾을 수 없음: {username}")
+            raise HTTPException(404, "사용자를 찾을 수 없습니다.")
         
-        # 해당 프리셋 업데이트 (INSERT OR REPLACE)
+        user_id = user["id"]
+        
+        # [중요] ON CONFLICT 처리를 위해 정확한 파라미터 전달
         conn.execute("""
             INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -272,10 +282,15 @@ async def save_my_deck(payload: dict = Body(...)):
                 slot_3=excluded.slot_3,
                 slot_4=excluded.slot_4,
                 slot_5=excluded.slot_5
-        """, (user["id"], preset_index, deck_name, *deck_slots))
+        """, (user_id, preset_index, deck_name, *deck_slots))
         
         conn.commit()
-        return {"message": "Deck saved"}
+        print(f"[*] 덱 저장 성공: 유저 {username}, 프리셋 {preset_index}, 구성 {deck_slots}")
+        return {"status": "success", "message": "덱이 저장되었습니다."}
+    except Exception as e:
+        conn.rollback()
+        print(f"[!] 데이터베이스 에러: {e}")
+        raise HTTPException(500, f"서버 오류: {str(e)}")
     finally:
         conn.close()
 
