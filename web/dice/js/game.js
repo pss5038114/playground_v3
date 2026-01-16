@@ -5,6 +5,7 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
+let userDeck = []; // 덱 데이터 저장용
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
@@ -51,6 +52,12 @@ async function runLoadingSequence() {
         gameMap = getMockMapData(); 
         await sleep(500);
 
+        // [추가됨] 덱 데이터 불러오기
+        updateLoading(50, "Loading User Deck...");
+        await fetchUserDeck(); 
+        renderBottomDeckSlots(); // 화면에 그리기
+        await sleep(500);
+
         updateLoading(70, "Loading resources...");
         // TODO: 이미지 프리로딩
         await sleep(800);
@@ -82,6 +89,82 @@ async function runLoadingSequence() {
         alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
         window.location.href = 'index.html'; // 로비로 강제 이동
     }
+}
+
+// [신규 함수] 유저 덱 가져오기 (API 호출)
+async function fetchUserDeck() {
+    try {
+        // 실제 API 호출 (나중에 주석 해제하여 사용)
+        // const res = await fetch('/api/dice/deck/active');
+        // const data = await res.json();
+        // userDeck = data.deck;
+
+        // [테스트용] 모의 데이터 (API가 아직 없다면 이걸 사용)
+        console.log("Fetching mock deck data...");
+        userDeck = [
+            { id: 'fire', name: 'Fire', color: '#ef4444' },     // Red
+            { id: 'electric', name: 'Electric', color: '#eab308' }, // Yellow
+            { id: 'wind', name: 'Wind', color: '#10b981' },     // Green
+            { id: 'ice', name: 'Ice', color: '#3b82f6' },       // Blue
+            { id: 'poison', name: 'Poison', color: '#a855f7' }  // Purple
+        ];
+    } catch (err) {
+        console.error("Failed to fetch deck:", err);
+        userDeck = []; // 에러 시 빈 덱
+    }
+}
+
+// [신규 함수] 하단 덱 슬롯 렌더링 (주사위 눈 없이 색상/아이콘만)
+function renderBottomDeckSlots() {
+    const slots = document.querySelectorAll('.dice-slot');
+    
+    userDeck.forEach((dice, index) => {
+        if (index >= slots.length) return;
+        
+        const slot = slots[index];
+        // 기존 내용(Lv.1 텍스트 등) 초기화하지 않고, 배경/아이콘만 추가
+        
+        // 1. 슬롯 배경색 변경 (주사위 색상, 약간 투명하게)
+        slot.style.backgroundColor = dice.color;
+        slot.style.borderColor = adjustColor(dice.color, -20); // 테두리는 좀 더 진하게
+        slot.style.boxShadow = `inset 0 0 10px rgba(0,0,0,0.2)`;
+
+        // 2. 주사위 아이콘/심볼 추가 (눈금 대신)
+        // 기존에 있던 span(Lv.1)은 유지하고, 그 뒤에 배경 이미지를 넣거나 아이콘을 추가
+        
+        // 아이콘 매핑 (RemixIcon 사용)
+        let iconClass = 'ri-question-mark';
+        switch(dice.id) {
+            case 'fire': iconClass = 'ri-fire-fill'; break;
+            case 'electric': iconClass = 'ri-flashlight-fill'; break;
+            case 'wind': iconClass = 'ri-windy-fill'; break;
+            case 'ice': iconClass = 'ri-snowflake-fill'; break;
+            case 'poison': iconClass = 'ri-skull-2-fill'; break;
+        }
+
+        // 아이콘 엘리먼트 생성
+        const iconEl = document.createElement('i');
+        iconEl.className = `${iconClass} text-white text-2xl drop-shadow-md absolute`;
+        iconEl.style.opacity = '0.9';
+        
+        // 기존 내용(Lv.1)을 맨 앞으로 가져오기 위해 z-index 조정이 필요할 수 있음
+        // 일단 슬롯에 아이콘 추가
+        slot.appendChild(iconEl);
+        
+        // Lv.1 텍스트가 가려지지 않게 처리 (기존 span 찾아서 z-index 올림)
+        const levelSpan = slot.querySelector('span');
+        if(levelSpan) {
+            levelSpan.style.position = 'relative';
+            levelSpan.style.zIndex = '10';
+            levelSpan.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
+            levelSpan.className = levelSpan.className.replace('text-slate-400', 'text-white'); // 글자색 흰색으로 변경
+        }
+    });
+}
+
+// 색상 밝기 조절 헬퍼 함수
+function adjustColor(color, amount) {
+    return color; // (실제 구현 시 HEX -> RGB 변환 후 계산 필요, 지금은 placeholder)
 }
 
 function updateLoading(percent, text) {
