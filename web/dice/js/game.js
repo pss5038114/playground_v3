@@ -1,219 +1,260 @@
 // web/dice/js/game.js
 
+// 전역 변수
 let canvas, ctx;
 let gameMap = null;
-let socket = null;
-let currentMonsters = []; // 서버에서 받은 몬스터 목록
+let currentMode = 'solo';
+let animationFrameId;
 
-// 1. 초기화
-window.onload = function() {
+// 1. 페이지 로드 시 초기화
+window.onload = async function() {
+    console.log("Game Script Loaded.");
+    
+    // URL 파라미터 확인 (mode)
+    const urlParams = new URLSearchParams(window.location.search);
+    currentMode = urlParams.get('mode') || 'solo';
+    console.log(`Initializing game in [${currentMode}] mode...`);
+
+    // 이탈 방지 이벤트 등록
+    setupLeaveWarning();
+
+    // 캔버스 크기 설정
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 맵 데이터 초기화 (좌표 변환용)
-    gameMap = getMockMapData(); 
-    
-    // 게임 연결 시작
-    connectGame();
+    // 로딩 시퀀스 시작
+    await runLoadingSequence();
 };
 
+// 2. 이탈 방지 (뒤로가기/새로고침 경고)
+function setupLeaveWarning() {
+    window.addEventListener('beforeunload', (event) => {
+        event.preventDefault();
+        event.returnValue = ''; 
+        return '';
+    });
+}
+
+// 3. 로딩 시뮬레이션
+async function runLoadingSequence() {
+    const loadingScreen = document.getElementById('game-loading');
+    const uiTop = document.getElementById('ui-top');
+    const uiBottom = document.getElementById('ui-bottom');
+    
+    try {
+        updateLoading(10, "Connecting to server...");
+        // TODO: 웹소켓 연결 로직
+        await sleep(500);
+
+        updateLoading(40, "Fetching map data...");
+        // 서버 데이터 모의 (여기서 맵 데이터 생성)
+        gameMap = getMockMapData(); 
+        await sleep(500);
+
+        updateLoading(70, "Loading resources...");
+        // TODO: 이미지 프리로딩
+        await sleep(800);
+
+        updateLoading(100, "Ready to Battle!");
+        await sleep(300);
+
+        // 로딩 화면 제거 & UI 표시
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.pointerEvents = 'none';
+        
+        setTimeout(() => {
+            loadingScreen.style.display = 'none'; // 완전히 가리기
+        }, 500);
+
+        // 인게임 UI 보이기
+        if(uiTop) uiTop.classList.remove('hidden');
+        if(uiBottom) {
+            uiBottom.classList.remove('hidden');
+            uiBottom.classList.add('flex');
+        }
+
+        console.log("Game Loop Starting...");
+        // 게임 루프 시작
+        requestAnimationFrame(gameLoop);
+
+    } catch (e) {
+        console.error("Loading Failed:", e);
+        alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
+        window.location.href = 'index.html'; // 로비로 강제 이동
+    }
+}
+
+function updateLoading(percent, text) {
+    const bar = document.getElementById('loading-bar');
+    const txt = document.getElementById('loading-text');
+    if(bar) bar.style.width = `${percent}%`;
+    if(txt) txt.innerText = text;
+}
+
+// 4. 캔버스 설정 (반응형)
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
     if(!canvas) return;
     ctx = canvas.getContext('2d');
 
+    // 화면 꽉 채우기 (여백 없이)
     const w = window.innerWidth;
     const h = window.innerHeight;
+
+    // 게임 내부 해상도 (1080x1920) 비율 유지
     const targetAspect = 1080 / 1920;
     const currentAspect = w / h;
 
     let finalW, finalH;
+
     if (currentAspect > targetAspect) {
-        finalH = h; finalW = h * targetAspect;
+        // 화면이 더 넓음 -> 높이에 맞춤
+        finalH = h;
+        finalW = h * targetAspect;
     } else {
-        finalW = w; finalH = w / targetAspect;
+        // 화면이 더 좁음 -> 너비에 맞춤
+        finalW = w;
+        finalH = w / targetAspect;
     }
 
-    // 내부 해상도 1080x1920 고정
+    // 캔버스 내부 해상도 고정
     canvas.width = 1080;  
     canvas.height = 1920; 
+    
+    // CSS로 화면 표출 크기 조정
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
+    
+    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
-// 2. 서버 연결
-function connectGame() {
-    const params = new URLSearchParams(window.location.search);
-    const roomCode = params.get('room') || 'TEST_ROOM';
-    
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${proto}//${window.location.host}/ws/game/${roomCode}`;
-
-    console.log(`Connecting to ${wsUrl}`);
-    socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-        console.log("🔥 Connected to Game Server!");
-        document.getElementById('game-loading').style.display = 'none';
-        document.getElementById('ui-top').classList.remove('hidden');
-        document.getElementById('ui-bottom').classList.remove('hidden');
-        document.getElementById('ui-bottom').classList.add('flex');
-        
-        // 게임 루프 시작
-        requestAnimationFrame(gameLoop);
-    };
-
-    socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'TICK') {
-            // [핵심] 서버가 보낸 몬스터 위치 업데이트
-            currentMonsters = data.monsters || [];
-            if(data.wave) document.getElementById('game-wave').innerText = data.wave;
-        }
-    };
-    
-    socket.onerror = (e) => console.error("WS Error:", e);
-}
-
-// 3. 게임 루프 (그리기)
+// 5. 게임 루프 (그리기)
 function gameLoop() {
     if(!ctx) return;
 
-    // 1. 배경 지우기
+    // 배경 클리어
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; // 배경색
+    ctx.fillStyle = "#1e293b"; // slate-800
     ctx.fillRect(0, 0, 1080, 1920);
 
+    // 맵 그리기
     if(gameMap) {
-        // 2. 맵 그리기
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
-        
-        // 3. 몬스터 그리기 (서버 데이터 기반)
-        drawMonsters(ctx, currentMonsters);
     }
 
-    requestAnimationFrame(gameLoop);
+    animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// 4. 그리기 헬퍼 함수들
-function drawMonsters(ctx, monsters) {
-    if (!monsters) return;
-    
-    monsters.forEach(mon => {
-        // 서버 좌표(x,y) -> 캔버스 좌표(px, py) 변환
-        // gameMap.toPixel 함수를 사용
-        const pos = gameMap.toPixel(mon.x, mon.y);
-        
-        const radius = 40; // 몬스터 크기
+// --- Helper Functions (자체 내장) ---
 
-        // 그림자
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y + 5, radius, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.3)";
-        ctx.fill();
-
-        // 본체 (빨간색)
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = "#ef4444"; 
-        ctx.fill();
-        
-        // 테두리
-        ctx.strokeStyle = "white";
-        ctx.lineWidth = 4;
-        ctx.stroke();
-    });
+function sleep(ms) { 
+    return new Promise(r => setTimeout(r, ms)); 
 }
 
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
-    const unit = 140; 
-    const boardRows = 4; 
+    const unit = 140; // 1 단위 크기
     
+    // 중앙 정렬 오프셋
     const offsetX = (width - (7 * unit)) / 2;
-    const offsetY = (height - (boardRows * unit)) / 2;
+    const offsetY = (height - (5 * unit)) / 2;
 
-    // 좌표 변환 함수 (Server Coord -> Canvas Pixel)
     const toPixel = (ux, uy) => ({
         x: offsetX + ux * unit,
-        y: offsetY + (boardRows - uy) * unit 
+        y: offsetY + uy * unit
     });
 
-    // 배경용 경로 (서버 경로와 일치)
+    // 1. Path (U자 형태)
     const logicPath = [
-        {x: 0.5, y: 0.0},
+        {x: 0.5, y: -1.0},
         {x: 0.5, y: 3.5},
         {x: 6.5, y: 3.5},
-        {x: 6.5, y: 0.0}
+        {x: 6.5, y: -1.0}
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
 
-    // 그리드 데이터 생성
+    // 2. Grid (5x3)
     const grid = [];
-    const rows = 3; 
-    const cols = 5; 
+    const rows = 3, cols = 5;
     const cellSize = unit * 0.9; 
 
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
-            const lx = 1.0 + c + 0.5; 
-            const ly = 0.0 + r + 0.5;
+            const lx = 1.5 + c;
+            const ly = 0.5 + r;
             const pos = toPixel(lx, ly);
             
             grid.push({
+                index: r*cols + c,
                 x: pos.x - cellSize/2,
                 y: pos.y - cellSize/2,
-                w: cellSize, h: cellSize
+                w: cellSize, h: cellSize,
+                cx: pos.x, cy: pos.y
             });
         }
     }
 
-    return { path, grid, toPixel };
+    return { width, height, path, grid };
 }
 
 function drawPath(ctx, path) {
     if(path.length < 2) return;
+
     ctx.beginPath();
-    ctx.lineWidth = 100;
-    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 100; // 길 너비
+    ctx.strokeStyle = "#334155"; // slate-700
     ctx.lineCap = "butt"; 
     ctx.lineJoin = "round"; 
+
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
     ctx.stroke();
     
-    // 중앙선
+    // 점선 중앙선
     ctx.beginPath();
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#475569";
     ctx.setLineDash([20, 30]);
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
 }
 
 function drawGrid(ctx, grid) {
     ctx.lineWidth = 4;
-    grid.forEach(cell => {
+    grid.forEach((cell, idx) => {
+        // 배경
         ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        
+        // 둥근 사각형 그리기 (간단 구현)
         const r = 16; 
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
+        
         ctx.beginPath();
-        ctx.roundRect(x, y, w, h, r);
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+        
         ctx.fill();
         ctx.stroke();
     });
 }
 
-// 기능 버튼 (임시)
+// UI 함수들
+window.toggleDebug = function() { alert("디버그 모드 준비중"); };
 window.confirmSurrender = function() {
     if(confirm("정말 포기하시겠습니까?")) window.location.href = 'index.html';
 };
-window.spawnDice = function() { 
-    if(socket) socket.send(JSON.stringify({type: "SPAWN_REQ"}));
-};
+window.spawnDice = function() { console.log("Spawn Request"); };
+window.powerUp = function(idx) { console.log("Power Up:", idx); };
