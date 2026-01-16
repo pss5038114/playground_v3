@@ -20,7 +20,7 @@
         <div class="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
             <div id="loading-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
         </div>
-        <p id="loading-text" class="text-xs text-slate-500 mt-2">Preparing Battle...</p>
+        <p id="loading-text" class="text-xs text-slate-500 mt-2">Connecting to Server...</p>
     </div>
 
     <div id="ui-top" class="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none hidden">
@@ -40,9 +40,6 @@
                 <i class="ri-heart-fill"></i><i class="ri-heart-fill"></i><i class="ri-heart-fill"></i>
             </div>
             <div class="flex gap-2">
-                <button onclick="toggleDebug()" class="w-8 h-8 bg-slate-800 text-slate-400 rounded-full flex items-center justify-center border border-slate-700 hover:text-white hover:bg-slate-700">
-                    <i class="ri-bug-line"></i>
-                </button>
                 <button onclick="confirmSurrender()" class="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold border border-red-500/30 hover:bg-red-500 hover:text-white transition-colors">
                     항복
                 </button>
@@ -55,7 +52,6 @@
     </div>
 
     <div id="ui-bottom" class="w-full bg-slate-900 border-t border-slate-800 flex flex-col pb-safe z-20 hidden">
-        
         <div class="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-800/50">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center border border-yellow-500/30">
@@ -63,27 +59,18 @@
                 </div>
                 <span id="game-sp" class="text-2xl font-black text-white tracking-tight">100</span>
             </div>
-            
             <button onclick="window.spawnDice()" class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2 rounded-xl text-white font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform flex items-center gap-2">
                 <i class="ri-add-circle-fill"></i>
                 <span>소환</span>
                 <span id="spawn-cost" class="text-xs bg-black/20 px-2 py-0.5 rounded ml-1">10</span>
             </button>
         </div>
-
         <div class="grid grid-cols-5 gap-1 p-2 h-28">
-            <div class="flex flex-col gap-1 h-full">
-                <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 relative dice-slot" data-index="0">
-                    <i class="ri-question-mark text-slate-600"></i> </div>
-                <button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700 flex flex-col items-center justify-center leading-none" onclick="powerUp(0)">
-                    <span class="text-[9px] text-slate-400 font-bold">Lv.1</span>
-                    <span class="text-[8px] text-yellow-500">100</span>
-                </button>
-            </div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="1"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(1)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="2"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(2)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="3"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(3)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
-            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="4"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(4)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+             <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-600">Deck 1</div>
+             <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-600">Deck 2</div>
+             <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-600">Deck 3</div>
+             <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-600">Deck 4</div>
+             <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 text-slate-600">Deck 5</div>
         </div>
     </div>
 
