@@ -3,84 +3,116 @@
 // 전역 변수
 let canvas, ctx;
 let gameMap = null;
+let gameState = null;
 let currentMode = 'solo';
 let animationFrameId;
+
+// 주사위 색상 매핑 (임시)
+const DICE_COLORS = {
+    'fire': '#ef4444',     // red-500
+    'electric': '#fdba74', // orange-300
+    'wind': '#5eead4',     // teal-300
+    'ice': '#93c5fd',      // blue-300
+    'poison': '#22c55e',   // green-500
+    'default': '#cbd5e1'
+};
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
     console.log("Game Script Loaded.");
     
-    // URL 파라미터 확인 (mode)
     const urlParams = new URLSearchParams(window.location.search);
     currentMode = urlParams.get('mode') || 'solo';
-    console.log(`Initializing game in [${currentMode}] mode...`);
+    const sessionId = urlParams.get('session') || "test_session";
 
-    // 이탈 방지 이벤트 등록
     setupLeaveWarning();
-
-    // 캔버스 크기 설정
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 로딩 시퀀스 시작
-    await runLoadingSequence();
+    // 로딩 시퀀스 대신 바로 접속 시도
+    connectWebSocket(sessionId);
 };
 
-// 2. 이탈 방지 (뒤로가기/새로고침 경고)
-function setupLeaveWarning() {
-    window.addEventListener('beforeunload', (event) => {
-        event.preventDefault();
-        event.returnValue = ''; 
-        return '';
-    });
+// 2. 웹소켓 연결
+function connectWebSocket(sessionId) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/dice/${sessionId}`;
+    
+    updateLoading(20, "Connecting to Server...");
+    
+    socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+        updateLoading(50, "Connected!");
+        console.log("WS Connected");
+        // 필요한 경우 JOIN 메시지 전송
+        // socket.send(JSON.stringify({ type: "JOIN", mode: currentMode }));
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleServerMessage(data);
+    };
+
+    socket.onclose = () => {
+        alert("서버 연결이 끊어졌습니다.");
+        location.href = 'index.html';
+    };
 }
 
-// 3. 로딩 시뮬레이션
-async function runLoadingSequence() {
+// 3. 서버 메시지 처리
+function handleServerMessage(data) {
+    if (data.type === 'INIT') {
+        gameMap = data.map;
+        gameState = data.state;
+        updateLoading(100, "Ready!");
+        setTimeout(hideLoadingScreen, 500);
+        updateUI(gameState);
+        requestAnimationFrame(gameLoop);
+    }
+    else if (data.type === 'GAME_STATE') {
+        gameState = data.state;
+        // 맵 그리드 정보 갱신 (주사위 배치 등)
+        if(gameMap && gameState.grid) {
+            gameMap.grid = gameState.grid;
+        }
+        updateUI(gameState);
+    }
+}
+
+function updateUI(state) {
+    if(!state) return;
+    // SP 및 소환 비용 업데이트
+    const spEl = document.getElementById('game-sp');
+    const costEl = document.getElementById('spawn-cost');
+    const lifeEl = document.getElementById('game-lives');
+    
+    if(spEl) spEl.innerText = state.sp;
+    if(costEl) costEl.innerText = state.spawn_cost;
+    
+    // 버튼 활성화/비활성화 시각적 처리
+    const spawnBtn = document.querySelector('button[onclick="window.spawnDice()"]');
+    if(spawnBtn) {
+        if(state.sp < state.spawn_cost) {
+            spawnBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            spawnBtn.classList.remove('active:scale-95');
+        } else {
+            spawnBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            spawnBtn.classList.add('active:scale-95');
+        }
+    }
+}
+
+function hideLoadingScreen() {
     const loadingScreen = document.getElementById('game-loading');
     const uiTop = document.getElementById('ui-top');
     const uiBottom = document.getElementById('ui-bottom');
     
-    try {
-        updateLoading(10, "Connecting to server...");
-        // TODO: 웹소켓 연결 로직
-        await sleep(500);
-
-        updateLoading(40, "Fetching map data...");
-        // 서버 데이터 모의 (여기서 맵 데이터 생성)
-        gameMap = getMockMapData(); 
-        await sleep(500);
-
-        updateLoading(70, "Loading resources...");
-        // TODO: 이미지 프리로딩
-        await sleep(800);
-
-        updateLoading(100, "Ready to Battle!");
-        await sleep(300);
-
-        // 로딩 화면 제거 & UI 표시
-        loadingScreen.style.opacity = '0';
-        loadingScreen.style.pointerEvents = 'none';
-        
-        setTimeout(() => {
-            loadingScreen.style.display = 'none'; // 완전히 가리기
-        }, 500);
-
-        // 인게임 UI 보이기
-        if(uiTop) uiTop.classList.remove('hidden');
-        if(uiBottom) {
-            uiBottom.classList.remove('hidden');
-            uiBottom.classList.add('flex');
-        }
-
-        console.log("Game Loop Starting...");
-        // 게임 루프 시작
-        requestAnimationFrame(gameLoop);
-
-    } catch (e) {
-        console.error("Loading Failed:", e);
-        alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
-        window.location.href = 'index.html'; // 로비로 강제 이동
+    if(loadingScreen) loadingScreen.style.display = 'none';
+    if(uiTop) uiTop.classList.remove('hidden');
+    if(uiBottom) {
+        uiBottom.classList.remove('hidden');
+        uiBottom.classList.add('flex');
     }
 }
 
@@ -91,53 +123,39 @@ function updateLoading(percent, text) {
     if(txt) txt.innerText = text;
 }
 
-// 4. 캔버스 설정 (반응형)
+// 4. 캔버스 설정
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
     if(!canvas) return;
     ctx = canvas.getContext('2d');
-
-    // 화면 꽉 채우기 (여백 없이)
+    
     const w = window.innerWidth;
     const h = window.innerHeight;
-
-    // 게임 내부 해상도 (1080x1920) 비율 유지
     const targetAspect = 1080 / 1920;
     const currentAspect = w / h;
 
     let finalW, finalH;
-
     if (currentAspect > targetAspect) {
-        // 화면이 더 넓음 -> 높이에 맞춤
-        finalH = h;
-        finalW = h * targetAspect;
+        finalH = h; finalW = h * targetAspect;
     } else {
-        // 화면이 더 좁음 -> 너비에 맞춤
-        finalW = w;
-        finalH = w / targetAspect;
+        finalW = w; finalH = w / targetAspect;
     }
-
-    // 캔버스 내부 해상도 고정
-    canvas.width = 1080;  
-    canvas.height = 1920; 
     
-    // CSS로 화면 표출 크기 조정
+    canvas.width = 1080;
+    canvas.height = 1920;
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
-    
-    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
-// 5. 게임 루프 (그리기)
+// 5. 게임 루프
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 클리어
+    // 배경
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; // slate-800
+    ctx.fillStyle = "#1e293b"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
@@ -146,75 +164,25 @@ function gameLoop() {
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// --- Helper Functions (자체 내장) ---
-
-function sleep(ms) { 
-    return new Promise(r => setTimeout(r, ms)); 
-}
-
-function getMockMapData() {
-    const width = 1080;
-    const height = 1920;
-    const unit = 140; // 1 단위 크기
-    
-    // 중앙 정렬 오프셋
-    const offsetX = (width - (7 * unit)) / 2;
-    const offsetY = (height - (5 * unit)) / 2;
-
-    const toPixel = (ux, uy) => ({
-        x: offsetX + ux * unit,
-        y: offsetY + uy * unit
-    });
-
-    // 1. Path (U자 형태)
-    const logicPath = [
-        {x: 0.5, y: -1.0},
-        {x: 0.5, y: 3.5},
-        {x: 6.5, y: 3.5},
-        {x: 6.5, y: -1.0}
-    ];
-    const path = logicPath.map(p => toPixel(p.x, p.y));
-
-    // 2. Grid (5x3)
-    const grid = [];
-    const rows = 3, cols = 5;
-    const cellSize = unit * 0.9; 
-
-    for(let r=0; r<rows; r++){
-        for(let c=0; c<cols; c++){
-            const lx = 1.5 + c;
-            const ly = 0.5 + r;
-            const pos = toPixel(lx, ly);
-            
-            grid.push({
-                index: r*cols + c,
-                x: pos.x - cellSize/2,
-                y: pos.y - cellSize/2,
-                w: cellSize, h: cellSize,
-                cx: pos.x, cy: pos.y
-            });
-        }
-    }
-
-    return { width, height, path, grid };
-}
+// --- 그리기 함수들 ---
 
 function drawPath(ctx, path) {
-    if(path.length < 2) return;
+    if(!path || path.length < 2) return;
 
+    // 길 그리기
     ctx.beginPath();
-    ctx.lineWidth = 100; // 길 너비
+    ctx.lineWidth = 100;
     ctx.strokeStyle = "#334155"; // slate-700
-    ctx.lineCap = "butt"; 
-    ctx.lineJoin = "round"; 
-
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
         ctx.lineTo(path[i].x, path[i].y);
     }
     ctx.stroke();
-    
-    // 점선 중앙선
+
+    // 점선 (중앙)
     ctx.beginPath();
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#475569";
@@ -228,33 +196,106 @@ function drawPath(ctx, path) {
 }
 
 function drawGrid(ctx, grid) {
-    ctx.lineWidth = 4;
-    grid.forEach((cell, idx) => {
-        // 배경
-        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        
-        // 둥근 사각형 그리기 (간단 구현)
-        const r = 16; 
+    if(!grid) return;
+    
+    grid.forEach((cell) => {
+        // 슬롯 배경
+        const r = 16;
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
         
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
+        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = 4;
         
+        drawRoundedRect(ctx, x, y, w, h, r);
         ctx.fill();
         ctx.stroke();
+
+        // 주사위 그리기
+        if(cell.dice) {
+            drawDice(ctx, x, y, w, h, cell.dice);
+        }
     });
 }
 
-// UI 함수들
-window.toggleDebug = function() { alert("디버그 모드 준비중"); };
-window.confirmSurrender = function() {
-    if(confirm("정말 포기하시겠습니까?")) window.location.href = 'index.html';
+function drawDice(ctx, x, y, w, h, dice) {
+    const pad = 10;
+    const size = w - pad*2;
+    const dx = x + pad;
+    const dy = y + pad;
+    
+    // 주사위 배경
+    const color = DICE_COLORS[dice.id] || DICE_COLORS['default'];
+    ctx.fillStyle = color;
+    // 간단한 입체감
+    ctx.shadowColor = "rgba(0,0,0,0.3)";
+    ctx.shadowBlur = 10;
+    drawRoundedRect(ctx, dx, dy, size, size, 20);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 주사위 눈금 (Level = Dot Count)
+    ctx.fillStyle = "white";
+    drawDiceDots(ctx, dx + size/2, dy + size/2, size, dice.level);
+    
+    // 텍스트 (옵션)
+    // ctx.fillStyle = "white";
+    // ctx.font = "bold 20px Pretendard";
+    // ctx.textAlign = "center";
+    // ctx.fillText(dice.id, dx + size/2, dy + size + 20);
+}
+
+function drawDiceDots(ctx, cx, cy, size, value) {
+    const dotSize = size * 0.16;
+    const offset = size * 0.25;
+    
+    const positions = {
+        1: [[0,0]],
+        2: [[-1,-1], [1,1]],
+        3: [[-1,-1], [0,0], [1,1]],
+        4: [[-1,-1], [1,-1], [-1,1], [1,1]],
+        5: [[-1,-1], [1,-1], [0,0], [-1,1], [1,1]],
+        6: [[-1,-1], [1,-1], [-1,0], [1,0], [-1,1], [1,1]],
+        7: [[0,0]] // 7 이상은 숫자로 표시하는게 나을수도
+    };
+
+    const pos = positions[value] || positions[1];
+    
+    pos.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(cx + p[0]*offset, cy + p[1]*offset, dotSize/2, 0, Math.PI*2);
+        ctx.fill();
+    });
+}
+
+// --- 유틸리티 ---
+function drawRoundedRect(ctx, x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function setupLeaveWarning() {
+    window.addEventListener('beforeunload', (e) => {
+        e.preventDefault(); e.returnValue = ''; return '';
+    });
+}
+
+// --- UI 액션 ---
+window.spawnDice = function() {
+    if(socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "SPAWN" }));
+    }
 };
-window.spawnDice = function() { console.log("Spawn Request"); };
+
+window.toggleDebug = function() { alert("Debug Mode"); };
+window.confirmSurrender = function() {
+    if(confirm("정말 포기하시겠습니까?")) location.href = '../home.html';
+};
 window.powerUp = function(idx) { console.log("Power Up:", idx); };
