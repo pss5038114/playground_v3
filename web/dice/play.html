@@ -8,55 +8,82 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* 텍스트 드래그 방지 및 터치 최적화 */
-        body { user-select: none; -webkit-user-select: none; touch-action: none; overflow: hidden; }
-        canvas { touch-action: none; }
+        body { user-select: none; touch-action: none; overflow: hidden; }
+        .power-btn { transition: all 0.1s; }
+        .power-btn:active { transform: scale(0.95); }
     </style>
 </head>
-<body class="bg-slate-900 h-screen w-screen flex flex-col justify-center items-center overflow-hidden">
+<body class="bg-slate-900 h-screen w-screen flex flex-col overflow-hidden relative">
 
-    <div id="game-loading" class="absolute inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="mb-8 relative animate-bounce">
-            <i class="ri-dice-line text-6xl text-blue-500"></i>
-            <div class="absolute inset-0 flex items-center justify-center">
-                <i class="ri-flashlight-fill text-2xl text-yellow-400 animate-pulse"></i>
-            </div>
-        </div>
-        <h2 class="text-2xl font-black text-white mb-2 tracking-widest">LOADING</h2>
+    <div id="game-loading" class="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center transition-opacity duration-500">
+        <h2 class="text-2xl font-black text-white mb-2">LOADING</h2>
         <div class="w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
             <div id="loading-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
         </div>
-        <p id="loading-text" class="text-xs text-slate-500 mt-2 font-mono">Initializing...</p>
+        <p id="loading-text" class="text-xs text-slate-500 mt-2">Preparing Battle...</p>
     </div>
 
-    <canvas id="game-canvas" class="bg-slate-800 shadow-2xl"></canvas>
-
-    <div id="ui-layer" class="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between hidden">
-        <div class="flex justify-between text-white">
-            <div class="flex flex-col">
-                <span class="text-xs text-slate-400 font-bold shadow-black drop-shadow-md">WAVE</span>
-                <span id="game-wave" class="text-3xl font-black drop-shadow-lg">1</span>
+    <div id="ui-top" class="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start pointer-events-none hidden">
+        <div class="flex flex-col gap-1 pointer-events-auto">
+            <div class="bg-black/40 backdrop-blur rounded-lg px-3 py-1 border border-white/10">
+                <span class="text-[10px] text-slate-400 font-bold block">WAVE</span>
+                <span id="game-wave" class="text-2xl font-black text-white">1</span>
             </div>
-            <div class="flex flex-col items-end">
-                <span class="text-xs text-slate-400 font-bold shadow-black drop-shadow-md">LIFE</span>
-                <div id="game-lives" class="flex gap-1 text-red-500 text-xl drop-shadow-lg">
-                    <i class="ri-heart-fill"></i><i class="ri-heart-fill"></i><i class="ri-heart-fill"></i>
-                </div>
+            <div class="bg-black/40 backdrop-blur rounded-lg px-3 py-1 border border-white/10">
+                <span class="text-[10px] text-slate-400 font-bold block">ENEMIES</span>
+                <span id="game-enemies" class="text-lg font-bold text-red-400">0</span>
             </div>
         </div>
 
-        <div class="pointer-events-auto flex items-center gap-4 mb-2">
-            <div class="flex flex-col items-center w-16 bg-black/40 rounded-xl p-2 backdrop-blur-sm border border-white/10">
-                <span class="text-[10px] text-slate-300 font-bold">SP</span>
-                <span id="game-sp" class="text-xl font-black text-yellow-400">100</span>
+        <div class="flex flex-col items-end gap-2 pointer-events-auto">
+            <div class="flex gap-1 text-red-500 text-2xl drop-shadow-md" id="game-lives">
+                <i class="ri-heart-fill"></i><i class="ri-heart-fill"></i><i class="ri-heart-fill"></i>
             </div>
-            <button id="btn-spawn" onclick="window.spawnDice()" class="flex-1 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-3 border-b-4 border-blue-800 active:border-b-0 active:translate-y-1">
-                <i class="ri-add-circle-fill text-3xl"></i>
-                <div class="flex flex-col items-start leading-none">
-                    <span class="text-lg font-black">소환</span>
-                    <span id="spawn-cost" class="text-xs opacity-80 font-mono">10 SP</span>
+            <div class="flex gap-2">
+                <button onclick="toggleDebug()" class="w-8 h-8 bg-slate-800 text-slate-400 rounded-full flex items-center justify-center border border-slate-700 hover:text-white hover:bg-slate-700">
+                    <i class="ri-bug-line"></i>
+                </button>
+                <button onclick="confirmSurrender()" class="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold border border-red-500/30 hover:bg-red-500 hover:text-white transition-colors">
+                    항복
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-1 flex items-center justify-center relative">
+        <canvas id="game-canvas" class="shadow-2xl"></canvas>
+    </div>
+
+    <div id="ui-bottom" class="w-full bg-slate-900 border-t border-slate-800 flex flex-col pb-safe z-20 hidden">
+        
+        <div class="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-800/50">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center border border-yellow-500/30">
+                    <i class="ri-flashlight-fill"></i>
                 </div>
+                <span id="game-sp" class="text-2xl font-black text-white tracking-tight">100</span>
+            </div>
+            
+            <button onclick="window.spawnDice()" class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2 rounded-xl text-white font-bold shadow-lg shadow-blue-900/50 active:scale-95 transition-transform flex items-center gap-2">
+                <i class="ri-add-circle-fill"></i>
+                <span>소환</span>
+                <span id="spawn-cost" class="text-xs bg-black/20 px-2 py-0.5 rounded ml-1">10</span>
             </button>
+        </div>
+
+        <div class="grid grid-cols-5 gap-1 p-2 h-28">
+            <div class="flex flex-col gap-1 h-full">
+                <div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 relative dice-slot" data-index="0">
+                    <i class="ri-question-mark text-slate-600"></i> </div>
+                <button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700 flex flex-col items-center justify-center leading-none" onclick="powerUp(0)">
+                    <span class="text-[9px] text-slate-400 font-bold">Lv.1</span>
+                    <span class="text-[8px] text-yellow-500">100</span>
+                </button>
+            </div>
+            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="1"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(1)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="2"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(2)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="3"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(3)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
+            <div class="flex flex-col gap-1 h-full"><div class="flex-1 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 dice-slot" data-index="4"></div><button class="power-btn bg-slate-800 h-8 rounded-lg border border-slate-700" onclick="powerUp(4)"><span class="text-[9px] text-slate-400">Lv.1</span></button></div>
         </div>
     </div>
 

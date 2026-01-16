@@ -133,63 +133,116 @@ function gameLoop() {
 // [임시] 유틸리티
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// [수정됨] 백엔드 로직과 싱크를 맞춘 7x4 맵 데이터
+// [수정됨] 백엔드 SoloGameSession 로직과 100% 일치
 function getMockMapData() {
     const width = 1080;
     const height = 1920;
+    const unit = 140; // 1 단위 크기
     
-    // Grid (7x4)
+    // 중앙 정렬 오프셋
+    const offsetX = (width - (7 * unit)) / 2;
+    const offsetY = (height - (5 * unit)) / 2;
+
+    // Helper: 논리 좌표 -> 픽셀 좌표
+    const toPixel = (ux, uy) => ({
+        x: offsetX + ux * unit,
+        y: offsetY + uy * unit
+    });
+
+    // 1. Path (U자 형태)
+    // (0.5, -1) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, -1)
+    const logicPath = [
+        {x: 0.5, y: -1.0},
+        {x: 0.5, y: 3.5},
+        {x: 6.5, y: 3.5},
+        {x: 6.5, y: -1.0}
+    ];
+    const path = logicPath.map(p => toPixel(p.x, p.y));
+
+    // 2. Grid (5x3)
+    // 주사위 중심: x=1.5~5.5, y=0.5~2.5
     const grid = [];
-    const rows = 4, cols = 7;
-    const cell_size = 125, gap = 15;
-    
-    const total_w = cols * cell_size + (cols - 1) * gap;
-    const startX = (width - total_w) / 2;
-    const startY = 1350;
-    
+    const rows = 3, cols = 5;
+    const cellSize = unit * 0.9; // 조금 작게
+
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
+            const lx = 1.5 + c;
+            const ly = 0.5 + r;
+            const pos = toPixel(lx, ly);
+            
             grid.push({
                 index: r*cols + c,
-                x: startX + c*(cell_size+gap),
-                y: startY + r*(cell_size+gap),
-                w: cell_size, h: cell_size
+                x: pos.x - cellSize/2,
+                y: pos.y - cellSize/2,
+                w: cellSize, h: cellSize,
+                cx: pos.x, cy: pos.y
             });
         }
     }
-    
-    // Path (심플한 U자 + 중앙 관통형)
-    // 몬스터가 그리드 사이를 지나가게 하여 긴장감 조성
-    const path = [
-        {x: 100, y: -100},    // 시작
-        {x: 100, y: 1200},    // 좌측 하단으로 내려옴
-        {x: 980, y: 1200},    // 우측으로 횡단 (그리드 바로 위)
-        {x: 980, y: 300},     // 우측 상단으로 올라감
-        {x: 540, y: 300},     // 중앙으로 이동
-        {x: 540, y: 2000}     // 중앙을 가로질러 아래로 골인 (End)
-    ];
-    
+
     return { width, height, path, grid };
 }
 
+// [수정] drawPath: 시작점과 끝점 처리
 function drawPath(ctx, path) {
+    if(path.length < 2) return;
+
     ctx.beginPath();
-    ctx.lineWidth = 40;
-    ctx.strokeStyle = "#334155"; 
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.lineWidth = 100; // 길 너비 (Unit Size 140보다 작게)
+    ctx.strokeStyle = "#334155"; // slate-700
+    ctx.lineCap = "butt"; // 끝부분 평평하게
+    ctx.lineJoin = "round"; // 코너 둥글게
+
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
     ctx.stroke();
     
+    // 점선 중앙선
     ctx.beginPath();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "#475569"; 
-    ctx.setLineDash([20, 20]);
+    ctx.strokeStyle = "#475569";
+    ctx.setLineDash([20, 30]);
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
+    
+    // 시작/끝 지점 표시 (디버그용)
+    // ctx.fillStyle = "rgba(0, 255, 0, 0.3)";
+    // ctx.beginPath(); ctx.arc(path[0].x, path[0].y, 20, 0, Math.PI*2); ctx.fill();
+    
+    // ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
+    // ctx.beginPath(); ctx.arc(path[path.length-1].x, path[path.length-1].y, 20, 0, Math.PI*2); ctx.fill();
 }
+
+// [NEW] 로딩 완료 시 UI 표시
+async function runLoadingSequence() {
+    // ... (기존 로직) ...
+    
+    // 로딩 끝난 후 UI 보이기
+    document.getElementById('ui-top').classList.remove('hidden');
+    document.getElementById('ui-bottom').classList.remove('hidden');
+    document.getElementById('ui-bottom').classList.add('flex'); // flex display 복구
+    
+    requestAnimationFrame(gameLoop);
+}
+// [NEW] 항복/디버그 함수
+window.toggleDebug = function() {
+    alert("디버그 모드 전환 (구현 예정)");
+};
+window.confirmSurrender = function() {
+    if(confirm("정말 항복하시겠습니까?")) {
+        window.location.href = 'index.html';
+    }
+};
+window.powerUp = function(index) {
+    console.log("Power Up Slot:", index);
+};
 
 function drawGrid(ctx, grid) {
     ctx.lineWidth = 3;
