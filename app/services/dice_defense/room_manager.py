@@ -23,9 +23,7 @@ class DiceGameRoom:
             "wave": 1,
             "sp": 100,
             "monsters": [],
-            
-            # [경로 데이터] 클라이언트 game.js의 logicPath와 좌표를 일치시킴
-            # (0.5, 0) -> (0.5, 3.5) -> (6.5, 3.5) -> (6.5, 0)
+            # 경로 데이터 (클라이언트와 좌표 일치)
             "path": [
                 {"x": 0.5, "y": 0.0},
                 {"x": 0.5, "y": 3.5},
@@ -71,7 +69,6 @@ class DiceGameRoom:
     async def push_action(self, user_id: str, action: dict):
         await self.input_queue.put({"user_id": user_id, "action": action})
 
-    # [핵심 로직] GlobalTicker에 의해 1초에 30번 호출됨
     async def update(self):
         self.game_state["tick"] += 1
         
@@ -117,7 +114,7 @@ class DiceGameRoom:
             
             target_idx = mon["path_idx"] + 1
             if target_idx >= len(path):
-                mon["finished"] = True # 도착
+                mon["finished"] = True 
                 continue
                 
             target = path[target_idx]
@@ -142,23 +139,37 @@ class DiceRoomManager:
     def __init__(self):
         self._rooms: Dict[str, DiceGameRoom] = {}
 
-    def create_room(self, mode: str = "solo") -> str:
-        while True:
-            code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
-            if code not in self._rooms: break
+    # [수정됨] 특정 코드로 방 생성 가능하도록 변경
+    def create_room(self, mode: str = "solo", room_code: str = None) -> str:
+        if room_code:
+            code = room_code
+        else:
+            while True:
+                code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+                if code not in self._rooms: break
         
         new_room = DiceGameRoom(code, mode)
         self._rooms[code] = new_room
-        ticker.subscribe(new_room) # 구독
-        print(f"=== Room Created: {code} ===")
+        ticker.subscribe(new_room)
+        
+        print(f"=== Room Created: {code} (Mode: {mode}) ===")
         return code
 
+    # [핵심 수정] TEST_ROOM 요청 시 방이 없으면 자동 생성!
     def get_room(self, room_code: str) -> Optional[DiceGameRoom]:
-        return self._rooms.get(room_code)
+        room = self._rooms.get(room_code)
+        
+        # 개발용: TEST_ROOM이 없으면 즉시 만든다
+        if room is None and room_code == "TEST_ROOM":
+            print("🛠️ [Debug] 'TEST_ROOM'이 없어서 자동으로 생성합니다...")
+            self.create_room("solo", "TEST_ROOM")
+            return self._rooms.get("TEST_ROOM")
+            
+        return room
 
     def remove_room(self, room_code: str):
         if room_code in self._rooms:
-            ticker.unsubscribe(self._rooms[room_code]) # 구독 해제
+            ticker.unsubscribe(self._rooms[room_code])
             del self._rooms[room_code]
 
 room_manager = DiceRoomManager()
