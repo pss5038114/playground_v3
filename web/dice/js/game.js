@@ -6,6 +6,15 @@ let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
 
+// 게임 상태 변수 (서버에서 수신)
+let gameState = {
+    wave: 1,
+    phase: 'NORMAL',
+    timer: 30,
+    lives: 3,
+    mobs: []
+};
+
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
     console.log("Game Script Loaded.");
@@ -91,6 +100,24 @@ function updateLoading(percent, text) {
     if(txt) txt.innerText = text;
 }
 
+// [추가됨] 웹소켓 메시지 처리
+function setupWebSocket(roomCode) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/dice/ws/dice/${roomCode}`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'GAME_STATE') {
+            // 서버 상태 동기화
+            gameState = msg.data;
+        }
+    };
+    // ... (onopen, onclose 등 생략) ...
+    return ws;
+}
+
 // 4. 캔버스 설정 (반응형)
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
@@ -128,20 +155,30 @@ function setupCanvas() {
     // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
-// 5. 게임 루프 (그리기)
+// 5. 게임 루프 (그리기) - [수정됨]
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 클리어
+    // 1. 배경 클리어
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; // slate-800
+    ctx.fillStyle = "#1e293b"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기
+    // 2. 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
+
+    // 3. 몹 그리기
+    if(gameState.mobs) {
+        gameState.mobs.forEach(mob => {
+            drawMob(ctx, mob);
+        });
+    }
+
+    // 4. UI 오버레이 그리기 (Life, Wave, Timer)
+    drawUI(ctx);
 
     animationFrameId = requestAnimationFrame(gameLoop);
 }
@@ -262,6 +299,69 @@ function drawGrid(ctx, grid) {
         ctx.fill();
         ctx.stroke();
     });
+}
+
+// [NEW] 몹 그리기 함수
+function drawMob(ctx, mob) {
+    ctx.beginPath();
+    
+    // 타입별 색상 및 크기
+    let color = "#ef4444"; // Normal (Red)
+    let radius = 20;
+    
+    if(mob.type === 'speed') {
+        color = "#eab308"; // Yellow
+        radius = 18;
+    } else if(mob.type === 'large') {
+        color = "#a855f7"; // Purple
+        radius = 35;
+    } else if(mob.type === 'boss_knight') {
+        color = "#ffffff"; // White Boss
+        radius = 60;
+    }
+    
+    ctx.fillStyle = color;
+    ctx.arc(mob.x, mob.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // HP Bar (간단하게)
+    const hpPercent = Math.max(0, mob.hp / mob.max_hp);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(mob.x - 20, mob.y - radius - 15, 40, 6);
+    ctx.fillStyle = "#22c55e"; // Green
+    ctx.fillRect(mob.x - 20, mob.y - radius - 15, 40 * hpPercent, 6);
+}
+
+// [NEW] UI 그리기 (Canvas 위에 직접 렌더링)
+function drawUI(ctx) {
+    ctx.save();
+    
+    // 상단 정보 바
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, 0, 1080, 150);
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 48px sans-serif";
+    ctx.textAlign = "center";
+    
+    // Wave 정보
+    const phaseText = gameState.phase === 'BOSS' ? "BOSS WAVE" : `WAVE ${gameState.wave}`;
+    ctx.fillText(phaseText, 540, 60);
+    
+    // Timer (Normal Phase일 때만)
+    if(gameState.phase === 'NORMAL') {
+        ctx.font = "36px sans-serif";
+        ctx.fillStyle = "#fbbf24";
+        ctx.fillText(`Next Wave: ${gameState.timer}s`, 540, 110);
+    }
+    
+    // Life 정보 (좌측 상단) -> 하트 대신 텍스트 표시
+    ctx.font = "bold 40px sans-serif";
+    ctx.fillStyle = "#f87171"; // Red text
+    ctx.textAlign = "left";
+    ctx.fillText(`Life remaining: ${gameState.lives}`, 50, 80);
+
+    ctx.restore();
 }
 
 // UI 함수들

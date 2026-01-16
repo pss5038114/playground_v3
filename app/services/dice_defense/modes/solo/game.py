@@ -4,16 +4,14 @@ import random
 from typing import List, Dict, Optional
 
 # ==========================================
-# 1. 맵 데이터 (기존 코드 유지 및 활용)
+# 1. 맵 데이터 (기존 유지)
 # ==========================================
 class SoloGameSession:
-    """맵의 정적 데이터(좌표, 경로)를 관리하는 클래스"""
     def __init__(self):
         self.width = 1080
         self.height = 1920
         self.unit = 140
         self.board_rows = 4
-        
         self.offset_x = (self.width - (7 * self.unit)) // 2 
         self.offset_y = (self.height - (self.board_rows * self.unit)) // 2 
         
@@ -64,24 +62,20 @@ class SoloGameSession:
         }
 
 # ==========================================
-# 2. 엔티티 (Mob) 클래스 정의
+# 2. 엔티티 (Mob) 클래스
 # ==========================================
 class Mob:
     def __init__(self, mob_id: int, path: List[dict], hp: float, speed: float, type_name: str):
         self.id = mob_id
-        self.path = path # 픽셀 좌표 리스트 [{'x':..., 'y':...}, ...]
+        self.path = path
         self.hp = hp
         self.max_hp = hp
-        self.speed = speed # pixels per second
+        self.speed = speed
         self.type = type_name
-        
-        # 경로 관련 상태
-        self.path_index = 0 # 현재 목표로 하는 경로 포인트 인덱스
+        self.path_index = 0
         self.x = path[0]['x']
         self.y = path[0]['y']
-        self.finished = False # 방어선 도달 여부
-        
-        # 다음 목표 지점 설정 (시작점 -> 첫번째 경유지)
+        self.finished = False 
         self._set_next_target()
 
     def _set_next_target(self):
@@ -89,12 +83,9 @@ class Mob:
         if self.path_index < len(self.path):
             self.target_x = self.path[self.path_index]['x']
             self.target_y = self.path[self.path_index]['y']
-            
-            # 방향 벡터 계산
             dx = self.target_x - self.x
             dy = self.target_y - self.y
             dist = math.sqrt(dx*dx + dy*dy)
-            
             if dist > 0:
                 self.vx = (dx / dist) * self.speed
                 self.vy = (dy / dist) * self.speed
@@ -105,24 +96,16 @@ class Mob:
 
     def move(self, dt: float):
         if self.finished: return
-
-        # 이동 예상 거리
         move_dist = self.speed * dt
-        
-        # 현재 목표까지 남은 거리
         dx = self.target_x - self.x
         dy = self.target_y - self.y
         dist_to_target = math.sqrt(dx*dx + dy*dy)
 
         if move_dist >= dist_to_target:
-            # 목표 지점 도착 혹은 통과 -> 좌표를 목표점으로 맞추고 다음 지점 설정
             self.x = self.target_x
             self.y = self.target_y
             self._set_next_target()
-            
-            # 남은 거리만큼 더 이동해야 하지만, 간단하게 여기서 처리
         else:
-            # 목표를 향해 이동
             self.x += self.vx * dt
             self.y += self.vy * dt
 
@@ -136,73 +119,78 @@ class Mob:
             "y": round(self.y, 1)
         }
 
-# 몹 타입별 클래스
 class NormalMob(Mob):
     def __init__(self, mid, path):
-        # 기준 속도: 140px/s (1초에 1유닛 이동) -> 13유닛 약 13초 주파
         super().__init__(mid, path, hp=100, speed=140, type_name="normal")
 
 class SpeedMob(Mob):
     def __init__(self, mid, path):
-        # 체력 50, 속도 150% (210px/s)
         super().__init__(mid, path, hp=50, speed=140 * 1.5, type_name="speed")
 
 class BigMob(Mob):
     def __init__(self, mid, path):
-        # 체력 1000, 속도 85% (119px/s)
-        super().__init__(mid, path, hp=1000, speed=140 * 0.85, type_name="big")
+        # type_name을 'large'로 통일 (스폰 리스트와 매칭)
+        super().__init__(mid, path, hp=1000, speed=140 * 0.85, type_name="large")
 
 class KnightBoss(Mob):
-    def __init__(self, mid, path, wave, current_mobs_hp_sum):
+    def __init__(self, mid, path, wave, extra_hp):
         # 체력 공식: 25000 * Wave + 0.5 * (잔여 몹 체력 합)
-        hp = (25000 * wave) + (0.5 * current_mobs_hp_sum)
-        # 보스 속도는 일반 몹의 60% 정도로 가정 (설정 필요 시 수정)
+        hp = (25000 * wave) + (0.5 * extra_hp)
         super().__init__(mid, path, hp=hp, speed=140 * 0.6, type_name="boss_knight")
 
 
 # ==========================================
-# 3. 게임 로직 (Game Logic)
+# 3. 게임 로직 (Game Logic) - [수정됨]
 # ==========================================
 class SoloGameLogic:
     def __init__(self):
-        # 맵 데이터 로드
         self.map_data = SoloGameSession()
         self.path = self.map_data.pixel_path
         
-        # 게임 상태
         self.wave = 1
-        self.wave_phase = "NORMAL" # "NORMAL" or "BOSS"
-        self.wave_timer = 30.0     # 노멀 웨이브 지속 시간 (30초)
+        self.wave_phase = "NORMAL"
+        self.wave_timer = 30.0
+        
+        # [NEW] 라이프 시스템 (음수 허용)
+        self.lives = 3
         
         self.mobs: List[Mob] = []
         self.mob_id_counter = 0
         
-        # 스폰 타이머 (노멀 웨이브용)
+        # [NEW] 스폰 패턴 정의
+        # normal 2 + speed 1 + large 1 + normal 4 + speed 1 + normal 6 + large 1 + speed 1 + normal 4
+        self.spawn_pattern = (
+            ['normal']*2 + ['speed']*1 + ['large']*1 + 
+            ['normal']*4 + ['speed']*1 + ['normal']*6 + 
+            ['large']*1 + ['speed']*1 + ['normal']*4
+        )
+        self.spawn_index = 0 # 패턴 내 현재 위치
         self.spawn_timer = 0.0
-        self.spawn_interval = 2.0 # 2초마다 스폰 (임시)
+        self.spawn_interval = 1.0 # 1초마다 스폰
 
     def update(self, dt: float):
-        """매 틱(Tick)마다 호출되는 메인 로직"""
-        
         # 1. 웨이브 관리
         if self.wave_phase == "NORMAL":
             self.wave_timer -= dt
             
-            # 스폰 로직
+            # 스폰 로직 (패턴 기반)
             self.spawn_timer -= dt
             if self.spawn_timer <= 0:
-                self.spawn_random_mob()
-                self.spawn_timer = self.spawn_interval # 간격 초기화
+                if self.spawn_index < len(self.spawn_pattern):
+                    mob_type = self.spawn_pattern[self.spawn_index]
+                    self.spawn_mob(mob_type)
+                    self.spawn_index += 1
+                self.spawn_timer = self.spawn_interval
             
             # 30초 종료 -> 보스 페이즈 전환
             if self.wave_timer <= 0:
                 self.start_boss_phase()
         
         elif self.wave_phase == "BOSS":
-            # 보스가 죽거나 도착했는지 확인
-            # (보스 페이즈인데 보스 타입 몹이 하나도 없으면 다음 웨이브로)
+            # 보스 생존 여부 확인
             boss_exists = any(m.type == "boss_knight" for m in self.mobs)
             if not boss_exists:
+                # 보스가 죽거나 도착해서 사라지면 다음 웨이브
                 self.next_wave()
 
         # 2. 몹 이동 및 처리
@@ -210,29 +198,31 @@ class SoloGameLogic:
         for mob in self.mobs:
             mob.move(dt)
             
-            # 경로 끝 도달 처리 (TODO: 라이프 차감)
+            # [NEW] 방어선 도달 처리 (라이프 차감)
             if mob.finished:
-                # print(f"Mob {mob.id} reached the end.")
-                continue # 리스트에서 제외 (삭제)
+                loss = 2 if mob.type == "boss_knight" else 1
+                self.lives -= loss
+                # print(f"Mob reached end! Lives: {self.lives}")
+                continue # 리스트에서 제거
             
-            # 체력 0 이하 처리 (TODO: SP 획득)
+            # 체력 0 이하 처리 (SP 획득 로직 추가 가능)
             if mob.hp <= 0:
-                continue # 리스트에서 제외 (삭제)
+                continue 
 
             active_mobs.append(mob)
         
         self.mobs = active_mobs
 
-    def spawn_random_mob(self):
-        """일반/스피드/빅 몹 중 랜덤 소환"""
+    def spawn_mob(self, mob_type: str):
         self.mob_id_counter += 1
-        r = random.random()
-        if r < 0.6:
+        if mob_type == 'normal':
             new_mob = NormalMob(self.mob_id_counter, self.path)
-        elif r < 0.85:
+        elif mob_type == 'speed':
             new_mob = SpeedMob(self.mob_id_counter, self.path)
-        else:
+        elif mob_type == 'large':
             new_mob = BigMob(self.mob_id_counter, self.path)
+        else:
+            new_mob = NormalMob(self.mob_id_counter, self.path)
         
         self.mobs.append(new_mob)
 
@@ -240,10 +230,11 @@ class SoloGameLogic:
         print(f"=== WAVE {self.wave} BOSS PHASE START ===")
         self.wave_phase = "BOSS"
         
-        # 잔여 몬스터 체력 합 계산
+        # [NEW] 잔여 몬스터 체력 합 계산 및 전원 삭제
         rem_hp_sum = sum(m.hp for m in self.mobs)
+        self.mobs.clear() # 일반 몹 전부 삭제
         
-        # 보스 소환
+        # 보스 소환 (삭제된 몹들의 체력을 흡수)
         self.mob_id_counter += 1
         boss = KnightBoss(self.mob_id_counter, self.path, self.wave, rem_hp_sum)
         self.mobs.append(boss)
@@ -253,13 +244,14 @@ class SoloGameLogic:
         print(f"=== WAVE {self.wave} START (NORMAL) ===")
         self.wave_phase = "NORMAL"
         self.wave_timer = 30.0
-        self.spawn_timer = 1.0
+        self.spawn_index = 0 # 스폰 패턴 초기화
+        self.spawn_timer = 1.0 # 1초 후 첫 스폰
 
     def get_state(self):
-        """클라이언트에 전송할 게임 상태 스냅샷"""
         return {
             "wave": self.wave,
             "phase": self.wave_phase,
             "timer": round(self.wave_timer, 1) if self.wave_phase == "NORMAL" else 0,
+            "lives": self.lives, # [NEW] 라이프 상태 전송
             "mobs": [m.to_dict() for m in self.mobs]
         }
