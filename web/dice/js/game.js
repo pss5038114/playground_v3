@@ -5,128 +5,82 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
-let ws = null; // 웹소켓 객체
 
-// 게임 상태 (서버 동기화용)
-let gameState = {
-    wave: 1,
-    phase: 'NORMAL',
-    timer: 30, // 초기값
-    lives: 3,
-    mobs: []
-};
-
+// 1. 페이지 로드 시 초기화
 window.onload = async function() {
     console.log("Game Script Loaded.");
+    
+    // URL 파라미터 확인 (mode)
+    const urlParams = new URLSearchParams(window.location.search);
+    currentMode = urlParams.get('mode') || 'solo';
+    console.log(`Initializing game in [${currentMode}] mode...`);
+
+    // 이탈 방지 이벤트 등록
     setupLeaveWarning();
+
+    // 캔버스 크기 설정
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 게임 로딩 및 시작
+    // 로딩 시퀀스 시작
     await runLoadingSequence();
 };
 
+// 2. 이탈 방지 (뒤로가기/새로고침 경고)
 function setupLeaveWarning() {
     window.addEventListener('beforeunload', (event) => {
         event.preventDefault();
         event.returnValue = ''; 
+        return '';
     });
 }
 
-// =========================================
-// [핵심] 로딩 시퀀스 & 서버 연결
-// =========================================
+// 3. 로딩 시뮬레이션
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
+    const uiTop = document.getElementById('ui-top');
+    const uiBottom = document.getElementById('ui-bottom');
     
     try {
-        updateLoading(10, "Creating Game Room...");
-        
-        // 1. 방 생성 요청 (API 호출)
-        const roomCode = await createGameRoom();
-        console.log("Room Created:", roomCode);
+        updateLoading(10, "Connecting to server...");
+        // TODO: 웹소켓 연결 로직
+        await sleep(500);
 
-        updateLoading(30, "Connecting to Server...");
-        
-        // 2. 웹소켓 연결
-        await connectToGameServer(roomCode);
-        
-        updateLoading(60, "Fetching Resources...");
-        // 맵 데이터는 서버 로직(game.py)과 클라이언트(utils.js/game.js)가 
-        // 동일한 좌표계를 쓰므로 여기서는 모의 데이터로 초기화
+        updateLoading(40, "Fetching map data...");
+        // 서버 데이터 모의 (여기서 맵 데이터 생성)
         gameMap = getMockMapData(); 
         await sleep(500);
 
-        updateLoading(100, "Battle Start!");
-        await sleep(500);
+        updateLoading(70, "Loading resources...");
+        // TODO: 이미지 프리로딩
+        await sleep(800);
 
-        // 로딩 화면 제거
+        updateLoading(100, "Ready to Battle!");
+        await sleep(300);
+
+        // 로딩 화면 제거 & UI 표시
         loadingScreen.style.opacity = '0';
-        setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+        loadingScreen.style.pointerEvents = 'none';
+        
+        setTimeout(() => {
+            loadingScreen.style.display = 'none'; // 완전히 가리기
+        }, 500);
 
-        // 게임 루프 시작
+        // 인게임 UI 보이기
+        if(uiTop) uiTop.classList.remove('hidden');
+        if(uiBottom) {
+            uiBottom.classList.remove('hidden');
+            uiBottom.classList.add('flex');
+        }
+
         console.log("Game Loop Starting...");
+        // 게임 루프 시작
         requestAnimationFrame(gameLoop);
 
     } catch (e) {
-        console.error("Critical Error:", e);
-        alert(`게임 접속 실패: ${e.message}`);
-        window.location.href = 'index.html';
-    }
-}
-
-// API: 방 생성
-async function createGameRoom() {
-    const response = await fetch('/api/dice/create_room?mode=solo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error("Failed to create room");
-    const data = await response.json();
-    return data.room_code;
-}
-
-// WS: 서버 연결
-function connectToGameServer(roomCode) {
-    return new Promise((resolve, reject) => {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
-        const wsUrl = `${protocol}//${host}/api/dice/ws/dice/${roomCode}`;
-        
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            console.log("WS Connected!");
-            resolve();
-        };
-
-        ws.onerror = (err) => {
-            console.error("WS Error:", err);
-            reject(err);
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                handleServerMessage(msg);
-            } catch (e) {
-                console.error("Packet Parse Error:", e);
-            }
-        };
-        
-        ws.onclose = () => {
-            console.log("WS Disconnected");
-            // alert("서버 연결이 끊어졌습니다.");
-            // window.location.href = 'index.html';
-        };
-    });
-}
-
-// 서버 메시지 처리 핸들러
-function handleServerMessage(msg) {
-    if (msg.type === 'GAME_STATE') {
-        // 서버가 보내준 최신 상태로 덮어쓰기
-        gameState = msg.data;
+        console.error("Loading Failed:", e);
+        alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
+        window.location.href = 'index.html'; // 로비로 강제 이동
     }
 }
 
@@ -137,185 +91,166 @@ function updateLoading(percent, text) {
     if(txt) txt.innerText = text;
 }
 
-// =========================================
-// 캔버스 & 렌더링
-// =========================================
+// 4. 캔버스 설정 (반응형)
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
     if(!canvas) return;
     ctx = canvas.getContext('2d');
 
+    // 화면 꽉 채우기 (여백 없이)
     const w = window.innerWidth;
     const h = window.innerHeight;
+
+    // 게임 내부 해상도 (1080x1920) 비율 유지
     const targetAspect = 1080 / 1920;
     const currentAspect = w / h;
 
     let finalW, finalH;
+
     if (currentAspect > targetAspect) {
+        // 화면이 더 넓음 -> 높이에 맞춤
         finalH = h;
         finalW = h * targetAspect;
     } else {
+        // 화면이 더 좁음 -> 너비에 맞춤
         finalW = w;
         finalH = w / targetAspect;
     }
 
+    // 캔버스 내부 해상도 고정
     canvas.width = 1080;  
     canvas.height = 1920; 
+    
+    // CSS로 화면 표출 크기 조정
     canvas.style.width = `${finalW}px`;
     canvas.style.height = `${finalH}px`;
+    
+    // 렌더링 컨텍스트 스케일링은 필요 없음 (내부 해상도 1080x1920 사용)
 }
 
+// 5. 게임 루프 (그리기)
 function gameLoop() {
     if(!ctx) return;
 
-    // 1. 배경
+    // 배경 클리어
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1e293b"; 
+    ctx.fillStyle = "#1e293b"; // slate-800
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 2. 맵
+    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
 
-    // 3. 몬스터 (서버 데이터 기반)
-    if(gameState.mobs) {
-        gameState.mobs.forEach(mob => drawMob(ctx, mob));
-    }
-
-    // 4. UI 오버레이 (Canvas에 직접 그림)
-    drawUI(ctx);
-
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-function drawMob(ctx, mob) {
-    ctx.beginPath();
-    
-    // 몹 종류별 스타일
-    let color = "#ef4444"; // Normal
-    let radius = 20;
-    
-    if(mob.type === 'speed') {
-        color = "#eab308"; // Yellow
-        radius = 18;
-    } else if(mob.type === 'large') {
-        color = "#a855f7"; // Purple
-        radius = 35;
-    } else if(mob.type === 'boss_knight') {
-        color = "#ffffff"; // White Boss
-        radius = 60;
-    }
-    
-    ctx.fillStyle = color;
-    ctx.arc(mob.x, mob.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // HP Bar
-    const hpPercent = Math.max(0, mob.hp / mob.max_hp);
-    const barWidth = radius * 2;
-    
-    ctx.fillStyle = "#333";
-    ctx.fillRect(mob.x - radius, mob.y - radius - 15, barWidth, 6);
-    ctx.fillStyle = "#22c55e"; 
-    ctx.fillRect(mob.x - radius, mob.y - radius - 15, barWidth * hpPercent, 6);
+// --- Helper Functions (자체 내장) ---
+
+function sleep(ms) { 
+    return new Promise(r => setTimeout(r, ms)); 
 }
 
-function drawUI(ctx) {
-    ctx.save();
-    
-    // 상단 정보 바 배경
-    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-    ctx.fillRect(0, 0, 1080, 160);
-    
-    // 1. Wave 정보 (중앙)
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 56px sans-serif";
-    
-    const phaseText = gameState.phase === 'BOSS' ? "BOSS WAVE" : `WAVE ${gameState.wave}`;
-    ctx.fillText(phaseText, 540, 70);
-    
-    // 2. Timer (Normal 페이즈일 때만)
-    if(gameState.phase === 'NORMAL') {
-        ctx.font = "40px sans-serif";
-        ctx.fillStyle = "#fbbf24"; // Amber
-        ctx.fillText(`Next Wave: ${gameState.timer}s`, 540, 130);
-    }
-    
-    // 3. Life (좌측 상단)
-    ctx.textAlign = "left";
-    ctx.font = "bold 40px sans-serif";
-    ctx.fillStyle = "#f87171"; // Red
-    ctx.fillText(`♥ ${gameState.lives}`, 40, 100);
-
-    ctx.restore();
-}
-
-// --- Helper Functions ---
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// 기존 getMockMapData 함수 등은 그대로 유지 (또는 utils.js에 있다면 생략 가능)
+// [수정됨] 맵 데이터 생성 로직 (좌표계 변경: 좌하단 0,0 기준)
 function getMockMapData() {
-    // ... (이전 코드와 동일, 생략하거나 필요하면 다시 넣어드립니다) ...
-    // 좌표계: 좌하단 0,0 기준 로직이 적용된 버전이어야 함
     const width = 1080;
     const height = 1920;
-    const unit = 140; 
+    const unit = 140; // 1 단위 크기
+    
+    // 보드 전체 크기 (가로 7칸, 세로 4칸 기준 가정)
     const boardRows = 4; 
+    
+    // 중앙 정렬 오프셋 계산
     const offsetX = (width - (7 * unit)) / 2;
     const offsetY = (height - (boardRows * unit)) / 2;
+
+    // 좌표 변환 함수 (Logical -> Pixel)
+    // ux: 0 ~ 7 (Left -> Right)
+    // uy: 0 ~ 4 (Bottom -> Top) ** Y축 반전 적용 **
     const toPixel = (ux, uy) => ({
         x: offsetX + ux * unit,
-        y: offsetY + (boardRows - uy) * unit 
+        y: offsetY + (boardRows - uy) * unit // Y축 뒤집기 (Canvas는 상단이 0이므로)
     });
+
+    // 1. Path (역 U자 / n자 형태)
+    // 시작(0.5, 0) -> 위(0.5, 3.5) -> 오른쪽(6.5, 3.5) -> 아래(6.5, 0)
     const logicPath = [
-        {x: 0.5, y: 0.0}, {x: 0.5, y: 3.5}, {x: 6.5, y: 3.5}, {x: 6.5, y: 0.0}
+        {x: 0.5, y: 0.0},
+        {x: 0.5, y: 3.5},
+        {x: 6.5, y: 3.5},
+        {x: 6.5, y: 0.0}
     ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
+
+    // 2. Grid (5x3)
+    // Dice Grid 시작점: (1, 0) -> 즉 x는 1~6 범위, y는 0~3 범위
     const grid = [];
-    const rows = 3; cols = 5; cellSize = unit * 0.9; 
+    const rows = 3; // 주사위 놓을 공간 세로 3칸
+    const cols = 5; // 주사위 놓을 공간 가로 5칸
+    const cellSize = unit * 0.9; 
+
     for(let r=0; r<rows; r++){
         for(let c=0; c<cols; c++){
+            // 주사위 그리드 시작점 (1, 0) 기준
+            // 각 칸의 중심 좌표 계산 (x: 1.5 ~ 5.5, y: 0.5 ~ 2.5)
             const lx = 1.0 + c + 0.5; 
             const ly = 0.0 + r + 0.5;
+            
             const pos = toPixel(lx, ly);
+            
             grid.push({
                 index: r*cols + c,
-                x: pos.x - cellSize/2, y: pos.y - cellSize/2,
-                w: cellSize, h: cellSize, cx: pos.x, cy: pos.y
+                x: pos.x - cellSize/2,
+                y: pos.y - cellSize/2,
+                w: cellSize, h: cellSize,
+                cx: pos.x, cy: pos.y
             });
         }
     }
+
     return { width, height, path, grid };
 }
 
-// 캔버스 그리기 헬퍼
 function drawPath(ctx, path) {
     if(path.length < 2) return;
+
     ctx.beginPath();
-    ctx.lineWidth = 100; ctx.strokeStyle = "#334155"; 
-    ctx.lineCap = "butt"; ctx.lineJoin = "round"; 
+    ctx.lineWidth = 100; // 길 너비
+    ctx.strokeStyle = "#334155"; // slate-700
+    ctx.lineCap = "butt"; 
+    ctx.lineJoin = "round"; 
+
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
     ctx.stroke();
     
+    // 점선 중앙선
     ctx.beginPath();
-    ctx.lineWidth = 4; ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#475569";
     ctx.setLineDash([20, 30]);
     ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke(); ctx.setLineDash([]);
+    for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
 }
 
 function drawGrid(ctx, grid) {
     ctx.lineWidth = 4;
-    grid.forEach((cell) => {
+    grid.forEach((cell, idx) => {
+        // 배경
         ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
         ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        
+        // 둥근 사각형 그리기 (간단 구현)
         const r = 16; 
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
+        
         ctx.beginPath();
         ctx.moveTo(x + r, y);
         ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -323,6 +258,16 @@ function drawGrid(ctx, grid) {
         ctx.arcTo(x, y + h, x, y, r);
         ctx.arcTo(x, y, x + w, y, r);
         ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        
+        ctx.fill();
+        ctx.stroke();
     });
 }
+
+// UI 함수들
+window.toggleDebug = function() { alert("디버그 모드 준비중"); };
+window.confirmSurrender = function() {
+    if(confirm("정말 포기하시겠습니까?")) window.location.href = 'index.html';
+};
+window.spawnDice = function() { console.log("Spawn Request"); };
+window.powerUp = function(idx) { console.log("Power Up:", idx); };
