@@ -59,9 +59,10 @@ window.onload = async function() {
 
 function setupLeaveWarning() {
     window.addEventListener('beforeunload', (event) => {
-        event.preventDefault();
-        event.returnValue = ''; 
-        return '';
+        // 개발 중엔 불편할 수 있으니 주석 처리 가능
+        // event.preventDefault();
+        // event.returnValue = ''; 
+        // return '';
     });
 }
 
@@ -96,7 +97,9 @@ async function runLoadingSequence(presetIndex) {
         // 세션 정보 저장
         gameId = data.game_id;
         // deck_details를 맵으로 변환하여 빠른 조회 가능하게 함
-        data.deck_details.forEach(d => { deckInfoMap[d.id] = d; });
+        if(data.deck_details) {
+            data.deck_details.forEach(d => { deckInfoMap[d.id] = d; });
+        }
 
         updateLoading(50, "Connecting to Realtime Server...");
         
@@ -110,27 +113,21 @@ async function runLoadingSequence(presetIndex) {
     }
 }
 
-// [수정] 로딩 텍스트 업데이트 기능 추가
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
-    const txtEl = document.getElementById('loading-text'); // HTML에 이 ID가 있어야 함
-    
+    const txt = document.getElementById('loading-text');
     if(bar) bar.style.width = `${percent}%`;
-    if(txtEl && text) txtEl.innerText = text;
+    if(txt && text) txt.innerText = text;
 }
 
 // ----------------------------------------------------------------------
 // 3. WebSocket 연결 및 핸들러
 // ----------------------------------------------------------------------
 function connectWebSocket(gid, deckDetails) {
-    // [수정] API 도메인 기반으로 WebSocket 주소 생성
-    // API_DICE가 "https://api.pyosh.cloud/api/dice" 형태라고 가정
     try {
         const apiObj = new URL(API_DICE);
         const protocol = apiObj.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = apiObj.host; // "api.pyosh.cloud" (포트 포함)
-        
-        // 백엔드 main.py의 경로: @app.websocket("/ws/game/{game_id}")
+        const host = apiObj.host;
         const wsUrl = `${protocol}//${host}/ws/game/${gid}`;
         
         console.log("Connecting WS:", wsUrl);
@@ -142,9 +139,7 @@ function connectWebSocket(gid, deckDetails) {
 
     socket.onopen = () => {
         console.log("WebSocket Connected");
-        updateLoading(100, "Ready!");
-        // 약간의 딜레이 후 게임 시작 (로딩바 꽉 찬거 보여주기)
-        setTimeout(() => finalizeLoading(gameState, deckDetails), 200); 
+        updateLoading(90, "Synchronizing...");
     };
 
     socket.onmessage = (event) => {
@@ -154,10 +149,9 @@ function connectWebSocket(gid, deckDetails) {
 
     socket.onclose = (e) => {
         console.warn("WebSocket Closed:", e.code, e.reason);
-        // 비정상 종료(1006)인 경우에만 알림
         if (e.code !== 1000) {
-            alert("서버 연결이 실패했습니다. (API 서버 상태를 확인해주세요)");
-            window.location.href = 'index.html';
+            // alert("서버 연결이 종료되었습니다.");
+            // window.location.href = 'index.html';
         }
     };
     
@@ -181,13 +175,13 @@ function handleServerMessage(msg, deckDetails) {
         
         // 초기 정보 갱신
         updateGameInfoUI();
-        syncGrid(msg.state.grid);
+        if(gameState.grid) syncGrid(gameState.grid);
         
     } else if (msg.type === 'STATE_UPDATE') {
         // [상태 업데이트] 30Hz 등 주기적 수신
         gameState = msg;
         updateGameInfoUI();
-        syncGrid(msg.grid);
+        if(msg.grid) syncGrid(msg.grid);
     }
 }
 
@@ -201,16 +195,26 @@ function finalizeLoading(state, deckDetails) {
 
     // UI 하단 덱 초기화
     initGameUI(state, deckDetails);
+    updateGameInfoUI(); // SP 등 텍스트 갱신
 
-    // 로딩 화면 제거 및 UI 표시
+    // 로딩 화면 제거
     loadingScreen.style.opacity = '0';
     loadingScreen.style.pointerEvents = 'none';
     setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
 
-    if(uiTop) uiTop.classList.remove('hidden');
+    // [수정] UI 표시 (hidden 제거 및 애니메이션 클래스 처리)
+    if(uiTop) {
+        uiTop.classList.remove('hidden');
+    }
+    
     if(uiBottom) {
         uiBottom.classList.remove('hidden');
-        uiBottom.classList.add('flex');
+        uiBottom.classList.add('flex'); // flex 유지
+        
+        // 약간의 딜레이 후 슬라이드 업 (CSS transition 적용을 위해)
+        setTimeout(() => {
+            uiBottom.classList.remove('translate-y-full');
+        }, 50);
     }
 
     // 게임 렌더링 루프 시작 (Canvas)
@@ -224,19 +228,24 @@ function finalizeLoading(state, deckDetails) {
 // 상단/하단 텍스트 정보 갱신
 function updateGameInfoUI() {
     if(!gameState) return;
-    document.getElementById('game-wave').innerText = gameState.wave;
-    document.getElementById('game-lives').innerText = gameState.lives;
-    document.getElementById('game-sp').innerText = gameState.sp;
     
-    // (선택) 소환 버튼의 비용 표시 업데이트
-    // const spawnBtn = document.querySelector('.spawn-btn span');
-    // if(spawnBtn) spawnBtn.innerText = gameState.spawn_cost;
+    const waveEl = document.getElementById('game-wave');
+    const livesEl = document.getElementById('game-lives');
+    const spEl = document.getElementById('game-sp');
+    const costEl = document.getElementById('spawn-cost-text'); // 소환 버튼 내 텍스트
+
+    if(waveEl) waveEl.innerText = gameState.wave;
+    if(livesEl) livesEl.innerText = gameState.lives;
+    if(spEl) spEl.innerText = gameState.sp;
+    if(costEl && gameState.spawn_cost) costEl.innerText = gameState.spawn_cost;
 }
 
 // 하단 덱 슬롯 초기화
 function initGameUI(state, deckList) {
     const slots = document.querySelectorAll('.dice-slot');
     
+    if(!deckList) return;
+
     deckList.forEach((dice, idx) => {
         if (idx >= slots.length) return;
         const slot = slots[idx];
@@ -246,13 +255,10 @@ function initGameUI(state, deckList) {
         
         // 현재 레벨 텍스트 (초기값 Lv.1)
         let currentLvText = 'Lv.1';
-        const existingSpan = slot.querySelector('span');
-        if (existingSpan && existingSpan.innerText.includes('Lv.')) {
-            currentLvText = existingSpan.innerText;
-        }
+        // (추후 서버 state.deck_levels 등으로 실제 레벨 반영 필요)
         
         // 동적 폰트 크기 (슬롯 너비의 40%)
-        const slotWidth = slot.clientWidth || 80; 
+        const slotWidth = slot.clientWidth || 60; 
         const fontSize = Math.floor(slotWidth * 0.4); 
 
         // 눈 없는 주사위(0) 생성 - 배경/디자인용
@@ -296,7 +302,7 @@ function initDiceLayer() {
             // 위치 잡기
             updateSlotPosition(slot, cell);
             
-            // (선택) 그리드 슬롯 클릭 시 합치기 등의 로직을 위한 핸들러
+            // 그리드 슬롯 클릭 (머지 등)
             slot.onclick = () => onGridSlotClick(idx);
             
             layer.appendChild(slot);
@@ -329,8 +335,11 @@ function syncGrid(serverGridData) {
                     
                     // 생성 애니메이션 (Pop)
                     if (!currentId) { 
-                        slot.classList.add('scale-0');
-                        setTimeout(() => slot.classList.remove('scale-0'), 50);
+                        slot.classList.remove('scale-0'); // reset
+                        void slot.offsetWidth; // trigger reflow
+                        slot.classList.add('animate-pop'); // custom animation class or manual scale
+                        slot.style.transform = 'scale(0)';
+                        setTimeout(() => slot.style.transform = 'scale(1)', 10);
                     }
                 }
             }
@@ -394,7 +403,7 @@ function gameLoop() {
 
     // 배경 지우기 & 다시 그리기
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#f3f4f6"; 
+    ctx.fillStyle = "#1f2937"; // Gray-800
     ctx.fillRect(0, 0, 1080, 1920);
 
     // 맵 그리기 (경로, 그리드 박스 등)
@@ -412,7 +421,7 @@ function drawPath(ctx, path) {
     // 도로 (회색)
     ctx.beginPath();
     ctx.lineWidth = 100; 
-    ctx.strokeStyle = "#d1d5db"; 
+    ctx.strokeStyle = "#374151"; // Gray-700
     ctx.lineCap = "butt"; 
     ctx.lineJoin = "round"; 
 
@@ -425,26 +434,27 @@ function drawPath(ctx, path) {
     // 중앙선 (파란색 점선 등)
     ctx.beginPath();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = "#3b82f6";
-    ctx.setLineDash([]); 
+    ctx.strokeStyle = "#4b5563"; // Gray-600
+    ctx.setLineDash([20, 20]); 
     
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
         ctx.lineTo(path[i].x, path[i].y);
     }
     ctx.stroke();
+    ctx.setLineDash([]);
 }
 
 function drawGrid(ctx, grid) {
     if(!grid) return;
     
-    // 그리드 영역 표시 (디버깅 또는 시각적 가이드)
-    ctx.lineWidth = 2; 
+    // 그리드 영역 표시
+    ctx.lineWidth = 4; 
     grid.forEach((cell) => {
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#e5e7eb";
+        ctx.fillStyle = "#374151"; // Gray-700
+        ctx.strokeStyle = "#4b5563"; // Gray-600
         
-        const r = 16; 
+        const r = 24; 
         const x=cell.x, y=cell.y, w=cell.w, h=cell.h;
         
         ctx.beginPath();
@@ -469,9 +479,12 @@ window.spawnDice = function() {
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "SPAWN" }));
         
-        // (선택) 버튼 클릭 애니메이션 (즉각적인 피드백)
-        // const btn = document.querySelector('.spawn-btn');
-        // if(btn) ...
+        // 버튼 클릭 효과
+        const btn = document.querySelector('button[onclick="window.spawnDice()"]');
+        if(btn) {
+            btn.classList.add('scale-95');
+            setTimeout(() => btn.classList.remove('scale-95'), 100);
+        }
     } else {
         console.warn("Socket not open");
     }
@@ -485,10 +498,10 @@ window.powerUp = function(idx) {
     }
 };
 
-// 그리드 슬롯 클릭 (나중에 머지 기능 구현 시 사용)
+// 그리드 슬롯 클릭
 function onGridSlotClick(idx) {
     console.log("Grid Clicked:", idx);
-    // 선택된 주사위가 있다면 머지 요청 전송 등
+    // TODO: 머지 로직 구현 시 사용
 }
 
 // ----------------------------------------------------------------------
