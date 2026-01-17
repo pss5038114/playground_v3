@@ -413,21 +413,68 @@ function setupCanvas() {
     canvas.style.height = `${finalH}px`;
 }
 
+// ----------------------------------------------------------------------
+// [수정] 캔버스 렌더링 루프
+// ----------------------------------------------------------------------
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 지우기 & 다시 그리기
+    // 배경 지우기
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#1f2937"; // Gray-800
+    ctx.fillStyle = "#1f2937"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기 (경로, 그리드 박스 등)
+    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
     
+    // [NEW] 몹 그리기
+    if (gameState && gameState.mobs) {
+        drawMobs(ctx, gameState.mobs);
+    }
+    
     animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+// [NEW] 몹 렌더링 함수
+function drawMobs(ctx, mobs) {
+    if (!mobs) return;
+    
+    mobs.forEach(mob => {
+        // 1. 몹 본체 (빨간 원)
+        ctx.beginPath();
+        ctx.fillStyle = '#ef4444'; // Red-500
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 10;
+        ctx.arc(mob.x, mob.y, 24, 0, Math.PI * 2); // 반지름 24px
+        ctx.fill();
+        ctx.shadowBlur = 0; // 쉐도우 초기화
+        
+        // 2. 테두리
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        // 3. 체력바 (몹 위에 표시)
+        const barWidth = 60;
+        const barHeight = 8;
+        const hpPercent = mob.hp / mob.max_hp;
+        
+        // 배경 (회색)
+        ctx.fillStyle = '#374151'; 
+        ctx.fillRect(mob.x - barWidth/2, mob.y - 45, barWidth, barHeight);
+        
+        // 체력 (초록색)
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(mob.x - barWidth/2, mob.y - 45, barWidth * hpPercent, barHeight);
+        
+        // 체력바 테두리
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000000';
+        ctx.strokeRect(mob.x - barWidth/2, mob.y - 45, barWidth, barHeight);
+    });
 }
 
 function drawPath(ctx, path) {

@@ -2,6 +2,7 @@
 import uuid
 import random
 import time
+import math # 거리 계산용
 
 class SoloGameSession:
     def __init__(self, user_id: int, deck: list):
@@ -15,13 +16,20 @@ class SoloGameSession:
         self.lives = 3
         self.wave = 1
         
-        # 맵 및 그리드 (기존 로직 유지)
+        # [NEW] 몹 관련 상태
+        self.mobs = [] # 몹 객체 리스트
+        self.mob_id_counter = 0
+        self.last_spawn_time = time.time()
+        self.spawn_interval = 1.0 # 1초마다 스폰
+        
+        # 맵 설정
         self.width = 1080
         self.height = 1920
         self.unit = 140
         self.offset_x = (self.width - (7 * self.unit)) // 2
         self.offset_y = (self.height - (5 * self.unit)) // 2 
         
+        # 경로 (U자 형태)
         self.path = [
             {'x': 0.5, 'y': 4.0}, {'x': 0.5, 'y': -0.5}, 
             {'x': 6.5, 'y': -0.5}, {'x': 6.5, 'y': 4.0},
@@ -31,7 +39,6 @@ class SoloGameSession:
         self.grid = []
         self._init_grid()
         
-        # [NEW] 마지막 업데이트 시간 (Delta Time 계산용)
         self.last_update_time = time.time()
 
     def _to_pixel(self, ux, uy):
@@ -55,49 +62,102 @@ class SoloGameSession:
                     'dice': None 
                 })
 
-    # [NEW] 게임 루프 (30Hz로 호출됨)
+    # [수정] 게임 루프 (30Hz)
     def update(self):
         current_time = time.time()
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
         
-        # 여기에 SP 자동 회복, 몹 이동, 투사체 이동 로직 추가 예정
-        # 예: self.sp += 1 * dt (초당 1 SP 회복)
+        # 1. 몹 스폰 (1초 주기)
+        if current_time - self.last_spawn_time >= self.spawn_interval:
+            self._spawn_mob()
+            self.last_spawn_time = current_time
+            
+        # 2. 몹 이동 처리
+        active_mobs = []
+        for mob in self.mobs:
+            reached_end = self._move_mob(mob, dt)
+            if reached_end:
+                self.lives -= 1 # 라이프 감소
+                # 라이프가 0 이하가 되어도 게임은 계속 진행 (요청사항)
+            else:
+                active_mobs.append(mob)
         
+        self.mobs = active_mobs
+        
+        # 상태 변경이 있을 때만 보내는 최적화는 추후 적용 (지금은 매 틱 전송)
         return self.get_broadcast_state()
 
-    # [NEW] 유저 명령 처리 (웹소켓에서 호출)
+    # [NEW] 몹 생성
+    def _spawn_mob(self):
+        start_node = self.pixel_path[0]
+        self.mob_id_counter += 1
+        
+        new_mob = {
+            'id': self.mob_id_counter,
+            'hp': 100,
+            'max_hp': 100,
+            'speed': 300, # 픽셀/초 (속도 조절 가능)
+            'path_index': 0, # 현재 출발한 웨이포인트 인덱스
+            'x': start_node['x'],
+            'y': start_node['y'],
+            'frozen': 0, 
+        }
+        self.mobs.append(new_mob)
+
+    # [NEW] 몹 이동
+    def _move_mob(self, mob, dt):
+        # 마지막 경로면 도착 처리
+        if mob['path_index'] >= len(self.pixel_path) - 1:
+            return True 
+
+        # 다음 목표 지점
+        target = self.pixel_path[mob['path_index'] + 1]
+        
+        # 방향 벡터 및 거리 계산
+        dx = target['x'] - mob['x']
+        dy = target['y'] - mob['y']
+        dist = math.sqrt(dx**2 + dy**2)
+        
+        move_dist = mob['speed'] * dt
+        
+        if move_dist >= dist:
+            # 목표 도달 -> 좌표를 목표로 맞추고 다음 인덱스로
+            mob['x'] = target['x']
+            mob['y'] = target['y']
+            mob['path_index'] += 1
+            
+            # 남은 이동 거리만큼 더 이동시키는 로직은 생략 (단순화)
+            if mob['path_index'] >= len(self.pixel_path) - 1:
+                return True # 끝 도달
+        else:
+            # 목표를 향해 이동
+            mob['x'] += (dx / dist) * move_dist
+            mob['y'] += (dy / dist) * move_dist
+            
+        return False
+
     def process_command(self, command: dict):
         ctype = command.get('type')
-        
         if ctype == 'SPAWN':
             return self._spawn_dice()
-        
-        # 추후 MERGE, POWER_UP 등 추가
         return None
 
     def _spawn_dice(self):
-        if self.sp < self.spawn_cost:
-            return None # 혹은 에러 메시지 리턴
+        if self.sp < self.spawn_cost: return None
         
         empty_indices = [i for i, cell in enumerate(self.grid) if cell['dice'] is None]
-        if not empty_indices:
-            return None
+        if not empty_indices: return None
         
         target_idx = random.choice(empty_indices)
         dice_id = random.choice(self.deck)
         
-        self.grid[target_idx]['dice'] = {
-            'id': dice_id,
-            'level': 1,
-        }
+        self.grid[target_idx]['dice'] = { 'id': dice_id, 'level': 1 }
         
         self.sp -= self.spawn_cost
         self.spawn_cost += 10
-        
-        return True # 상태 변경됨 알림
+        return True
 
-    # [NEW] 클라이언트 동기화용 경량 데이터
     def get_broadcast_state(self):
         return {
             "type": "STATE_UPDATE",
@@ -105,10 +165,10 @@ class SoloGameSession:
             "spawn_cost": self.spawn_cost,
             "lives": self.lives,
             "wave": self.wave,
-            "grid": [cell['dice'] for cell in self.grid] # 전체 그리드 상태 (최적화 가능)
+            "grid": [cell['dice'] for cell in self.grid],
+            "mobs": self.mobs # [NEW] 몹 정보 전송
         }
 
-    # 초기 접속 시 전체 데이터 (맵 정보 포함)
     def get_initial_state(self):
         return {
             "type": "INIT",
