@@ -1,29 +1,24 @@
 // web/dice/js/utils.js
 
-// [NEW] 주사위 크기 추정 함수 (Tailwind 클래스 파싱)
+// [수정] 주사위 크기 추정 함수 (w-full 상향 유지)
 function getDiceSize(sizeClass) {
-    if (!sizeClass) return 48; // 기본값 (w-12 = 48px)
+    if (!sizeClass) return 48;
 
-    // w-숫자 또는 w-[값] 패턴 찾기
     const match = sizeClass.match(/w-(\[?[\d.]+(px|rem)?\]?|\d+)/);
-    
     if (match) {
         let val = match[1];
-        // 1. 임의 값 w-[50px]
         if (val.startsWith('[')) {
             val = val.replace(/[\[\]]/g, '');
             if (val.endsWith('px')) return parseFloat(val);
-            if (val.endsWith('rem')) return parseFloat(val) * 16; 
+            if (val.endsWith('rem')) return parseFloat(val) * 16;
             return parseFloat(val);
         } 
-        // 2. 기본 척도 w-10 (1 unit = 4px)
         else if (!isNaN(val)) {
             return parseFloat(val) * 4; 
         }
     }
     
-    // [수정] w-full일 때 추정치 상향 (64 -> 80)
-    // 전투 화면 하단 바 등에서 w-full 사용 시 좀 더 두껍게 나오도록 유도
+    // w-full일 때 80px (전투화면 하단 등)
     if (sizeClass.includes('w-full')) return 80; 
     
     return 48;
@@ -37,10 +32,8 @@ function getDiceVisualClasses(dice, sizePx) {
     let effectClasses = "dice-glossy"; 
     let customStyle = "";
     
-    // [수정] 단위 두께 계산 로직 개선
-    // 1. 비율 상향: 전체 크기의 6% -> 10% (더 두껍게)
-    // 2. 최대값 상향: 9px -> 100px (큰 주사위에서도 두께 유지)
-    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.1, 100)); 
+    // [사용자 설정 반영] 테두리: 10% 비율, 최대 100px
+    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.10, 100)); 
     const unitWidth = totalBorderWidth / 3; 
     
     customStyle += `--dice-border-unit: ${unitWidth.toFixed(2)}px; `;
@@ -64,17 +57,28 @@ function renderDicePips(dice, count = 1) {
 
 // 주사위 배경(Background) 생성
 function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
+    // 1. 크기 계산
     const sizePx = getDiceSize(sizeClass);
+    
+    // 2. 스타일 클래스 생성
     const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice, sizePx);
     
+    // 3. 테두리 스타일 (일반 등급용)
     let borderStyle = "";
     if (dice.rarity !== 'Legend') {
-        // 일반 등급은 단위 두께의 3배를 적용하여 전설과 전체 두께를 맞춤
         borderStyle = `border-style: solid; border-width: calc(var(--dice-border-unit) * 3);`;
     }
 
     const symbolIcon = dice.symbol || "ri-dice-fill";
-    const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0"><i class="${symbolIcon} text-4xl"></i></div>`;
+    
+    // [NEW] 아이콘 크기 동적 계산 (주사위 크기의 60% 정도)
+    // 기존 text-4xl(36px) 대신 직접 font-size 적용
+    const iconSize = Math.floor(sizePx * 0.6);
+    
+    // pointer-events-none, opacity-30 등은 유지하되 text-4xl 제거하고 style로 대체
+    const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0">
+        <i class="${symbolIcon}" style="font-size: ${iconSize}px; line-height: 1;"></i>
+    </div>`;
     
     return `<div class="dice-face ${sizeClass} ${borderColor} ${effectClasses}" style="${customStyle} ${borderStyle}">
         ${bgSymbolHtml}
