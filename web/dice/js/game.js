@@ -1,6 +1,8 @@
 // web/dice/js/game.js
-
-const API_BASE_URL = "https://api.pyosh.cloud/api";
+// [핵심 수정] API 주소 자동 감지 (어디서 실행하든 8000번 포트 바라보기)
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? "http://localhost:8000/api"  // 로컬 개발 환경 (Live Server 등)
+    : "/api";                      // 배포 환경 (같은 도메인)
 
 // 전역 변수
 let canvas, ctx;
@@ -80,55 +82,75 @@ async function runLoadingSequence() {
     }
 }
 
-// [수정됨] 파워업 UI 초기화 & 데이터 저장
+// [수정됨] 파워업 UI 초기화 (에러 처리 강화)
 async function initPowerUpUI() {
+    // 세션 혹은 로컬 스토리지에서 ID 확인
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
-    if (!username) return;
+    
+    if (!username) {
+        console.error("[Game] 로그인 정보가 없습니다.");
+        return;
+    }
 
     try {
+        console.log(`[Game] Fetching deck for ${username}...`);
+
+        // [중요] API_BASE_URL 사용하여 절대 경로로 요청
         const [listRes, deckRes] = await Promise.all([
-            fetch(`/api/dice/list/${username}`), // 상세 스탯(p값 등) 포함
-            fetch(`/api/dice/deck/${username}`)
+            fetch(`${API_BASE_URL}/dice/list/${username}`),
+            fetch(`${API_BASE_URL}/dice/deck/${username}`)
         ]);
 
-        if (!listRes.ok || !deckRes.ok) return;
+        // HTML 응답(에러 페이지)이 왔는지 체크
+        const listContentType = listRes.headers.get("content-type");
+        const deckContentType = deckRes.headers.get("content-type");
+        
+        if (listContentType && listContentType.includes("text/html")) {
+            throw new Error("서버 주소가 잘못되었습니다. (HTML 응답 수신)");
+        }
+
+        if (!listRes.ok || !deckRes.ok) throw new Error("API 요청 실패");
 
         const diceList = await listRes.json();
         const deckData = await deckRes.json();
+        
+        // 데이터 파싱
         const currentDeckSlots = deckData.decks && deckData.decks["1"] ? deckData.decks["1"].slots : [];
 
-        if (currentDeckSlots.length === 0) return;
+        if (currentDeckSlots.length === 0) {
+            console.warn("[Game] 장착된 덱이 없습니다.");
+            return;
+        }
 
-        // [중요] 전투용 데이터 캐싱 (나중에 데미지 계산 때 씀)
+        // 전투용 데이터 캐싱
         battleDiceData = currentDeckSlots.map(id => diceList.find(d => d.id === id));
 
+        // UI 렌더링
         const uiSlots = document.querySelectorAll('#ui-bottom .dice-slot');
-        const powerBtns = document.querySelectorAll('#ui-bottom .power-btn'); // 버튼들
-
+        
         currentDeckSlots.forEach((diceId, idx) => {
             const diceInfo = battleDiceData[idx];
             if (!diceInfo || !uiSlots[idx]) return;
 
-            // 1. 주사위 아이콘 그리기 (눈 없음)
+            // 주사위 아이콘 (눈 없음: pips=0)
             uiSlots[idx].innerHTML = renderDiceIcon(diceInfo, "w-full h-full", 0);
 
-            // 2. [변경] 클래스 레벨 대신 '파워업 레벨(Lv.1)' 표시
-            // 기존 span 제거 후 새로 생성
-            const oldSpan = uiSlots[idx].querySelector('span');
-            if(oldSpan) oldSpan.remove();
-
+            // 레벨 배지
             const lvBadge = document.createElement('span');
-            lvBadge.id = `dice-lv-${idx}`; // 나중에 업데이트를 위해 ID 부여
-            lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-sm pointer-events-none z-20 drop-shadow-sm"; // 글씨 크기 키움 (text-xs -> text-sm)
-            lvBadge.innerText = `Lv.${inGameDiceLevels[idx]}`; 
+            lvBadge.id = `dice-lv-${idx}`;
+            lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-sm pointer-events-none z-20 drop-shadow-sm";
+            lvBadge.innerText = `Lv.${inGameDiceLevels[idx]}`;
             uiSlots[idx].appendChild(lvBadge);
 
-            // 3. [신규] 버튼 초기화 (비용 표시)
+            // 버튼 업데이트
             updatePowerUpButton(idx);
         });
+        console.log("[Game] PowerUp UI Initialized.");
 
     } catch (err) {
-        console.error("PowerUp UI Init Error:", err);
+        console.error("[Game] Init Error:", err);
+        // 사용자에게 덱 로딩 실패를 알리지 않고 조용히 넘어가거나, 
+        // alert("덱 정보를 불러오지 못했습니다."); 라고 띄울 수 있음.
     }
 }
 
