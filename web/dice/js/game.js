@@ -49,14 +49,9 @@ async function runLoadingSequence() {
 
         updateLoading(40, "Fetching Battle Data...");
         // 서버에서 덱 및 주사위 상세 정보 가져오기
-        await fetchBattleDiceData(); 
+        fetchBattleDiceData(); 
         gameMap = getMockMapData(); 
         await sleep(300);
-        
-        updateLoading(40, "Fetching map data...");
-        // 서버 데이터 모의 (여기서 맵 데이터 생성)
-        gameMap = getMockMapData(); 
-        await sleep(500);
 
         updateLoading(70, "Rendering UI...");
         renderBattleSlots(); // 하단 파워업 슬롯 그리기
