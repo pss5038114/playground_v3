@@ -47,69 +47,36 @@ function getDiceVisualClasses(dice, sizePx) {
 function renderDicePips(dice, count = 1) {
     if (count <= 0) return ""; 
 
-    const colorClass = dice.color || 'bg-slate-500';
+    // [핵심] dice.color(예: bg-red-500)를 눈의 배경색으로 직접 사용
+    const pipColorClass = dice.color || 'bg-slate-500';
     
-    // 눈(점) 스타일: 약간의 그림자와 둥근 모서리
-    // z-10으로 배경 아이콘보다 위에 표시
-    const pipStyle = `
-        background-color: currentColor; 
-        border-radius: 50%; 
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.3), 0 1px 1px rgba(255,255,255,0.5);
-    `;
+    const size = "w-[24%] h-[24%]";
     
-    // 공통 래퍼 클래스 (Grid 사용)
-    const wrapperClass = `dice-pips-container w-full h-full absolute inset-0 p-[15%] grid grid-cols-3 grid-rows-3 z-10 pointer-events-none text-${colorClass.replace('bg-', '')}`;
-    
-    // 점 생성 함수
-    const mkPip = (posClass) => `<div class="${posClass} rounded-full shadow-sm" style="${pipStyle}"></div>`;
-    
-    // 위치 정의 (Grid Area 방식도 좋지만, Tailwind col/row로 배치)
-    // 3x3 그리드 기준:
-    // 1 2 3
-    // 4 5 6
-    // 7 8 9
-    
-    // 단순화를 위해 위치별 HTML 조각 생성
-    // flex나 absolute로 위치 잡는게 더 깔끔할 수 있음. 여기선 absolute % 배치 사용.
-    
-    let pipsHtml = "";
-    const size = "w-[24%] h-[24%]"; // 점 크기
-    
-    // 좌표 설정 (top, left %)
+    // 위치 좌표 (Tailwind arbitrary values 활용)
     const pos = {
-        tl: "top-[10%] left-[10%]", // Top-Left
-        tc: "top-[10%] left-[38%]", // Top-Center
-        tr: "top-[10%] right-[10%]", // Top-Right
-        cl: "top-[38%] left-[10%]", // Center-Left
-        cc: "top-[38%] left-[38%]", // Center-Center
-        cr: "top-[38%] right-[10%]", // Center-Right
-        bl: "bottom-[10%] left-[10%]", // Bottom-Left
-        bc: "bottom-[10%] left-[38%]", // Bottom-Center
-        br: "bottom-[10%] right-[10%]"  // Bottom-Right
+        tl: "top-[10%] left-[10%]", tc: "top-[10%] left-[38%]", tr: "top-[10%] right-[10%]",
+        cl: "top-[38%] left-[10%]", cc: "top-[38%] left-[38%]", cr: "top-[38%] right-[10%]",
+        bl: "bottom-[10%] left-[10%]", bc: "bottom-[10%] left-[38%]", br: "bottom-[10%] right-[10%]"
     };
 
-    // 눈 개수별 배치 (표준 주사위 + 7성)
+    // 눈 개수별 배치 설정
     const configs = {
         1: ['cc'],
         2: ['tl', 'br'],
         3: ['tl', 'cc', 'br'],
         4: ['tl', 'tr', 'bl', 'br'],
         5: ['tl', 'tr', 'cc', 'bl', 'br'],
-        6: ['tl', 'tc', 'tr', 'bl', 'bc', 'br'], // 가로 2줄 or 세로 2줄? 보통 세로 (tl, cl, bl / tr, cr, br)
-        // 6 (세로형): tl, cl, bl, tr, cr, br
-        6: ['tl', 'cl', 'bl', 'tr', 'cr', 'br'],
-        7: ['tl', 'cl', 'bl', 'cc', 'tr', 'cr', 'br'] // 6 + 중앙 (Star)
+        6: ['tl', 'cl', 'bl', 'tr', 'cr', 'br'], // 세로형 6
+        7: ['tl', 'cl', 'bl', 'cc', 'tr', 'cr', 'br']
     };
     
-    // 7 이상은 7과 동일하게 처리 (혹은 별 모양 아이콘 등으로 대체 가능)
     const currentConfig = configs[Math.min(count, 7)] || configs[1];
     
-    // HTML 조립
-    // 컨테이너는 relative여야 함
+    // bg-current 대신 pipColorClass 사용
     return `<div class="absolute inset-0 w-full h-full p-[15%] z-10 pointer-events-none">
-        <div class="relative w-full h-full text-${colorClass.replace('bg-', '')}-700">
+        <div class="relative w-full h-full">
             ${currentConfig.map(p => 
-                `<div class="absolute ${pos[p]} ${size} rounded-full bg-current shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] border border-white/20"></div>`
+                `<div class="absolute ${pos[p]} ${size} rounded-full ${pipColorClass} shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] border border-white/20"></div>`
             ).join('')}
         </div>
     </div>`;
