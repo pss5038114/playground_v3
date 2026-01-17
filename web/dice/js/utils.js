@@ -38,9 +38,9 @@ function getDiceVisualClasses(dice, sizePx) {
     let customStyle = "";
     
     // [수정] 단위 두께 계산 로직 개선
-    // 1. 비율 상향: 전체 크기의 6% -> 8% (더 두껍게)
+    // 1. 비율 상향: 전체 크기의 6% -> 10% (더 두껍게)
     // 2. 최대값 상향: 9px -> 24px (큰 주사위에서도 두께 유지)
-    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.08, 24)); 
+    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.1, 24)); 
     const unitWidth = totalBorderWidth / 3; 
     
     customStyle += `--dice-border-unit: ${unitWidth.toFixed(2)}px; `;
