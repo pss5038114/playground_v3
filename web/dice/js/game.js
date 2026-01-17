@@ -5,6 +5,7 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
+let myDeckInfo = []; // 현재 전투에 사용하는 5개 주사위의 상세 정보
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
@@ -35,7 +36,7 @@ function setupLeaveWarning() {
     });
 }
 
-// 3. 로딩 시뮬레이션
+// 3. 로딩 시뮬레이션 [수정] 로딩 시퀀스에 주사위 데이터 로드 추가
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
     const uiTop = document.getElementById('ui-top');
@@ -46,17 +47,22 @@ async function runLoadingSequence() {
         // TODO: 웹소켓 연결 로직
         await sleep(500);
 
+        updateLoading(40, "Fetching Battle Data...");
+        // 서버에서 덱 및 주사위 상세 정보 가져오기
+        await fetchBattleDiceData(); 
+        gameMap = getMockMapData(); 
+        await sleep(300);
+        
         updateLoading(40, "Fetching map data...");
         // 서버 데이터 모의 (여기서 맵 데이터 생성)
         gameMap = getMockMapData(); 
         await sleep(500);
 
-        updateLoading(70, "Loading resources...");
-        // TODO: 이미지 프리로딩
-        await sleep(800);
-
-        updateLoading(100, "Ready to Battle!");
+        updateLoading(70, "Rendering UI...");
+        renderBattleSlots(); // 하단 파워업 슬롯 그리기
         await sleep(300);
+
+        updateLoading(100, "Ready!");
 
         // 로딩 화면 제거 & UI 표시
         loadingScreen.style.opacity = '0';
@@ -266,6 +272,54 @@ function drawGrid(ctx, grid) {
         // 그림자 끄고 테두리 그리기
         ctx.shadowColor = "transparent";
         ctx.stroke();
+    });
+}
+
+// [신규] 전투에 필요한 주사위 정보 가져오기
+async function fetchBattleDiceData() {
+    const username = localStorage.getItem('dice_username'); // state.js의 myId와 동일
+    
+    // 1. 현재 선택된 덱(프리셋) 가져오기
+    const deckRes = await fetch(`/dice/deck/${username}`);
+    const deckData = await deckRes.json();
+    // 현재 프리셋(기본 1번)의 슬롯 아이디 배열 (예: ['fire', 'wind', ...])
+    const currentPreset = deckData.decks["1"].slots; 
+
+    // 2. 전체 주사위 상세 정보(색상, 심볼) 가져오기
+    const diceRes = await fetch(`/dice/list/${username}`);
+    const allDice = await diceRes.json();
+
+    // 3. 덱에 있는 주사위만 필터링하여 저장
+    myDeckInfo = currentPreset.map(id => allDice.find(d => d.id === id));
+}
+
+// [신규] 하단 슬롯에 주사위 그리기
+function renderBattleSlots() {
+    const slots = document.querySelectorAll('.dice-slot');
+    
+    slots.forEach((slot, index) => {
+        const dice = myDeckInfo[index];
+        if (!dice) return;
+
+        // 1. 슬롯 배경색 적용 (game_data.py의 color 값)
+        // 기존 bg-slate-100 등을 제거하고 주사위 고유색 적용
+        slot.className = `aspect-square rounded-lg border border-white/20 relative dice-slot flex items-center justify-center group shadow-inner ${dice.color}`;
+
+        // 2. 내부 아이콘 및 레벨 텍스트 구성
+        // 주사위 눈은 제외하고 아이콘(symbol)만 크게 표시
+        slot.innerHTML = `
+            <i class="${dice.symbol} text-white text-3xl opacity-90"></i>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-white font-black text-[10px] mt-8 drop-shadow-md">Lv.${dice.class_level}</span>
+            </div>
+        `;
+
+        // 3. 파워업 버튼의 비용/레벨 정보도 동기화 (필요 시)
+        const btn = slot.nextElementSibling; // power-btn
+        if (btn) {
+            const costSpan = btn.querySelector('span:last-child');
+            if (costSpan) costSpan.innerText = dice.next_cost ? dice.next_cost.gold : "MAX";
+        }
     });
 }
 
