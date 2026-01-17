@@ -250,3 +250,20 @@ async def start_solo_game(payload: dict = Body(...)):
         
     finally:
         conn.close()
+    
+@router.post("/game/solo/spawn")
+async def spawn_solo_dice(payload: dict = Body(...)):
+    game_id = payload.get("game_id")
+    # username 검증 로직은 생략 (세션 기반이면 game_id로 충분)
+    
+    session = active_games.get(game_id)
+    if not session:
+        raise HTTPException(404, "Game session not found")
+        
+    result = session.spawn_dice()
+    
+    # 덱 정보 등 부가 정보가 필요하다면 여기서 추가할 수 있음
+    # 예: 주사위 ID만으로는 색상을 모르니까 프론트엔드가 이미 알고 있는 정보를 쓰거나 여기서 보내줘야 함.
+    # 프론트엔드는 처음에 deck_details를 받았으므로 ID만으로 렌더링 가능.
+    
+    return result

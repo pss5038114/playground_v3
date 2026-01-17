@@ -6,6 +6,9 @@ let gameMap = null;
 let gameState = null; // SP, Lives, Wave 등
 let currentMode = 'solo';
 let animationFrameId;
+let gameId = null; // [NEW] 게임 ID 저장
+let deckInfoMap = {}; // [NEW] ID -> 상세정보 매핑 (색상 등)
+
 const API_DICE = "https://api.pyosh.cloud/api/dice";
 const myId = sessionStorage.getItem('username');
 
@@ -63,22 +66,19 @@ async function runLoadingSequence(presetIndex) {
         const response = await fetch(`${API_DICE}/game/solo/start`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                username: myId,
-                preset_index: presetIndex
-            })
+            body: JSON.stringify({ username: myId, preset_index: presetIndex })
         });
 
-        if (!response.ok) {
-            throw new Error("Failed to start game session");
-        }
-
+        if (!response.ok) throw new Error("Failed to start");
         const data = await response.json();
         
-        // 데이터 저장
+        gameId = data.game_id; // [NEW] ID 저장
         gameMap = data.map;
         gameState = data.state;
         const deckDetails = data.deck_details;
+
+        // [NEW] 덱 정보 매핑 (소환 시 빠른 참조용)
+        deckDetails.forEach(d => { deckInfoMap[d.id] = d; });
 
         updateLoading(70, "Setting up board...");
         
@@ -112,6 +112,85 @@ async function runLoadingSequence(presetIndex) {
         alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
         window.location.href = 'index.html'; 
     }
+}
+
+// [NEW] 주사위 표시용 HTML 레이어 생성
+function initDiceLayer() {
+    const container = document.getElementById('game-container');
+    let layer = document.getElementById('dice-layer');
+    if (!layer) {
+        layer = document.createElement('div');
+        layer.id = 'dice-layer';
+        layer.className = 'absolute inset-0 pointer-events-none'; // 클릭 통과 (필요시 auto)
+        // 캔버스 크기와 일치해야 함 (반응형 대응은 resize 이벤트에서)
+        container.appendChild(layer);
+    }
+    layer.innerHTML = ''; // 초기화
+    
+    // 그리드 위치에 미리 빈 슬롯(div)들을 만들어두면 업데이트가 편함
+    if (gameMap && gameMap.grid) {
+        gameMap.grid.forEach((cell, idx) => {
+            const slot = document.createElement('div');
+            slot.id = `grid-slot-${idx}`;
+            slot.className = 'absolute flex items-center justify-center transition-all duration-200';
+            
+            // 좌표 변환 (1080x1920 기준 -> 실제 화면 비율)
+            updateSlotPosition(slot, cell);
+            
+            layer.appendChild(slot);
+        });
+    }
+}
+
+// 좌표 비율 계산 및 적용
+function updateSlotPosition(element, cell) {
+    if (!canvas) return;
+    // 캔버스 실제 크기 / 내부 해상도(1080)
+    const scale = canvas.clientWidth / 1080; 
+    
+    element.style.left = `${cell.x * scale}px`;
+    element.style.top = `${cell.y * scale}px`;
+    element.style.width = `${cell.w * scale}px`;
+    element.style.height = `${cell.h * scale}px`;
+}
+
+// 상단/하단 정보 갱신
+function updateGameInfoUI() {
+    document.getElementById('game-sp').innerText = gameState.sp;
+    
+    // 소환 버튼 비용 텍스트 갱신 (만약 있다면)
+    const costEl = document.getElementById('spawn-cost-text');
+    if(costEl) costEl.innerText = gameState.spawn_cost;
+}
+
+// 화면 리사이즈 시 주사위 위치도 조정
+window.addEventListener('resize', () => {
+    setupCanvas();
+    if (gameMap && gameMap.grid) {
+        gameMap.grid.forEach((cell, idx) => {
+            const slot = document.getElementById(`grid-slot-${idx}`);
+            if (slot) updateSlotPosition(slot, cell);
+        });
+    }
+});
+
+// 그리드에 주사위 그리기
+function renderDiceOnGrid(gridIndex, diceId, level) {
+    const slot = document.getElementById(`grid-slot-${gridIndex}`);
+    if (!slot) return;
+    
+    const diceInfo = deckInfoMap[diceId]; // 미리 저장해둔 정보 (색상 등)
+    if (!diceInfo) return;
+    
+    // utils.js의 renderDiceIcon 활용!
+    // w-full h-full로 부모(slot)에 꽉 차게
+    const diceHtml = renderDiceIcon(diceInfo, "w-full h-full", level); // level=1 (눈 1개)
+    
+    slot.innerHTML = diceHtml;
+    
+    // 등장 애니메이션
+    slot.classList.add('scale-0');
+    setTimeout(() => slot.classList.remove('scale-0'), 50);
 }
 
 function updateLoading(percent, text) {
@@ -275,9 +354,44 @@ function drawGrid(ctx, grid) {
     });
 }
 
-// UI 이벤트 핸들러
-window.spawnDice = function() { 
-    console.log("Spawn Request"); 
+// [수정] 소환 버튼 핸들러
+window.spawnDice = async function() { 
+    if (!gameId) return;
+    
+    // 버튼 쿨타임/애니메이션 등 추가 가능
+    const btn = document.querySelector('.spawn-btn'); // 가정
+    if(btn) btn.classList.add('scale-95');
+
+    try {
+        const res = await fetch(`${API_DICE}/game/solo/spawn`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ game_id: gameId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            // 상태 업데이트
+            gameState.sp = data.state.sp;
+            gameState.spawn_cost = data.state.spawn_cost; // 서버에서 비용 관리
+            
+            // UI 업데이트
+            updateGameInfoUI();
+            
+            // 주사위 렌더링
+            const newDice = data.new_dice;
+            renderDiceOnGrid(newDice.index, newDice.id, newDice.level);
+            
+        } else {
+            // 실패 (SP 부족, 꽉 참 등) -> 토스트 메시지나 흔들림 효과
+            console.log(data.message);
+            const spText = document.getElementById('game-sp');
+            spText.classList.add('text-red-500');
+            setTimeout(() => spText.classList.remove('text-red-500'), 500);
+        }
+    } catch(e) { console.error(e); }
+    
+    if(btn) setTimeout(() => btn.classList.remove('scale-95'), 100);
 };
 
 // [수정] 파워업 로직 (테스트용 콘솔 출력 및 Lv 증가 시뮬레이션)
