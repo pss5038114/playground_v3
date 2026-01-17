@@ -1,6 +1,7 @@
 // web/dice/js/utils.js
 
 function getDiceVisualClasses(dice) {
+    // [수정] 방어 코드: color가 없으면 기본값 사용
     const colorClass = dice.color || 'bg-slate-500'; 
     
     let borderColor = colorClass.replace('bg-', 'border-');
@@ -18,46 +19,41 @@ function getDiceVisualClasses(dice) {
     return { borderColor, effectClasses, customStyle };
 }
 
-function renderDiceIcon(dice, sizeClass="w-10 h-10") {
-    // [NEW] 1. 크기 분석 (w-10 -> 10, w-32 -> 32)
-    let sizeIndex = 10; // 기본값
-    const match = sizeClass.match(/w-\[?(\d+)\]?/);
-    if (match) {
-        sizeIndex = parseInt(match[1], 10);
-    }
+// [NEW] 주사위 눈(Pips) HTML 생성 함수
+// count: 0이면 눈을 그리지 않음. 1이상이면 현재는 기본 눈(가운데 점) 하나만 그림.
+// 추후 1~7 주사위 눈 배치 로직을 이곳에 구현하면 됩니다.
+function renderDicePips(dice, count = 1) {
+    if (count === 0) return ""; // 0이면 빈 문자열 반환
 
-    // [NEW] 2. 비례 수치 계산
-    // 테두리: 너비의 약 5% (Tailwind 1단위 = 4px, 0.2배 하면 0.8px... 좀 얇음. 0.25배 -> 1px.
-    // w-10(40px)일 때 2px이 적당하므로 factor 0.2 (10 * 0.2 = 2px)
-    // w-32(128px)일 때 32 * 0.2 = 6.4px (약 6~7px) -> 적절함
-    const borderWidth = Math.max(2, sizeIndex * 0.2); 
-    const borderWidthPx = `${borderWidth.toFixed(1)}px`;
-    
-    // 배경 아이콘 크기: 너비의 약 90%
-    const fontSize = sizeIndex * 4 * 0.9; 
-
-    const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
-    
-    // [NEW] 3. 스타일 조합
-    let finalCustomStyle = customStyle;
-    let finalBorderClass = borderColor;
-
-    if (dice.rarity === 'Legend') {
-        // 전설: CSS 변수로 두께 전달
-        finalCustomStyle += ` --dice-border-width: ${borderWidthPx};`;
-    } else {
-        // 일반/희귀/영웅: 직접 border-width 설정 (border-2 클래스 제거 대신)
-        finalCustomStyle += ` border-width: ${borderWidthPx}; border-style: solid;`;
-    }
-
-    const symbolIcon = dice.symbol || "ri-dice-fill";
+    // 현재는 눈의 개수와 상관없이 중앙에 하나의 큰 점만 표시하는 기존 스타일 유지
+    // 나중에 switch(count) 등으로 주사위 눈 배치를 다르게 할 수 있음
     const colorClass = dice.color || 'bg-slate-500';
-
-    // [수정] 배경 아이콘 크기(fontSize) 적용
-    const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0" style="font-size: ${fontSize}px; line-height: 1;"><i class="${symbolIcon}"></i></div>`;
     
-    // [수정] borderBase(border-2) 제거하고 finalBorderClass 및 finalCustomStyle 사용
-    return `<div class="dice-face ${sizeClass} ${finalBorderClass} ${effectClasses}" style="${finalCustomStyle}">${bgSymbolHtml}<div class="dice-content w-[25%] h-[25%] rounded-full ${colorClass} shadow-sm z-10"></div></div>`;
+    // [확장 가능성] 여기서 count에 따라 다른 HTML을 리턴하면 됨
+    return `<div class="dice-content w-[25%] h-[25%] rounded-full ${colorClass} shadow-sm z-10"></div>`;
+}
+
+// [NEW] 주사위 배경(Background) 생성 함수
+// childrenHtml: 주사위 눈(Pips) HTML이 들어갈 자리
+function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
+    const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
+    const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
+    const symbolIcon = dice.symbol || "ri-dice-fill";
+    
+    // 배경에 깔리는 흐릿한 심볼 아이콘
+    const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0"><i class="${symbolIcon} text-4xl"></i></div>`;
+    
+    return `<div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses}" style="${customStyle}">
+        ${bgSymbolHtml}
+        ${childrenHtml}
+    </div>`;
+}
+
+// [MODIFIED] 메인 렌더링 함수 (기존 코드와의 호환성 유지)
+// pipCount 인자를 추가하여 눈의 개수를 조절할 수 있음 (기본값 1)
+function renderDiceIcon(dice, sizeClass="w-10 h-10", pipCount=1) {
+    const pipsHtml = renderDicePips(dice, pipCount);
+    return renderDiceBackground(dice, sizeClass, pipsHtml);
 }
 
 function getRarityBgIcon(rarity) {
