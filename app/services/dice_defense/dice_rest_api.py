@@ -203,45 +203,40 @@ async def upgrade_dice(payload: dict = Body(...)):
 
 # [NEW] 덱 정보 불러오기
 @router.get("/deck/{username}")
-async def get_my_deck(username: str):
+async def get_user_deck(username: str):
     conn = get_db_connection()
     try:
-        user = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if not user: raise HTTPException(404, "User not found")
+        # [수정 1] username(문자열) -> user_id(숫자) 변환 (대소문자 무시)
+        user = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
         
+        if not user:
+            # 유저가 없으면 빈 덱 반환 (에러 대신)
+            return {"decks": {}}
+            
         user_id = user["id"]
-        
-        # 모든 프리셋 조회
-        rows = conn.execute("SELECT * FROM user_decks WHERE user_id = ? ORDER BY preset_index ASC", (user_id,)).fetchall()
+
+        # [수정 2] 찾은 user_id로 user_decks 조회
+        rows = conn.execute("SELECT * FROM user_decks WHERE user_id = ?", (user_id,)).fetchall()
         
         decks = {}
-        # 기본 덱 (데이터가 없을 경우를 대비)
-        default_deck_slots = ['fire', 'electric', 'wind', 'ice', 'poison']
-        
-        # 1~7번 프리셋 확인 및 생성
-        for i in range(1, 8):
-            found = next((r for r in rows if r["preset_index"] == i), None)
-            if found:
-                decks[i] = {
-                    "name": found["deck_name"],
-                    "slots": [found["slot_1"], found["slot_2"], found["slot_3"], found["slot_4"], found["slot_5"]]
-                }
-            else:
-                # 없으면 DB에 기본값 생성
-                default_name = f"Preset {i}"
-                conn.execute("""
-                    INSERT INTO user_decks (user_id, preset_index, deck_name, slot_1, slot_2, slot_3, slot_4, slot_5)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (user_id, i, default_name, *default_deck_slots))
-                
-                decks[i] = {
-                    "name": default_name,
-                    "slots": default_deck_slots
-                }
-        
-        conn.commit()
-        return {"decks": decks} # { "1": {name:..., slots:[...]}, ... }
+        for row in rows:
+            # preset_index를 키로 사용 (문자열 변환)
+            idx = str(row["preset_index"])
+            decks[idx] = {
+                "name": row["deck_name"],
+                "slots": [
+                    row["slot_1"], row["slot_2"], row["slot_3"], row["slot_4"], row["slot_5"]
+                ]
+            }
             
+        # 디버깅용 로그 (서버 콘솔에서 확인 가능)
+        print(f"[API] Deck fetch for '{username}' (ID: {user_id}): Found {len(decks)} presets.")
+        
+        return {"decks": decks}
+
+    except Exception as e:
+        print(f"[API Error] get_user_deck: {e}")
+        raise HTTPException(500, str(e))
     finally:
         conn.close()
 
