@@ -2,20 +2,30 @@
 
 // [NEW] 주사위 크기 추정 함수 (Tailwind 클래스 파싱)
 function getDiceSize(sizeClass) {
-    if (!sizeClass) return 48;
+    if (!sizeClass) return 48; // 기본값 (w-12 = 48px)
+
+    // w-숫자 또는 w-[값] 패턴 찾기
     const match = sizeClass.match(/w-(\[?[\d.]+(px|rem)?\]?|\d+)/);
+    
     if (match) {
         let val = match[1];
+        // 1. 임의 값 w-[50px]
         if (val.startsWith('[')) {
             val = val.replace(/[\[\]]/g, '');
             if (val.endsWith('px')) return parseFloat(val);
-            if (val.endsWith('rem')) return parseFloat(val) * 16;
+            if (val.endsWith('rem')) return parseFloat(val) * 16; 
             return parseFloat(val);
-        } else if (!isNaN(val)) {
+        } 
+        // 2. 기본 척도 w-10 (1 unit = 4px)
+        else if (!isNaN(val)) {
             return parseFloat(val) * 4; 
         }
     }
-    if (sizeClass.includes('w-full')) return 64; 
+    
+    // [수정] w-full일 때 추정치 상향 (64 -> 80)
+    // 전투 화면 하단 바 등에서 w-full 사용 시 좀 더 두껍게 나오도록 유도
+    if (sizeClass.includes('w-full')) return 80; 
+    
     return 48;
 }
 
@@ -27,10 +37,10 @@ function getDiceVisualClasses(dice, sizePx) {
     let effectClasses = "dice-glossy"; 
     let customStyle = "";
     
-    // [NEW] 단위 두께 계산 (전체 두께의 1/3)
-    // 전체 두께를 sizePx의 5% 정도로 잡고, 그것을 3등분한 값을 '단위 두께'로 설정
-    // 최소 1px은 되어야 선이 보임
-    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.06, 9)); // 전체 두께 (3~9px)
+    // [수정] 단위 두께 계산 로직 개선
+    // 1. 비율 상향: 전체 크기의 6% -> 8% (더 두껍게)
+    // 2. 최대값 상향: 9px -> 24px (큰 주사위에서도 두께 유지)
+    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.08, 24)); 
     const unitWidth = totalBorderWidth / 3; 
     
     customStyle += `--dice-border-unit: ${unitWidth.toFixed(2)}px; `;
@@ -59,7 +69,7 @@ function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
     
     let borderStyle = "";
     if (dice.rarity !== 'Legend') {
-        // [수정] 일반 등급은 단위 두께의 3배(3)를 적용하여 전설과 전체 두께를 맞춤
+        // 일반 등급은 단위 두께의 3배를 적용하여 전설과 전체 두께를 맞춤
         borderStyle = `border-style: solid; border-width: calc(var(--dice-border-unit) * 3);`;
     }
 
