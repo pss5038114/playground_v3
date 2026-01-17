@@ -73,48 +73,44 @@ class SoloGameSession:
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
         
-        # 1. 몹 스폰 (기존 유지)
+        # 1. 몹 스폰 (유지)
         if current_time - self.last_spawn_time >= self.spawn_interval:
             self._spawn_entity('normal_mob')
             self.last_spawn_time = current_time
             
-        # 2. 엔티티(몹) 이동 (기존 유지)
+        # 2. 엔티티 이동 (유지)
         active_entities = []
-        # 엔티티 딕셔너리 맵핑 (ID로 빠른 조회용)
         entity_map = {} 
-        
         for entity in self.entities:
             manager = get_entity_manager(entity['type'])
             manager.update_move(entity, self.pixel_path, dt)
-            
             if entity.get('finished'):
                 self.lives -= 1
             else:
                 active_entities.append(entity)
-                entity_map[entity['id']] = entity # 맵핑 저장
-                
+                entity_map[entity['id']] = entity
         self.entities = active_entities
         
-        # 3. [NEW] 주사위 공격 처리
+        # 3. [수정] 주사위 공격 처리
         for cell in self.grid:
             dice = cell['dice']
             if dice:
-                # 좌표 정보 주입 (한 번만 하면 되지만 안전하게 매번 확인)
+                # 좌표 정보 주입
                 if 'cx' not in dice:
                     dice['cx'] = cell['cx']
                     dice['cy'] = cell['cy']
                 
-                # 로직 가져오기
                 logic = get_dice_logic(dice['id'])
                 
-                # 공격 시도
-                attack_result = logic.update_attack(dice, self.entities, dt, current_time)
+                # [수정] 주사위 크기(cell['w']) 전달 -> 눈 위치 계산용
+                attack_result = logic.update_attack(
+                    dice, self.entities, dt, current_time, dice_size=cell['w']
+                )
                 
-                # 투사체 생성 요청이 오면 리스트에 추가
                 if attack_result and attack_result['type'] == 'projectile':
                     self._spawn_projectile(attack_result)
 
-        # 4. [NEW] 투사체 이동 및 충돌 처리
+        # 4. 투사체 이동 (유지)
         self._update_projectiles(dt, entity_map)
         
         return self.get_broadcast_state()

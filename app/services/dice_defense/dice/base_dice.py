@@ -1,17 +1,13 @@
 # app/services/dice_defense/dice/base_dice.py
 import math
 import random
-import time
 
 class BaseDice:
     def __init__(self, dice_id: str, data: dict):
         self.id = dice_id
-        self.data = data
-        
-        # 공격 관련 상태 (인스턴스마다 별도 관리 필요하므로 game.py의 grid에 저장된 상태를 활용해야 함)
-        # 하지만 여기서는 로직 클래스이므로, 상태값(dict)을 인자로 받아 처리합니다.
+        self.data = data # game_data.py의 정보 (speed, damage 등)
 
-    # ... (기존 can_merge_with, on_merge 유지) ...
+    # ... (can_merge_with, on_merge는 기존과 동일) ...
     def can_merge_with(self, my_state: dict, target_state: dict) -> bool:
         if not target_state: return False
         return (self.id == target_state['id'] and my_state['level'] == target_state['level'])
@@ -22,74 +18,89 @@ class BaseDice:
         new_id = random.choice(deck)
         return {'id': new_id, 'level': new_level}
 
-    # [NEW] 공격 업데이트 로직
-    def update_attack(self, dice_state: dict, mobs: list, dt: float, current_time: float):
-        """
-        주사위의 쿨타임을 체크하고, 공격 가능하다면 타겟을 찾아 발사 정보를 반환함.
-        """
-        # 1. 쿨타임 초기화 체크
+    # [수정] 공격 로직 개선 (사거리 제거, 눈 순환 발사)
+    def update_attack(self, dice_state: dict, mobs: list, dt: float, current_time: float, dice_size: int = 100):
+        # 1. 기본 스탯 가져오기
+        base_speed = self.data.get('speed', 1.0) # 예: 1.0초
+        level = dice_state['level']
+        
+        # 2. 레벨에 따른 발사 간격 (DPS = 데미지 * 레벨 / 기본속도)
+        # 예: 1.0초 주사위 -> 1성: 1.0초마다, 3성: 0.33초마다
+        attack_interval = base_speed / level
+        
+        # 3. 쿨타임 체크
         if 'last_attack_time' not in dice_state:
             dice_state['last_attack_time'] = 0
             
-        # 2. 공격 속도 (기본 1.0초, 레벨업 시 빨라지게 하거나 데이터에서 가져옴)
-        # 예: 기본 1.5초 - (레벨 * 0.1)
-        attack_interval = max(0.5, 1.5 - (dice_state['level'] * 0.1))
-        
-        # 3. 쿨타임 체크
         if current_time - dice_state['last_attack_time'] >= attack_interval:
-            # 4. 타겟 탐색 (Front: 경로 인덱스가 가장 큰 적)
+            # 4. 타겟 탐색 (사거리 제한 없음)
             target = self._find_target_front(dice_state, mobs)
             
             if target:
                 dice_state['last_attack_time'] = current_time
-                dice_state['target_id'] = target['id'] # 시각적 연결용
+                dice_state['target_id'] = target['id']
                 
-                # 투사체 생성 정보 반환
+                # [NEW] 발사 위치 계산 (눈 위치 순환)
+                if 'shot_seq' not in dice_state:
+                    dice_state['shot_seq'] = 0
+                
+                seq = dice_state['shot_seq']
+                ox, oy = self._get_pip_offset(level, seq, dice_size)
+                
+                # 다음 발사를 위해 시퀀스 증가
+                dice_state['shot_seq'] = (seq + 1) % level
+                
                 return {
                     "type": "projectile",
-                    "damage": 10 * dice_state['level'], # 데미지 공식
-                    "speed": 600, # 투사체 속도
+                    "damage": self.data.get('damage', 10), # 기본 데미지
+                    "speed": 800, # 투사체 속도
                     "target_id": target['id'],
-                    "start_x": dice_state['cx'], # 그리드 중심 (game.py에서 주입 필요)
-                    "start_y": dice_state['cy']
+                    "start_x": dice_state['cx'] + ox,
+                    "start_y": dice_state['cy'] + oy
                 }
         
-        # 타겟이 없거나 쿨타임 중이면 타겟 ID 초기화 (선 지우기)
-        if current_time - dice_state['last_attack_time'] > 0.2:
+        # 타겟 없거나 쿨타임 중일 때 시각적 연결 해제 (짧은 유예 시간)
+        if current_time - dice_state['last_attack_time'] > 0.1:
              dice_state['target_id'] = None
              
         return None
 
+    # [수정] 거리 제한 제거 (무조건 앞선 적)
     def _find_target_front(self, dice_state, mobs):
-        """
-        가장 앞서가는(finish에 가까운) 적을 찾음.
-        거리 제한(사거리)이 있다면 여기서 체크.
-        """
-        if not mobs:
-            return None
-            
-        # path_index가 클수록, 그리고 같은 index라면 다음 노드까지 거리가 가까울수록 앞선 적임.
-        # 간단하게 path_index가 가장 큰 적을 선택
-        # (더 정교하게 하려면 총 이동 거리를 계산해야 함)
+        if not mobs: return None
         
-        # 사거리 체크 (예: 반경 300px)
-        range_radius = 250
-        
-        candidates = []
-        dice_x = dice_state.get('cx', 0)
-        dice_y = dice_state.get('cy', 0)
+        # path_index가 큰 순서대로 정렬 (가장 멀리 간 적)
+        # 동점일 경우 다음 노드까지의 거리가 짧은 순서 등 정밀 계산 가능하나, 일단 index 우선
+        sorted_mobs = sorted(mobs, key=lambda m: m['path_index'], reverse=True)
+        return sorted_mobs[0]
 
-        for mob in mobs:
-            dx = mob['x'] - dice_x
-            dy = mob['y'] - dice_y
-            dist = math.sqrt(dx*dx + dy*dy)
-            
-            if dist <= range_radius:
-                candidates.append(mob)
+    # [NEW] 눈 위치 오프셋 계산 (utils.js의 시각적 위치와 동기화)
+    def _get_pip_offset(self, level, seq_index, size):
+        if level >= 7: return (0, 0) # 7성은 중앙(Star)에서 발사
         
-        if not candidates:
-            return None
-            
-        # path_index 역순 정렬 (큰게 0번) -> 가장 앞선 놈
-        candidates.sort(key=lambda m: m['path_index'], reverse=True)
-        return candidates[0]
+        # 3x3 그리드 기준 오프셋 비율 (중앙 0,0 기준)
+        # TL(-0.25, -0.25), TR(0.25, -0.25) ...
+        d = size * 0.25 
+        
+        # 위치 정의
+        pos_map = {
+            'tl': (-d, -d), 'tc': (0, -d), 'tr': (d, -d),
+            'cl': (-d, 0),  'cc': (0, 0),  'cr': (d, 0),
+            'bl': (-d, d),  'bc': (0, d),  'br': (d, d)
+        }
+        
+        # 레벨별 눈 배치 순서 (utils.js와 동일하게 맞춤)
+        configs = {
+            1: ['cc'],
+            2: ['tl', 'br'],
+            3: ['tl', 'cc', 'br'],
+            4: ['tl', 'tr', 'bl', 'br'],
+            5: ['tl', 'tr', 'cc', 'bl', 'br'],
+            6: ['tl', 'cl', 'bl', 'tr', 'cr', 'br'] # 세로형 2줄
+        }
+        
+        layout = configs.get(level, ['cc'])
+        # 안전장치: 시퀀스가 레이아웃 범위 넘어가면 0번으로
+        pos_key = layout[seq_index % len(layout)]
+        
+        return pos_map[pos_key]
