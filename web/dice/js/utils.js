@@ -1,7 +1,6 @@
 // web/dice/js/utils.js
 
 function getDiceVisualClasses(dice) {
-    // [수정] 방어 코드: color가 없으면 기본값 사용
     const colorClass = dice.color || 'bg-slate-500'; 
     
     let borderColor = colorClass.replace('bg-', 'border-');
@@ -19,6 +18,13 @@ function getDiceVisualClasses(dice) {
     return { borderColor, effectClasses, customStyle };
 }
 
+// [NEW] 크기에 따른 테두리 두께 계산 함수
+function getAdaptiveBorderWidth(sizeClass) {
+    if (sizeClass.includes('w-32')) return 4; // 가챠 1회 (128px) -> 4px
+    if (sizeClass.includes('w-20') || sizeClass.includes('w-24')) return 3; // 가챠 11회 (80px) -> 3px
+    return 2; // 기본 (40~48px) -> 2px
+}
+
 // [NEW] 주사위 눈(Pips) HTML 생성 함수
 // count: 0이면 눈을 그리지 않음. 1이상이면 현재는 기본 눈(가운데 점) 하나만 그림.
 // 추후 1~7 주사위 눈 배치 로직을 이곳에 구현하면 됩니다.
@@ -34,16 +40,29 @@ function renderDicePips(dice, count = 1) {
 }
 
 // [NEW] 주사위 배경(Background) 생성 함수
-// childrenHtml: 주사위 눈(Pips) HTML이 들어갈 자리
 function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
     const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
-    const borderBase = dice.rarity === 'Legend' ? '' : 'border-2';
     const symbolIcon = dice.symbol || "ri-dice-fill";
     
-    // 배경에 깔리는 흐릿한 심볼 아이콘
+    // [NEW] 적응형 테두리 두께 계산
+    const borderWidth = getAdaptiveBorderWidth(sizeClass);
+    
+    // 스타일 조합
+    let finalStyle = customStyle;
+    
+    // 전설: CSS 변수로 두께 전달
+    if (dice.rarity === 'Legend') {
+        finalStyle += ` --dice-border-width: ${borderWidth}px;`;
+    } 
+    // 일반: 직접 border-width 스타일 적용
+    else {
+        finalStyle += ` border-width: ${borderWidth}px;`;
+    }
+
     const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0"><i class="${symbolIcon} text-4xl"></i></div>`;
     
-    return `<div class="dice-face ${sizeClass} ${borderBase} ${borderColor} ${effectClasses}" style="${customStyle}">
+    // border-2 클래스 제거 (스타일로 직접 제어)
+    return `<div class="dice-face ${sizeClass} ${borderColor} ${effectClasses}" style="${finalStyle}">
         ${bgSymbolHtml}
         ${childrenHtml}
     </div>`;
