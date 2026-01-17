@@ -87,7 +87,7 @@ class SoloGameSession:
             
             # 2-2. 사망 체크 (HP <= 0)
             if entity['hp'] <= 0:
-                self.sp += 50 # 사망 보상 (테스트용 50)
+                self.sp += 500 # 사망 보상 (테스트용 50)
                 continue # 리스트에 추가하지 않음 -> 삭제됨
             
             # 2-3. 도착 체크
