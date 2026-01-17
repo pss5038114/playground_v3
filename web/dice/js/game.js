@@ -7,6 +7,9 @@ let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
+let gameSP = 100; // 초기 SP (나중에 서버와 동기화 필요)
+let inGameDiceLevels = [1, 1, 1, 1, 1]; // 슬롯별 파워업 레벨 (1~5)
+let battleDiceData = []; // 현재 덱의 주사위 스탯 정보 저장용
 
 // 1. 페이지 로드 시 초기화
 window.onload = async function() {
@@ -37,7 +40,11 @@ async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
     const uiTop = document.getElementById('ui-top');
     const uiBottom = document.getElementById('ui-bottom');
-    
+    // [중요] 전투 시작 시 상태 초기화
+    gameSP = 100;
+    inGameDiceLevels = [1, 1, 1, 1, 1];
+    updateSPDisplay(); // SP 화면 갱신
+
     try {
         updateLoading(10, "Connecting to server...");
         await sleep(200);
@@ -73,67 +80,133 @@ async function runLoadingSequence() {
     }
 }
 
-// [수정됨] 파워업 UI 초기화
+// [수정됨] 파워업 UI 초기화 & 데이터 저장
 async function initPowerUpUI() {
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
-    
-    if (!username) {
-        console.error("로그인 정보(username)를 찾을 수 없습니다.");
-        return;
-    }
+    if (!username) return;
 
     try {
-        console.log(`[Game] Fetching data for ${username}...`);
-
-        // [수정] 절대 경로(API_BASE_URL) 사용
         const [listRes, deckRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/dice/list/${username}`),
-            fetch(`${API_BASE_URL}/dice/deck/${username}`)
+            fetch(`/api/dice/list/${username}`), // 상세 스탯(p값 등) 포함
+            fetch(`/api/dice/deck/${username}`)
         ]);
 
-        // 에러 확인 (HTML이 왔는지 체크)
-        if (!listRes.ok) throw new Error(`List API Error: ${listRes.status}`);
-        if (!deckRes.ok) throw new Error(`Deck API Error: ${deckRes.status}`);
+        if (!listRes.ok || !deckRes.ok) return;
 
         const diceList = await listRes.json();
         const deckData = await deckRes.json();
-        
-        // 현재 덱 가져오기 (Preset 1번 기준)
-        // deckData.decks가 없거나 "1"이 없을 경우 대비
         const currentDeckSlots = deckData.decks && deckData.decks["1"] ? deckData.decks["1"].slots : [];
 
-        if (currentDeckSlots.length === 0) {
-            console.warn("장착된 덱이 없습니다.");
-            return;
-        }
+        if (currentDeckSlots.length === 0) return;
 
-        // UI 그리기
+        // [중요] 전투용 데이터 캐싱 (나중에 데미지 계산 때 씀)
+        battleDiceData = currentDeckSlots.map(id => diceList.find(d => d.id === id));
+
         const uiSlots = document.querySelectorAll('#ui-bottom .dice-slot');
-        
+        const powerBtns = document.querySelectorAll('#ui-bottom .power-btn'); // 버튼들
+
         currentDeckSlots.forEach((diceId, idx) => {
-            if (!uiSlots[idx]) return;
+            const diceInfo = battleDiceData[idx];
+            if (!diceInfo || !uiSlots[idx]) return;
 
-            const diceInfo = diceList.find(d => d.id === diceId);
-            if (diceInfo) {
-                // [중요] renderDiceIcon의 3번째 인자(pips)로 0을 넘겨 '눈 없는 아이콘' 생성
-                // (utils.js가 업데이트 되어 있어야 함)
-                const iconHtml = renderDiceIcon(diceInfo, "w-full h-full", 0);
-                
-                uiSlots[idx].innerHTML = iconHtml;
+            // 1. 주사위 아이콘 그리기 (눈 없음)
+            uiSlots[idx].innerHTML = renderDiceIcon(diceInfo, "w-full h-full", 0);
 
-                // 레벨 표시 덮어쓰기
-                const lvBadge = document.createElement('span');
-                lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-xs pointer-events-none z-20";
-                lvBadge.innerText = `Lv.${diceInfo.class_level}`;
-                
-                uiSlots[idx].appendChild(lvBadge);
-            }
+            // 2. [변경] 클래스 레벨 대신 '파워업 레벨(Lv.1)' 표시
+            // 기존 span 제거 후 새로 생성
+            const oldSpan = uiSlots[idx].querySelector('span');
+            if(oldSpan) oldSpan.remove();
+
+            const lvBadge = document.createElement('span');
+            lvBadge.id = `dice-lv-${idx}`; // 나중에 업데이트를 위해 ID 부여
+            lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-sm pointer-events-none z-20 drop-shadow-sm"; // 글씨 크기 키움 (text-xs -> text-sm)
+            lvBadge.innerText = `Lv.${inGameDiceLevels[idx]}`; 
+            uiSlots[idx].appendChild(lvBadge);
+
+            // 3. [신규] 버튼 초기화 (비용 표시)
+            updatePowerUpButton(idx);
         });
-        console.log("Deck Loaded:", currentDeckSlots);
 
     } catch (err) {
         console.error("PowerUp UI Init Error:", err);
     }
+}
+
+// [신규] 파워업 버튼 상태 업데이트 함수
+function updatePowerUpButton(idx) {
+    const btns = document.querySelectorAll('#ui-bottom .power-btn');
+    if (!btns[idx]) return;
+
+    const level = inGameDiceLevels[idx];
+    const btn = btns[idx];
+    
+    // 기존 내용 비우기
+    btn.innerHTML = "";
+
+    // 최대 레벨 체크
+    if (level >= 5) {
+        btn.innerHTML = `<span class="text-xs font-black text-red-400">MAX</span>`;
+        btn.disabled = true;
+        return;
+    }
+
+    // 다음 레벨 비용 계산 (Lv.1 -> 100, Lv.2 -> 200...)
+    const cost = level * 100;
+    
+    // 버튼 내용 (번개 아이콘 + 비용)
+    btn.innerHTML = `
+        <i class="ri-flashlight-fill text-yellow-500 text-[10px]"></i>
+        <span class="text-[10px] text-slate-700 font-bold font-mono ml-0.5">${cost}</span>
+    `;
+    btn.disabled = false;
+}
+
+// [신규] 파워업 액션 함수 (HTML onclick="powerUp(0)" 등에서 호출)
+window.powerUp = function(idx) {
+    const level = inGameDiceLevels[idx];
+    
+    // 1. 만렙 체크
+    if (level >= 5) {
+        console.log("Max Level Reached");
+        return;
+    }
+
+    // 2. 비용 체크
+    const cost = level * 100;
+    if (gameSP < cost) {
+        // SP 부족 효과 (흔들림 등) 주면 좋음
+        console.log("Not enough SP");
+        alert("SP가 부족합니다!"); // 임시 알림
+        return;
+    }
+
+    // 3. 실행
+    gameSP -= cost;
+    inGameDiceLevels[idx]++; // 레벨 증가
+    
+    // 4. UI 갱신
+    updateSPDisplay();
+    updatePowerUpButton(idx); // 버튼 비용 갱신
+    
+    // 주사위 위 레벨 텍스트 갱신
+    const badge = document.getElementById(`dice-lv-${idx}`);
+    if (badge) badge.innerText = `Lv.${inGameDiceLevels[idx]}`;
+
+    // [디버그] 스탯 변화 로그 출력
+    const diceInfo = battleDiceData[idx];
+    if (diceInfo && diceInfo.atk) {
+        // 공격력 공식: base + (class_lv-1)*c + (power_up-1)*p
+        // diceInfo.atk는 객체임 {base:20, c:..., p:15} 라고 가정
+        // 하지만 보통 API 응답은 평탄화되어 오거나 구조가 다를 수 있으니 game_data.py 구조를 따름
+        // 여기선 간단히 로그만 찍습니다.
+        console.log(`[PowerUp] ${diceInfo.name} Lv.${level} -> Lv.${level+1}`);
+    }
+};
+
+// [신규] SP 표시 갱신
+function updateSPDisplay() {
+    const spEl = document.getElementById('game-sp');
+    if (spEl) spEl.innerText = gameSP;
 }
 
 function updateLoading(percent, text) {
