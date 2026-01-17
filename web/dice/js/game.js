@@ -143,9 +143,9 @@ function initGameUI(state, deckList) {
             currentLvText = lvSpan.innerText;
         }
         
-        // [NEW] 동적 폰트 크기 계산 (슬롯 너비의 40% 정도)
+        // [NEW] 동적 폰트 크기 계산 (슬롯 너비의 20% 정도)
         const slotWidth = slot.clientWidth || 80; // 기본값 80px 가정
-        const fontSize = Math.floor(slotWidth * 0.4); 
+        const fontSize = Math.floor(slotWidth * 0.2); 
 
         // 눈 없는 주사위 생성
         const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
