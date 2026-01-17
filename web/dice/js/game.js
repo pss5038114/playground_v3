@@ -59,7 +59,7 @@ async function runLoadingSequence(presetIndex) {
 
         updateLoading(30, "Initializing Game Session...");
         
-        // [API 호출] 게임 시작 (덱 정보 로드 및 세션 생성)
+        // [API 호출] 게임 시작
         const response = await fetch(`${API_DICE}/game/solo/start`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -116,48 +116,54 @@ async function runLoadingSequence(presetIndex) {
 
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
-    const txt = document.getElementById('loading-text'); // HTML에 없다면 무시됨
     if(bar) bar.style.width = `${percent}%`;
-    // loading-text 요소가 있다면 텍스트 업데이트 가능
 }
 
-// [UI 초기화 함수]
+// [UI 초기화 함수 - 수정됨]
 function initGameUI(state, deckList) {
-    // 1. 상단 정보 (Wave, Life)
+    // 1. 상단 정보
     document.getElementById('game-wave').innerText = state.wave;
     document.getElementById('game-lives').innerText = state.lives;
-    
-    // 2. 하단 정보 (SP)
     document.getElementById('game-sp').innerText = state.sp;
     
-    // 3. 덱 슬롯 렌더링 (하단 바)
+    // 2. 덱 슬롯 렌더링 (하단 바)
     const slots = document.querySelectorAll('.dice-slot');
     
     deckList.forEach((dice, idx) => {
         if (idx >= slots.length) return;
         const slot = slots[idx];
         
-        // [수정] 클래스 초기화 (renderDiceIcon이 비주얼을 담당하므로 배경색/테두리 클래스 제거)
-        // flex, items-center 등 레이아웃용 클래스만 남김
-        slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer";
+        // [수정] 클릭 가능한 버튼 스타일 추가 (active:scale-95)
+        slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer transition-transform active:scale-95 select-none";
         
-        // 기존 Lv 텍스트 유지 (없으면 기본값 Lv.1)
+        // 기존 Lv 텍스트 가져오기 (없으면 1)
         const lvSpan = slot.querySelector('span');
-        const lvText = lvSpan ? lvSpan.innerText : 'Lv.1';
+        let currentLvText = 'Lv.1';
+        if (lvSpan && lvSpan.innerText.includes('Lv.')) {
+            currentLvText = lvSpan.innerText;
+        }
         
-        // [NEW] utils.js의 renderDiceIcon 사용하여 눈 없는 주사위(0) 생성
-        // 'w-full h-full'로 부모(slot) 크기에 꽉 차게 렌더링
+        // [NEW] 동적 폰트 크기 계산 (슬롯 너비의 40% 정도)
+        const slotWidth = slot.clientWidth || 80; // 기본값 80px 가정
+        const fontSize = Math.floor(slotWidth * 0.4); 
+
+        // 눈 없는 주사위 생성
         const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
         
+        // [수정] 중앙 정렬 및 큰 폰트로 Lv 표시
         slot.innerHTML = `
             ${diceHtml}
-            <div class="absolute bottom-1 right-1 z-20 pointer-events-none">
-                <span class="text-slate-600 font-bold text-[10px] bg-white/60 px-1 rounded backdrop-blur-[1px] shadow-sm">${lvText}</span>
+            <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <span style="font-size: ${fontSize}px; line-height: 1;" class="text-white font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                    ${currentLvText}
+                </span>
             </div>
         `;
         
-        // 추후 파워업 버튼 연결 구현 시 활용
-        // const powerBtn = slot.nextElementSibling; // button.power-btn
+        // [NEW] 슬롯 전체 클릭 시 파워업 실행
+        slot.onclick = () => {
+            if(window.powerUp) window.powerUp(idx);
+        };
     });
 }
 
@@ -271,9 +277,22 @@ function drawGrid(ctx, grid) {
 
 // UI 이벤트 핸들러
 window.spawnDice = function() { 
-    // SP 체크 및 소환 요청 (추후 구현)
     console.log("Spawn Request"); 
 };
+
+// [수정] 파워업 로직 (테스트용 콘솔 출력 및 Lv 증가 시뮬레이션)
 window.powerUp = function(idx) { 
-    console.log("Power Up:", idx); 
+    console.log("Power Up Triggered for Index:", idx);
+    
+    // UI 업데이트 시뮬레이션 (실제로는 서버 통신 후 갱신해야 함)
+    const slots = document.querySelectorAll('.dice-slot');
+    if(slots[idx]) {
+        const span = slots[idx].querySelector('span');
+        if(span) {
+            let lv = parseInt(span.innerText.replace('Lv.', '')) || 1;
+            span.innerText = `Lv.${lv + 1}`;
+            
+            // 클릭 효과음이나 파티클 등을 여기에 추가 가능
+        }
+    }
 };
