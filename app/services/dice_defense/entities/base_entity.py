@@ -18,7 +18,6 @@ class BaseEntity:
         }
 
     def create_state(self, entity_id: int, start_node: dict):
-        """초기 상태 생성"""
         stats = self.default_stats
         return {
             "id": entity_id,
@@ -28,12 +27,13 @@ class BaseEntity:
             "speed": stats["speed"],
             "radius": stats["radius"],
             "hitbox_radius": stats["hitbox_radius"],
-            
-            # 위치 상태
             "x": start_node['x'],
             "y": start_node['y'],
             "path_index": 0,
-            "finished": False # 도착 여부
+            "finished": False,
+            
+            # [NEW] 상태 이상 관리용
+            "effects": {} 
         }
 
     def update_move(self, state: dict, path: list, dt: float):
