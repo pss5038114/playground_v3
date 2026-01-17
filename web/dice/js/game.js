@@ -240,7 +240,7 @@ function updateGameInfoUI() {
     if(costEl && gameState.spawn_cost) costEl.innerText = gameState.spawn_cost;
 }
 
-// 하단 덱 슬롯 초기화
+// [수정] 하단 덱 슬롯 초기화
 function initGameUI(state, deckList) {
     const slots = document.querySelectorAll('.dice-slot');
     
@@ -258,11 +258,16 @@ function initGameUI(state, deckList) {
             currentLvText = existingSpan.innerText;
         }
         
-        // [핵심] 현재 슬롯의 실제 너비를 구함
-        const slotWidth = slot.clientWidth || 60; 
-        const fontSize = Math.floor(slotWidth * 0.4); 
+        // [핵심 수정]
+        // 슬롯이 숨겨져 있어 width가 0일 수 있음.
+        // 0이면 renderDiceIcon에 0을 전달 -> utils.js가 w-full 기본값(100px) 사용 -> 테두리 두껍게 나옴!
+        // 기존엔 || 60 처럼 작은 값을 넣어서 얇게 나왔었음.
+        const slotWidth = slot.clientWidth; 
+        
+        // 폰트 크기는 어쩔 수 없이 추정치 사용 (보통 80px 이상임)
+        const fontSize = Math.floor((slotWidth || 80) * 0.4); 
 
-        // [수정] renderDiceIcon의 4번째 인자로 실제 크기(slotWidth) 전달 -> 테두리 두께 자동 조정
+        // 4번째 인자로 slotWidth(0 또는 실제값) 전달
         const diceHtml = renderDiceIcon(dice, "w-full h-full", 0, slotWidth);
         
         slot.innerHTML = `
