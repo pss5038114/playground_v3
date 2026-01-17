@@ -4,7 +4,7 @@ import random
 import time
 import math
 from app.services.dice_defense.dice import get_dice_logic
-from app.services.dice_defense.entities import get_entity_manager # [NEW]
+from app.services.dice_defense.entities import get_entity_manager
 
 class SoloGameSession:
     def __init__(self, user_id: int, deck: list):
@@ -17,18 +17,13 @@ class SoloGameSession:
         self.lives = 3
         self.wave = 1
         
-        # [NEW] 엔티티 관리 (기존 mobs 대체)
         self.entities = [] 
         self.entity_id_counter = 0
-
-        # [NEW] 투사체 관리
-        self.projectiles = [] 
-        self.projectile_id_counter = 0
         
         self.last_spawn_time = time.time()
         self.spawn_interval = 1.0 
         
-        # 맵 설정 (기존 유지)
+        # 맵 설정
         self.width = 1080
         self.height = 1920
         self.unit = 140
@@ -45,6 +40,10 @@ class SoloGameSession:
         self._init_grid()
         
         self.last_update_time = time.time()
+        
+        # 투사체 관리
+        self.projectiles = [] 
+        self.projectile_id_counter = 0
 
     def _to_pixel(self, ux, uy):
         return { 'x': self.offset_x + ux * self.unit, 'y': self.offset_y + uy * self.unit }
@@ -67,39 +66,53 @@ class SoloGameSession:
                     'dice': None 
                 })
 
-    # [수정] 메인 업데이트 루프
     def update(self):
         current_time = time.time()
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
         
-        # 1. 몹 스폰 (유지)
+        # 1. 몹 스폰
         if current_time - self.last_spawn_time >= self.spawn_interval:
             self._spawn_entity('normal_mob')
             self.last_spawn_time = current_time
             
-        # 2. 엔티티 이동 (유지)
+        # 2. 엔티티 상태 업데이트 (이동, 사망, 도착 처리)
         active_entities = []
-        entity_map = {} 
+        entity_map = {} # ID로 살아있는 엔티티 조회용
+        
         for entity in self.entities:
+            # 2-1. 이동 로직 실행
             manager = get_entity_manager(entity['type'])
             manager.update_move(entity, self.pixel_path, dt)
+            
+            # 2-2. 사망 체크 (HP <= 0)
+            if entity['hp'] <= 0:
+                self.sp += 50 # 사망 보상 (테스트용 50)
+                continue # 리스트에 추가하지 않음 -> 삭제됨
+            
+            # 2-3. 도착 체크
             if entity.get('finished'):
                 self.lives -= 1
-            else:
-                active_entities.append(entity)
-                entity_map[entity['id']] = entity
+                self.sp += 50 # 도착해도 보상 지급 (요청사항)
+                continue # 리스트에 추가하지 않음 -> 삭제됨
+            
+            # 살아남은 엔티티만 유지
+            active_entities.append(entity)
+            entity_map[entity['id']] = entity
+                
         self.entities = active_entities
         
-        # 3. 주사위 공격
+        # 3. 주사위 공격 처리
         for cell in self.grid:
             dice = cell['dice']
             if dice:
-                if 'cx' not in dice: dice['cx'] = cell['cx']; dice['cy'] = cell['cy']
+                if 'cx' not in dice:
+                    dice['cx'] = cell['cx']
+                    dice['cy'] = cell['cy']
                 
                 logic = get_dice_logic(dice['id'])
                 
-                # projectiles_list는 이제 리스트로 반환됨 (create_projectiles가 리스트 반환)
+                # 살아있는 엔티티(active_entities)만 타게팅 후보로 전달
                 projectiles_list = logic.update_attack(
                     dice, self.entities, dt, current_time, dice_size=cell['w']
                 )
@@ -107,18 +120,26 @@ class SoloGameSession:
                 if projectiles_list:
                     self._spawn_projectiles(projectiles_list)
 
-        # 4. 투사체 이동
-        self._update_projectiles(dt, entity_map) # entity_map은 위에서 생성된 것 사용
+        # 4. 투사체 이동 및 충돌 처리
+        self._update_projectiles(dt, entity_map)
         
         return self.get_broadcast_state()
 
-    # [수정] 투사체 생성 (리스트 처리)
+    def _spawn_entity(self, entity_type: str):
+        self.entity_id_counter += 1
+        start_node = self.pixel_path[0]
+        
+        manager = get_entity_manager(entity_type)
+        new_entity_state = manager.create_state(self.entity_id_counter, start_node)
+        
+        self.entities.append(new_entity_state)
+
     def _spawn_projectiles(self, proj_list):
         for info in proj_list:
             self.projectile_id_counter += 1
             self.projectiles.append({
                 'id': self.projectile_id_counter,
-                'dice_id': info['dice_id'], # [중요] 누가 쐈는지 기록
+                'dice_id': info['dice_id'],
                 'x': info['start_x'],
                 'y': info['start_y'],
                 'target_id': info['target_id'],
@@ -127,14 +148,17 @@ class SoloGameSession:
                 'hit': False
             })
 
-    # [수정] 투사체 업데이트 및 [3] 데미지 로직 위임
     def _update_projectiles(self, dt, entity_map):
         active_projectiles = []
         
         for proj in self.projectiles:
+            # 타겟 조회
             target = entity_map.get(proj['target_id'])
             
-            if not target: continue # 타겟 소실 시 투사체 삭제 (또는 유도 해제)
+            # [핵심 로직] 타겟이 entity_map에 없다면 (사망했거나 도착해서 사라짐)
+            # 투사체도 즉시 소멸 (continue)
+            if not target:
+                continue
                 
             dx = target['x'] - proj['x']
             dy = target['y'] - proj['y']
@@ -144,15 +168,11 @@ class SoloGameSession:
             hit_threshold = target['hitbox_radius'] + 5 
             
             if dist <= hit_threshold or (dist <= move_dist):
-                # [Hit 발생!]
-                # 여기서 직접 데미지를 주지 않고, 주사위 로직에게 위임
+                # Hit!
                 logic = get_dice_logic(proj['dice_id'])
-                
-                # [3] 특수 데미지 로직 실행 (전체 엔티티 리스트 전달 -> 스플래시/체인 등 처리용)
+                # 데미지 로직 실행 (여기서 HP를 깎음)
+                # target['hp']가 0 이하가 되어도 이번 프레임엔 살아있고, 다음 update 루프 2-2에서 처리됨
                 logic.on_hit(target, proj, self.entities)
-                
-                # 투사체 소멸 (관통 로직이 있다면 여기서 처리 가능)
-                # target['hp'] 체크는 다음 update 루프에서 처리됨
             else:
                 proj['x'] += (dx / dist) * move_dist
                 proj['y'] += (dy / dist) * move_dist
@@ -160,18 +180,6 @@ class SoloGameSession:
                 
         self.projectiles = active_projectiles
 
-    # [NEW] 엔티티 생성 함수
-    def _spawn_entity(self, entity_type: str):
-        self.entity_id_counter += 1
-        start_node = self.pixel_path[0]
-        
-        # Factory를 통해 초기 상태 생성
-        manager = get_entity_manager(entity_type)
-        new_entity_state = manager.create_state(self.entity_id_counter, start_node)
-        
-        self.entities.append(new_entity_state)
-
-    # [기존 로직 유지]
     def process_command(self, command: dict):
         ctype = command.get('type')
         if ctype == 'SPAWN': return self._spawn_dice()
@@ -222,7 +230,7 @@ class SoloGameSession:
             "wave": self.wave,
             "grid": [cell['dice'] for cell in self.grid],
             "entities": self.entities,
-            "projectiles": self.projectiles # [NEW] 투사체 전송
+            "projectiles": self.projectiles
         }
 
     def get_initial_state(self):
