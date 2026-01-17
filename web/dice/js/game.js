@@ -8,6 +8,7 @@ let gameMap = null;
 let gameState = null; // 서버에서 받은 게임 상태 (SP, Lives, Wave, Grid 등)
 let currentMode = 'solo';
 let animationFrameId;
+let selectedGridIndex = null; // [NEW] 현재 선택된 주사위 인덱스
 
 // 네트워크 관련
 let socket = null;
@@ -307,7 +308,7 @@ function initDiceLayer() {
             // 위치 잡기
             updateSlotPosition(slot, cell);
             
-            // 그리드 슬롯 클릭 (머지 등)
+            // [수정] 클릭 이벤트 연결
             slot.onclick = () => onGridSlotClick(idx);
             
             layer.appendChild(slot);
@@ -315,9 +316,128 @@ function initDiceLayer() {
     }
 }
 
+// [NEW] 그리드 슬롯 클릭 핸들러
+function onGridSlotClick(idx) {
+    if (!gameState || !gameState.grid) return;
+    
+    const clickedDice = gameState.grid[idx];
+    const slotEl = document.getElementById(`grid-slot-${idx}`);
+
+    // 1. 이미 선택된 것이 있는 경우 (결합 시도 or 선택 변경)
+    if (selectedGridIndex !== null) {
+        // 같은 거 다시 클릭 -> 선택 해제
+        if (selectedGridIndex === idx) {
+            deselectDice();
+            return;
+        }
+        
+        const sourceIdx = selectedGridIndex;
+        const sourceDice = gameState.grid[sourceIdx];
+        
+        // 결합 조건 확인 (클라이언트 측 1차 검증: 같은 ID, 같은 레벨)
+        // 실제 로직은 서버에 있지만, 반응성을 위해 기본 규칙은 여기서 체크
+        if (clickedDice && sourceDice && 
+            clickedDice.id === sourceDice.id && 
+            clickedDice.level === sourceDice.level) {
+            
+            // [결합 요청 전송]
+            console.log(`Merging ${sourceIdx} -> ${idx}`);
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ 
+                    type: "MERGE", 
+                    source_index: sourceIdx, 
+                    target_index: idx 
+                }));
+            }
+            
+            // 선택 해제
+            deselectDice();
+            return;
+        }
+        
+        // 결합 불가능한 대상을 클릭함 -> 선택 대상 변경 (빈칸이 아니면)
+        if (clickedDice) {
+            selectDice(idx);
+        } else {
+            deselectDice(); // 빈칸 클릭 시 해제
+        }
+    } 
+    // 2. 아무것도 선택되지 않은 상태 (새로운 선택)
+    else {
+        if (clickedDice) {
+            selectDice(idx);
+        }
+    }
+}
+
+// [NEW] 선택 처리 (하이라이트)
+function selectDice(idx) {
+    deselectDice(); // 기존 것 해제
+    
+    selectedGridIndex = idx;
+    const slot = document.getElementById(`grid-slot-${idx}`);
+    if (slot) {
+        // 선택된 주사위 강조 (파란 테두리 + 살짝 커짐)
+        slot.classList.add('scale-110', 'z-20');
+        slot.style.filter = "drop-shadow(0 0 5px #3b82f6)";
+    }
+    
+    // 결합 가능한 대상 하이라이트
+    highlightMergeableTargets(idx);
+}
+
+// [NEW] 선택 해제
+function deselectDice() {
+    if (selectedGridIndex !== null) {
+        const slot = document.getElementById(`grid-slot-${selectedGridIndex}`);
+        if (slot) {
+            slot.classList.remove('scale-110', 'z-20');
+            slot.style.filter = "";
+        }
+    }
+    selectedGridIndex = null;
+    clearHighlights();
+}
+
+// [NEW] 결합 가능 대상 표시
+function highlightMergeableTargets(sourceIdx) {
+    const sourceDice = gameState.grid[sourceIdx];
+    if (!sourceDice) return;
+    
+    gameState.grid.forEach((targetDice, idx) => {
+        if (idx === sourceIdx) return; // 자기 자신 제외
+        
+        // 기본 결합 규칙 체크 (같은 ID, 같은 레벨)
+        if (targetDice && 
+            targetDice.id === sourceDice.id && 
+            targetDice.level === sourceDice.level) {
+            
+            const targetSlot = document.getElementById(`grid-slot-${idx}`);
+            if (targetSlot) {
+                // 하이라이트 효과 (반짝임)
+                targetSlot.classList.add('animate-pulse');
+                targetSlot.style.filter = "drop-shadow(0 0 5px #ef4444)"; // 붉은색 힌트
+            }
+        }
+    });
+}
+
+// [NEW] 하이라이트 제거
+function clearHighlights() {
+    const slots = document.querySelectorAll('[id^="grid-slot-"]');
+    slots.forEach(slot => {
+        slot.classList.remove('animate-pulse');
+        // 선택된 놈 빼고 필터 제거 (선택된 놈은 selectDice에서 관리)
+        if (selectedGridIndex === null || slot.id !== `grid-slot-${selectedGridIndex}`) {
+            slot.style.filter = "";
+        }
+    });
+}
+
 // ----------------------------------------------------------------------
 // [수정] 그리드 상태 동기화 (필드 주사위)
 // ----------------------------------------------------------------------
+// 그리드 상태 동기화 (서버 -> 클라이언트)
 function syncGrid(serverGridData) {
     if (!serverGridData) return;
 
@@ -332,24 +452,24 @@ function syncGrid(serverGridData) {
         const currentLevel = slot.dataset.diceLevel;
 
         if (diceData) {
+            // 변경사항이 있을 때만 렌더링 (성능 최적화)
             if (currentId !== diceData.id || currentLevel != diceData.level) {
                 const diceInfo = deckInfoMap[diceData.id];
                 if (diceInfo) {
-                    // [핵심] 필드 그리드 셀의 실제 픽셀 크기 계산
-                    // gameMap.grid[idx].w는 1080해상도 기준 크기(약 126px)
-                    // 여기에 현재 화면 비율(scale)을 곱하면 실제 화면상 크기가 됨 (예: 모바일이면 40px)
-                    let realSizePx = 80; // 기본값
+                    // 필드 주사위 크기 계산 (비율 적용)
+                    let realSizePx = 80; 
                     if (gameMap && gameMap.grid && gameMap.grid[idx]) {
                         realSizePx = gameMap.grid[idx].w * scale;
                     }
 
-                    // 4번째 인자로 realSizePx 전달 -> 작은 주사위는 얇은 테두리!
+                    // 4번째 인자로 realSizePx 전달
                     const html = renderDiceIcon(diceInfo, "w-full h-full", diceData.level, realSizePx);
                     
                     slot.innerHTML = html;
                     slot.dataset.diceId = diceData.id;
                     slot.dataset.diceLevel = diceData.level;
                     
+                    // 생성 애니메이션 (Pop)
                     if (!currentId) { 
                         slot.classList.remove('scale-0'); 
                         void slot.offsetWidth; 
@@ -360,6 +480,7 @@ function syncGrid(serverGridData) {
                 }
             }
         } else {
+            // 서버엔 없는데 클라엔 있다면 -> 삭제
             if (currentId) {
                 slot.innerHTML = '';
                 delete slot.dataset.diceId;
@@ -367,6 +488,14 @@ function syncGrid(serverGridData) {
             }
         }
     });
+
+    // [추가된 로직] 만약 선택된 인덱스에 주사위가 없어졌다면(결합되어 사라짐 등) 선택 해제
+    if (selectedGridIndex !== null) {
+        // serverGridData[selectedGridIndex]가 null이면 주사위가 없는 것
+        if (!serverGridData[selectedGridIndex]) {
+            deselectDice();
+        }
+    }
 }
 
 function updateSlotPosition(element, cell) {

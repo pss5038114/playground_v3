@@ -3,6 +3,7 @@ import uuid
 import random
 import time
 import math # 거리 계산용
+from app.services.dice_defense.dice import get_dice_logic # [NEW]
 
 class SoloGameSession:
     def __init__(self, user_id: int, deck: list):
@@ -139,8 +140,51 @@ class SoloGameSession:
 
     def process_command(self, command: dict):
         ctype = command.get('type')
+        
         if ctype == 'SPAWN':
             return self._spawn_dice()
+        
+        elif ctype == 'MERGE':
+            return self._handle_merge(command)
+            
+        return None
+    
+    # [NEW] 결합 처리 로직
+    def _handle_merge(self, command):
+        src_idx = command.get('source_index')
+        tgt_idx = command.get('target_index')
+        
+        if src_idx is None or tgt_idx is None: return None
+        if src_idx == tgt_idx: return None # 자기 자신과 결합 불가
+        
+        # 그리드 범위 확인
+        if not (0 <= src_idx < len(self.grid)) or not (0 <= tgt_idx < len(self.grid)):
+            return None
+
+        src_cell = self.grid[src_idx]
+        tgt_cell = self.grid[tgt_idx]
+        
+        src_dice = src_cell['dice']
+        tgt_dice = tgt_cell['dice']
+        
+        if not src_dice or not tgt_dice: return None # 빈 칸 결합 불가
+        
+        # 1. 소스 주사위의 로직 객체 가져오기
+        logic = get_dice_logic(src_dice['id'])
+        
+        # 2. 결합 가능 여부 확인 (전략 패턴)
+        if logic.can_merge_with(src_dice, tgt_dice):
+            # 3. 결합 실행 (결과물 생성)
+            new_dice_state = logic.on_merge(src_dice, tgt_dice, self.deck)
+            
+            # 4. 그리드 업데이트
+            # 타겟 위치에 새로운 주사위 배치
+            self.grid[tgt_idx]['dice'] = new_dice_state
+            # 소스 위치는 비움
+            self.grid[src_idx]['dice'] = None
+            
+            return True # 상태 변경됨 -> 브로드캐스트 트리거
+            
         return None
 
     def _spawn_dice(self):
