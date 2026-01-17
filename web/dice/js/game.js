@@ -1,18 +1,25 @@
 // web/dice/js/game.js
 
+// ----------------------------------------------------------------------
 // 전역 변수
+// ----------------------------------------------------------------------
 let canvas, ctx;
 let gameMap = null;
-let gameState = null; // SP, Lives, Wave 등
+let gameState = null; // 서버에서 받은 게임 상태 (SP, Lives, Wave, Grid 등)
 let currentMode = 'solo';
 let animationFrameId;
-let gameId = null; // [NEW] 게임 ID 저장
-let deckInfoMap = {}; // [NEW] ID -> 상세정보 매핑 (색상 등)
+
+// 네트워크 관련
+let socket = null;
+let gameId = null;
+let deckInfoMap = {}; // ID -> 덱 상세정보(색상, 아이콘 등) 캐싱
 
 const API_DICE = "https://api.pyosh.cloud/api/dice";
 const myId = sessionStorage.getItem('username');
 
-// 1. 페이지 로드 시 초기화
+// ----------------------------------------------------------------------
+// 1. 초기화 (Window Load)
+// ----------------------------------------------------------------------
 window.onload = async function() {
     console.log("Game Script Loaded.");
     
@@ -33,15 +40,23 @@ window.onload = async function() {
     // 이탈 방지 이벤트 등록
     setupLeaveWarning();
 
-    // 캔버스 크기 설정
+    // 캔버스 크기 설정 (반응형)
     setupCanvas();
-    window.addEventListener('resize', setupCanvas);
+    window.addEventListener('resize', () => {
+        setupCanvas();
+        // 리사이즈 시 그리드 슬롯 위치도 재조정
+        if (gameMap && gameMap.grid) {
+            gameMap.grid.forEach((cell, idx) => {
+                const slot = document.getElementById(`grid-slot-${idx}`);
+                if (slot) updateSlotPosition(slot, cell);
+            });
+        }
+    });
 
     // 로딩 시퀀스 시작
     await runLoadingSequence(presetIndex);
 };
 
-// 2. 이탈 방지
 function setupLeaveWarning() {
     window.addEventListener('beforeunload', (event) => {
         event.preventDefault();
@@ -50,62 +65,43 @@ function setupLeaveWarning() {
     });
 }
 
-// 3. 게임 시작 및 로딩
+// ----------------------------------------------------------------------
+// 2. 게임 시작 및 로딩 (HTTP -> WebSocket)
+// ----------------------------------------------------------------------
 async function runLoadingSequence(presetIndex) {
     const loadingScreen = document.getElementById('game-loading');
-    const uiTop = document.getElementById('ui-top');
-    const uiBottom = document.getElementById('ui-bottom');
     
     try {
         updateLoading(10, "Connecting to server...");
         await sleep(300);
 
-        updateLoading(30, "Initializing Game Session...");
+        updateLoading(30, "Creating Game Session...");
         
-        // [API 호출] 게임 시작
+        // 1. HTTP로 게임 세션 생성 요청
         const response = await fetch(`${API_DICE}/game/solo/start`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username: myId, preset_index: presetIndex })
+            body: JSON.stringify({
+                username: myId,
+                preset_index: presetIndex
+            })
         });
 
-        if (!response.ok) throw new Error("Failed to start");
-        const data = await response.json();
-        
-        gameId = data.game_id; // [NEW] ID 저장
-        gameMap = data.map;
-        gameState = data.state;
-        const deckDetails = data.deck_details;
-
-        // [NEW] 덱 정보 매핑 (소환 시 빠른 참조용)
-        deckDetails.forEach(d => { deckInfoMap[d.id] = d; });
-
-        updateLoading(70, "Setting up board...");
-        
-        // UI 초기화
-        initGameUI(gameState, deckDetails);
-        
-        await sleep(500);
-        updateLoading(100, "Ready to Battle!");
-        await sleep(300);
-
-        // 로딩 화면 제거 & UI 표시
-        loadingScreen.style.opacity = '0';
-        loadingScreen.style.pointerEvents = 'none';
-        
-        setTimeout(() => {
-            loadingScreen.style.display = 'none'; 
-        }, 500);
-
-        if(uiTop) uiTop.classList.remove('hidden');
-        if(uiBottom) {
-            uiBottom.classList.remove('hidden');
-            uiBottom.classList.add('flex');
+        if (!response.ok) {
+            throw new Error("Failed to start game session");
         }
 
-        console.log("Game Loop Starting...");
-        // 게임 루프 시작
-        requestAnimationFrame(gameLoop);
+        const data = await response.json();
+        
+        // 세션 정보 저장
+        gameId = data.game_id;
+        // deck_details를 맵으로 변환하여 빠른 조회 가능하게 함
+        data.deck_details.forEach(d => { deckInfoMap[d.id] = d; });
+
+        updateLoading(50, "Connecting to Realtime Server...");
+        
+        // 2. 웹소켓 연결 시작
+        connectWebSocket(gameId, data.deck_details);
 
     } catch (e) {
         console.error("Loading Failed:", e);
@@ -114,35 +110,222 @@ async function runLoadingSequence(presetIndex) {
     }
 }
 
-// [NEW] 주사위 표시용 HTML 레이어 생성
+function updateLoading(percent, text) {
+    const bar = document.getElementById('loading-bar');
+    if(bar) bar.style.width = `${percent}%`;
+}
+
+// ----------------------------------------------------------------------
+// 3. WebSocket 연결 및 핸들러
+// ----------------------------------------------------------------------
+function connectWebSocket(gid, deckDetails) {
+    // 프로토콜 자동 감지 (https -> wss, http -> ws)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/game/${gid}`;
+    
+    console.log("Connecting WS:", wsUrl);
+    socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+        console.log("WebSocket Connected");
+        updateLoading(90, "Synchronizing...");
+    };
+
+    socket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg, deckDetails);
+    };
+
+    socket.onclose = (e) => {
+        console.warn("WebSocket Closed:", e);
+        alert("서버 연결이 끊어졌습니다.");
+        window.location.href = 'index.html';
+    };
+    
+    socket.onerror = (error) => {
+        console.error("WebSocket Error:", error);
+    };
+}
+
+// 서버 메시지 라우터
+function handleServerMessage(msg, deckDetails) {
+    if (msg.type === 'INIT') {
+        // [초기화 메시지]
+        gameMap = msg.map;
+        gameState = msg.state;
+        
+        // 맵(그리드 레이어) 생성
+        initDiceLayer();
+        
+        // UI 초기화 및 로딩 종료
+        finalizeLoading(gameState, deckDetails);
+        
+        // 초기 정보 갱신
+        updateGameInfoUI();
+        syncGrid(msg.state.grid);
+        
+    } else if (msg.type === 'STATE_UPDATE') {
+        // [상태 업데이트] 30Hz 등 주기적 수신
+        gameState = msg;
+        updateGameInfoUI();
+        syncGrid(msg.grid);
+    }
+}
+
+// 로딩 완료 처리
+function finalizeLoading(state, deckDetails) {
+    updateLoading(100, "Ready!");
+    
+    const loadingScreen = document.getElementById('game-loading');
+    const uiTop = document.getElementById('ui-top');
+    const uiBottom = document.getElementById('ui-bottom');
+
+    // UI 하단 덱 초기화
+    initGameUI(state, deckDetails);
+
+    // 로딩 화면 제거 및 UI 표시
+    loadingScreen.style.opacity = '0';
+    loadingScreen.style.pointerEvents = 'none';
+    setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+
+    if(uiTop) uiTop.classList.remove('hidden');
+    if(uiBottom) {
+        uiBottom.classList.remove('hidden');
+        uiBottom.classList.add('flex');
+    }
+
+    // 게임 렌더링 루프 시작 (Canvas)
+    requestAnimationFrame(gameLoop);
+}
+
+// ----------------------------------------------------------------------
+// 4. UI 및 그리드 렌더링
+// ----------------------------------------------------------------------
+
+// 상단/하단 텍스트 정보 갱신
+function updateGameInfoUI() {
+    if(!gameState) return;
+    document.getElementById('game-wave').innerText = gameState.wave;
+    document.getElementById('game-lives').innerText = gameState.lives;
+    document.getElementById('game-sp').innerText = gameState.sp;
+    
+    // (선택) 소환 버튼의 비용 표시 업데이트
+    // const spawnBtn = document.querySelector('.spawn-btn span');
+    // if(spawnBtn) spawnBtn.innerText = gameState.spawn_cost;
+}
+
+// 하단 덱 슬롯 초기화
+function initGameUI(state, deckList) {
+    const slots = document.querySelectorAll('.dice-slot');
+    
+    deckList.forEach((dice, idx) => {
+        if (idx >= slots.length) return;
+        const slot = slots[idx];
+        
+        // 클릭 가능한 스타일
+        slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer transition-transform active:scale-95 select-none";
+        
+        // 현재 레벨 텍스트 (초기값 Lv.1)
+        let currentLvText = 'Lv.1';
+        const existingSpan = slot.querySelector('span');
+        if (existingSpan && existingSpan.innerText.includes('Lv.')) {
+            currentLvText = existingSpan.innerText;
+        }
+        
+        // 동적 폰트 크기 (슬롯 너비의 40%)
+        const slotWidth = slot.clientWidth || 80; 
+        const fontSize = Math.floor(slotWidth * 0.4); 
+
+        // 눈 없는 주사위(0) 생성 - 배경/디자인용
+        const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
+        
+        slot.innerHTML = `
+            ${diceHtml}
+            <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                <span style="font-size: ${fontSize}px; line-height: 1;" class="text-white font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                    ${currentLvText}
+                </span>
+            </div>
+        `;
+        
+        // 파워업 핸들러 연결
+        slot.onclick = () => {
+            if(window.powerUp) window.powerUp(idx);
+        };
+    });
+}
+
+// 주사위 표시용 HTML 레이어 생성 (Canvas 위에 얹음)
 function initDiceLayer() {
     const container = document.getElementById('game-container');
     let layer = document.getElementById('dice-layer');
     if (!layer) {
         layer = document.createElement('div');
         layer.id = 'dice-layer';
-        layer.className = 'absolute inset-0 pointer-events-none'; // 클릭 통과 (필요시 auto)
-        // 캔버스 크기와 일치해야 함 (반응형 대응은 resize 이벤트에서)
+        layer.className = 'absolute inset-0 pointer-events-none'; // 클릭 통과
         container.appendChild(layer);
     }
     layer.innerHTML = ''; // 초기화
     
-    // 그리드 위치에 미리 빈 슬롯(div)들을 만들어두면 업데이트가 편함
     if (gameMap && gameMap.grid) {
         gameMap.grid.forEach((cell, idx) => {
             const slot = document.createElement('div');
             slot.id = `grid-slot-${idx}`;
-            slot.className = 'absolute flex items-center justify-center transition-all duration-200';
+            // 주사위 슬롯 스타일 (중앙 정렬, 애니메이션)
+            slot.className = 'absolute flex items-center justify-center transition-all duration-200 pointer-events-auto cursor-pointer';
             
-            // 좌표 변환 (1080x1920 기준 -> 실제 화면 비율)
+            // 위치 잡기
             updateSlotPosition(slot, cell);
+            
+            // (선택) 그리드 슬롯 클릭 시 합치기 등의 로직을 위한 핸들러
+            slot.onclick = () => onGridSlotClick(idx);
             
             layer.appendChild(slot);
         });
     }
 }
 
-// 좌표 비율 계산 및 적용
+// 그리드 상태 동기화 (서버 -> 클라이언트)
+function syncGrid(serverGridData) {
+    // serverGridData: [ {id:'fire', level:1}, null, ... ]
+    if (!serverGridData) return;
+
+    serverGridData.forEach((diceData, idx) => {
+        const slot = document.getElementById(`grid-slot-${idx}`);
+        if (!slot) return;
+
+        const currentId = slot.dataset.diceId;
+        const currentLevel = slot.dataset.diceLevel;
+
+        if (diceData) {
+            // 변경사항이 있을 때만 렌더링 (성능 최적화)
+            if (currentId !== diceData.id || currentLevel != diceData.level) {
+                const diceInfo = deckInfoMap[diceData.id];
+                if (diceInfo) {
+                    // w-full h-full로 부모 크기에 맞춤
+                    const html = renderDiceIcon(diceInfo, "w-full h-full", diceData.level);
+                    slot.innerHTML = html;
+                    slot.dataset.diceId = diceData.id;
+                    slot.dataset.diceLevel = diceData.level;
+                    
+                    // 생성 애니메이션 (Pop)
+                    if (!currentId) { 
+                        slot.classList.add('scale-0');
+                        setTimeout(() => slot.classList.remove('scale-0'), 50);
+                    }
+                }
+            }
+        } else {
+            // 서버엔 없는데 클라엔 있다면 -> 삭제
+            if (currentId) {
+                slot.innerHTML = '';
+                delete slot.dataset.diceId;
+                delete slot.dataset.diceLevel;
+            }
+        }
+    });
+}
+
 function updateSlotPosition(element, cell) {
     if (!canvas) return;
     // 캔버스 실제 크기 / 내부 해상도(1080)
@@ -154,99 +337,9 @@ function updateSlotPosition(element, cell) {
     element.style.height = `${cell.h * scale}px`;
 }
 
-// 상단/하단 정보 갱신
-function updateGameInfoUI() {
-    document.getElementById('game-sp').innerText = gameState.sp;
-    
-    // 소환 버튼 비용 텍스트 갱신 (만약 있다면)
-    const costEl = document.getElementById('spawn-cost-text');
-    if(costEl) costEl.innerText = gameState.spawn_cost;
-}
-
-// 화면 리사이즈 시 주사위 위치도 조정
-window.addEventListener('resize', () => {
-    setupCanvas();
-    if (gameMap && gameMap.grid) {
-        gameMap.grid.forEach((cell, idx) => {
-            const slot = document.getElementById(`grid-slot-${idx}`);
-            if (slot) updateSlotPosition(slot, cell);
-        });
-    }
-});
-
-// 그리드에 주사위 그리기
-function renderDiceOnGrid(gridIndex, diceId, level) {
-    const slot = document.getElementById(`grid-slot-${gridIndex}`);
-    if (!slot) return;
-    
-    const diceInfo = deckInfoMap[diceId]; // 미리 저장해둔 정보 (색상 등)
-    if (!diceInfo) return;
-    
-    // utils.js의 renderDiceIcon 활용!
-    // w-full h-full로 부모(slot)에 꽉 차게
-    const diceHtml = renderDiceIcon(diceInfo, "w-full h-full", level); // level=1 (눈 1개)
-    
-    slot.innerHTML = diceHtml;
-    
-    // 등장 애니메이션
-    slot.classList.add('scale-0');
-    setTimeout(() => slot.classList.remove('scale-0'), 50);
-}
-
-function updateLoading(percent, text) {
-    const bar = document.getElementById('loading-bar');
-    if(bar) bar.style.width = `${percent}%`;
-}
-
-// [UI 초기화 함수 - 수정됨]
-function initGameUI(state, deckList) {
-    // 1. 상단 정보
-    document.getElementById('game-wave').innerText = state.wave;
-    document.getElementById('game-lives').innerText = state.lives;
-    document.getElementById('game-sp').innerText = state.sp;
-    
-    // 2. 덱 슬롯 렌더링 (하단 바)
-    const slots = document.querySelectorAll('.dice-slot');
-    
-    deckList.forEach((dice, idx) => {
-        if (idx >= slots.length) return;
-        const slot = slots[idx];
-        
-        // [수정] 클릭 가능한 버튼 스타일 추가 (active:scale-95)
-        slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer transition-transform active:scale-95 select-none";
-        
-        // 기존 Lv 텍스트 가져오기 (없으면 1)
-        const lvSpan = slot.querySelector('span');
-        let currentLvText = 'Lv.1';
-        if (lvSpan && lvSpan.innerText.includes('Lv.')) {
-            currentLvText = lvSpan.innerText;
-        }
-        
-        // [NEW] 동적 폰트 크기 계산 (슬롯 너비의 20% 정도)
-        const slotWidth = slot.clientWidth || 80; // 기본값 80px 가정
-        const fontSize = Math.floor(slotWidth * 0.2); 
-
-        // 눈 없는 주사위 생성
-        const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
-        
-        // [수정] 중앙 정렬 및 큰 폰트로 Lv 표시
-        slot.innerHTML = `
-            ${diceHtml}
-            <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                <span style="font-size: ${fontSize}px; line-height: 1;" class="text-white font-black drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                    ${currentLvText}
-                </span>
-            </div>
-        `;
-        
-        // [NEW] 슬롯 전체 클릭 시 파워업 실행
-        slot.onclick = () => {
-            if(window.powerUp) window.powerUp(idx);
-        };
-    });
-}
-
-// 4. 캔버스 설정
+// ----------------------------------------------------------------------
+// 5. 캔버스 렌더링 (맵, 경로 등)
+// ----------------------------------------------------------------------
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
     const container = document.getElementById('game-container'); 
@@ -277,16 +370,15 @@ function setupCanvas() {
     canvas.style.height = `${finalH}px`;
 }
 
-// 5. 게임 루프
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 클리어
+    // 배경 지우기 & 다시 그리기
     ctx.clearRect(0, 0, 1080, 1920);
     ctx.fillStyle = "#f3f4f6"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기
+    // 맵 그리기 (경로, 그리드 박스 등)
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
@@ -295,16 +387,10 @@ function gameLoop() {
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// --- Helper Functions ---
-
-function sleep(ms) { 
-    return new Promise(r => setTimeout(r, ms)); 
-}
-
 function drawPath(ctx, path) {
     if(!path || path.length < 2) return;
 
-    // 도로
+    // 도로 (회색)
     ctx.beginPath();
     ctx.lineWidth = 100; 
     ctx.strokeStyle = "#d1d5db"; 
@@ -317,7 +403,7 @@ function drawPath(ctx, path) {
     }
     ctx.stroke();
     
-    // 중앙선
+    // 중앙선 (파란색 점선 등)
     ctx.beginPath();
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#3b82f6";
@@ -333,8 +419,9 @@ function drawPath(ctx, path) {
 function drawGrid(ctx, grid) {
     if(!grid) return;
     
+    // 그리드 영역 표시 (디버깅 또는 시각적 가이드)
     ctx.lineWidth = 2; 
-    grid.forEach((cell, idx) => {
+    grid.forEach((cell) => {
         ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = "#e5e7eb";
         
@@ -354,59 +441,40 @@ function drawGrid(ctx, grid) {
     });
 }
 
-// [수정] 소환 버튼 핸들러
-window.spawnDice = async function() { 
-    if (!gameId) return;
-    
-    // 버튼 쿨타임/애니메이션 등 추가 가능
-    const btn = document.querySelector('.spawn-btn'); // 가정
-    if(btn) btn.classList.add('scale-95');
+// ----------------------------------------------------------------------
+// 6. 사용자 입력 핸들러 (WebSocket 전송)
+// ----------------------------------------------------------------------
 
-    try {
-        const res = await fetch(`${API_DICE}/game/solo/spawn`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ game_id: gameId })
-        });
-        const data = await res.json();
+// 소환 버튼 클릭
+window.spawnDice = function() {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "SPAWN" }));
         
-        if (data.success) {
-            // 상태 업데이트
-            gameState.sp = data.state.sp;
-            gameState.spawn_cost = data.state.spawn_cost; // 서버에서 비용 관리
-            
-            // UI 업데이트
-            updateGameInfoUI();
-            
-            // 주사위 렌더링
-            const newDice = data.new_dice;
-            renderDiceOnGrid(newDice.index, newDice.id, newDice.level);
-            
-        } else {
-            // 실패 (SP 부족, 꽉 참 등) -> 토스트 메시지나 흔들림 효과
-            console.log(data.message);
-            const spText = document.getElementById('game-sp');
-            spText.classList.add('text-red-500');
-            setTimeout(() => spText.classList.remove('text-red-500'), 500);
-        }
-    } catch(e) { console.error(e); }
-    
-    if(btn) setTimeout(() => btn.classList.remove('scale-95'), 100);
-};
-
-// [수정] 파워업 로직 (테스트용 콘솔 출력 및 Lv 증가 시뮬레이션)
-window.powerUp = function(idx) { 
-    console.log("Power Up Triggered for Index:", idx);
-    
-    // UI 업데이트 시뮬레이션 (실제로는 서버 통신 후 갱신해야 함)
-    const slots = document.querySelectorAll('.dice-slot');
-    if(slots[idx]) {
-        const span = slots[idx].querySelector('span');
-        if(span) {
-            let lv = parseInt(span.innerText.replace('Lv.', '')) || 1;
-            span.innerText = `Lv.${lv + 1}`;
-            
-            // 클릭 효과음이나 파티클 등을 여기에 추가 가능
-        }
+        // (선택) 버튼 클릭 애니메이션 (즉각적인 피드백)
+        // const btn = document.querySelector('.spawn-btn');
+        // if(btn) ...
+    } else {
+        console.warn("Socket not open");
     }
 };
+
+// 파워업 버튼(슬롯) 클릭
+window.powerUp = function(idx) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        console.log("Power Up Request:", idx);
+        socket.send(JSON.stringify({ type: "POWER_UP", index: idx }));
+    }
+};
+
+// 그리드 슬롯 클릭 (나중에 머지 기능 구현 시 사용)
+function onGridSlotClick(idx) {
+    console.log("Grid Clicked:", idx);
+    // 선택된 주사위가 있다면 머지 요청 전송 등
+}
+
+// ----------------------------------------------------------------------
+// 7. 유틸리티
+// ----------------------------------------------------------------------
+function sleep(ms) { 
+    return new Promise(r => setTimeout(r, ms)); 
+}
