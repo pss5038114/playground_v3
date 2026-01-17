@@ -250,19 +250,20 @@ function initGameUI(state, deckList) {
         if (idx >= slots.length) return;
         const slot = slots[idx];
         
-        // 클릭 가능한 스타일
         slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer transition-transform active:scale-95 select-none";
         
-        // 현재 레벨 텍스트 (초기값 Lv.1)
         let currentLvText = 'Lv.1';
-        // (추후 서버 state.deck_levels 등으로 실제 레벨 반영 필요)
+        const existingSpan = slot.querySelector('span');
+        if (existingSpan && existingSpan.innerText.includes('Lv.')) {
+            currentLvText = existingSpan.innerText;
+        }
         
-        // 동적 폰트 크기 (슬롯 너비의 40%)
+        // [핵심] 현재 슬롯의 실제 너비를 구함
         const slotWidth = slot.clientWidth || 60; 
         const fontSize = Math.floor(slotWidth * 0.4); 
 
-        // 눈 없는 주사위(0) 생성 - 배경/디자인용
-        const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
+        // [수정] renderDiceIcon의 4번째 인자로 실제 크기(slotWidth) 전달 -> 테두리 두께 자동 조정
+        const diceHtml = renderDiceIcon(dice, "w-full h-full", 0, slotWidth);
         
         slot.innerHTML = `
             ${diceHtml}
@@ -273,7 +274,6 @@ function initGameUI(state, deckList) {
             </div>
         `;
         
-        // 파워업 핸들러 연결
         slot.onclick = () => {
             if(window.powerUp) window.powerUp(idx);
         };
@@ -310,10 +310,14 @@ function initDiceLayer() {
     }
 }
 
-// 그리드 상태 동기화 (서버 -> 클라이언트)
+// ----------------------------------------------------------------------
+// [수정] 그리드 상태 동기화 (필드 주사위)
+// ----------------------------------------------------------------------
 function syncGrid(serverGridData) {
-    // serverGridData: [ {id:'fire', level:1}, null, ... ]
     if (!serverGridData) return;
+
+    // 현재 캔버스의 축소 비율 계산 (원본 1080px 대비 현재 크기)
+    const scale = canvas ? (canvas.clientWidth / 1080) : 1;
 
     serverGridData.forEach((diceData, idx) => {
         const slot = document.getElementById(`grid-slot-${idx}`);
@@ -323,28 +327,34 @@ function syncGrid(serverGridData) {
         const currentLevel = slot.dataset.diceLevel;
 
         if (diceData) {
-            // 변경사항이 있을 때만 렌더링 (성능 최적화)
             if (currentId !== diceData.id || currentLevel != diceData.level) {
                 const diceInfo = deckInfoMap[diceData.id];
                 if (diceInfo) {
-                    // w-full h-full로 부모 크기에 맞춤
-                    const html = renderDiceIcon(diceInfo, "w-full h-full", diceData.level);
+                    // [핵심] 필드 그리드 셀의 실제 픽셀 크기 계산
+                    // gameMap.grid[idx].w는 1080해상도 기준 크기(약 126px)
+                    // 여기에 현재 화면 비율(scale)을 곱하면 실제 화면상 크기가 됨 (예: 모바일이면 40px)
+                    let realSizePx = 80; // 기본값
+                    if (gameMap && gameMap.grid && gameMap.grid[idx]) {
+                        realSizePx = gameMap.grid[idx].w * scale;
+                    }
+
+                    // 4번째 인자로 realSizePx 전달 -> 작은 주사위는 얇은 테두리!
+                    const html = renderDiceIcon(diceInfo, "w-full h-full", diceData.level, realSizePx);
+                    
                     slot.innerHTML = html;
                     slot.dataset.diceId = diceData.id;
                     slot.dataset.diceLevel = diceData.level;
                     
-                    // 생성 애니메이션 (Pop)
                     if (!currentId) { 
-                        slot.classList.remove('scale-0'); // reset
-                        void slot.offsetWidth; // trigger reflow
-                        slot.classList.add('animate-pop'); // custom animation class or manual scale
+                        slot.classList.remove('scale-0'); 
+                        void slot.offsetWidth; 
+                        slot.classList.add('animate-pop'); 
                         slot.style.transform = 'scale(0)';
                         setTimeout(() => slot.style.transform = 'scale(1)', 10);
                     }
                 }
             }
         } else {
-            // 서버엔 없는데 클라엔 있다면 -> 삭제
             if (currentId) {
                 slot.innerHTML = '';
                 delete slot.dataset.diceId;

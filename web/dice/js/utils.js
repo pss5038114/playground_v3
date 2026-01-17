@@ -1,8 +1,13 @@
 // web/dice/js/utils.js
 
-// [수정] 주사위 크기 추정 함수 (w-full 상향 유지)
-function getDiceSize(sizeClass) {
-    if (!sizeClass) return 48;
+// [수정] 주사위 크기 추정 함수 (customSizePx 우선 사용)
+function getDiceSize(sizeClass, customSizePx = null) {
+    // 1. 외부에서 명시적으로 크기를 줬으면 그것을 최우선으로 사용
+    if (customSizePx && typeof customSizePx === 'number' && customSizePx > 0) {
+        return customSizePx;
+    }
+
+    if (!sizeClass) return 48; // 기본값 (w-12 = 48px)
 
     const match = sizeClass.match(/w-(\[?[\d.]+(px|rem)?\]?|\d+)/);
     if (match) {
@@ -18,7 +23,7 @@ function getDiceSize(sizeClass) {
         }
     }
     
-    // w-full일 때 80px (전투화면 하단 등)
+    // w-full일 때의 추정치 (customSizePx가 없을 때만 사용됨)
     if (sizeClass.includes('w-full')) return 80; 
     
     return 48;
@@ -32,8 +37,8 @@ function getDiceVisualClasses(dice, sizePx) {
     let effectClasses = "dice-glossy"; 
     let customStyle = "";
     
-    // [사용자 설정 반영] 테두리: 10% 비율, 최대 100px
-    const totalBorderWidth = Math.max(3, Math.min(sizePx * 0.10, 100)); 
+    // [설정 유지] 테두리: 10% 비율, 최대 100px
+    const totalBorderWidth = Math.max(2, Math.min(sizePx * 0.10, 100)); 
     const unitWidth = totalBorderWidth / 3; 
     
     customStyle += `--dice-border-unit: ${unitWidth.toFixed(2)}px; `;
@@ -52,18 +57,19 @@ function getDiceVisualClasses(dice, sizePx) {
 function renderDicePips(dice, count = 1) {
     if (count === 0) return ""; 
     const colorClass = dice.color || 'bg-slate-500';
+    // 눈 크기도 약간 동적으로? 일단 25% 유지
     return `<div class="dice-content w-[25%] h-[25%] rounded-full ${colorClass} shadow-sm z-10"></div>`;
 }
 
-// 주사위 배경(Background) 생성
-function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
-    // 1. 크기 계산
-    const sizePx = getDiceSize(sizeClass);
+/// [수정] customSizePx 인자 추가
+function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="", customSizePx=null) {
+    // 1. 크기 계산 (명시적 크기 우선)
+    const sizePx = getDiceSize(sizeClass, customSizePx);
     
     // 2. 스타일 클래스 생성
     const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice, sizePx);
     
-    // 3. 테두리 스타일 (일반 등급용)
+    // 3. 테두리 스타일
     let borderStyle = "";
     if (dice.rarity !== 'Legend') {
         borderStyle = `border-style: solid; border-width: calc(var(--dice-border-unit) * 3);`;
@@ -71,11 +77,9 @@ function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
 
     const symbolIcon = dice.symbol || "ri-dice-fill";
     
-    // [NEW] 아이콘 크기 동적 계산 (주사위 크기의 60% 정도)
-    // 기존 text-4xl(36px) 대신 직접 font-size 적용
-    const iconSize = Math.floor(sizePx * 0.6);
+    // 아이콘 크기: 주사위 크기의 60%
+    const iconSize = Math.max(12, Math.floor(sizePx * 0.6));
     
-    // pointer-events-none, opacity-30 등은 유지하되 text-4xl 제거하고 style로 대체
     const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30 text-slate-400 z-0">
         <i class="${symbolIcon}" style="font-size: ${iconSize}px; line-height: 1;"></i>
     </div>`;
@@ -86,11 +90,10 @@ function renderDiceBackground(dice, sizeClass="w-10 h-10", childrenHtml="") {
     </div>`;
 }
 
-// [MODIFIED] 메인 렌더링 함수 (기존 코드와의 호환성 유지)
-// pipCount 인자를 추가하여 눈의 개수를 조절할 수 있음 (기본값 1)
-function renderDiceIcon(dice, sizeClass="w-10 h-10", pipCount=1) {
+// [수정] customSizePx 인자 추가 및 전달
+function renderDiceIcon(dice, sizeClass="w-10 h-10", pipCount=1, customSizePx=null) {
     const pipsHtml = renderDicePips(dice, pipCount);
-    return renderDiceBackground(dice, sizeClass, pipsHtml);
+    return renderDiceBackground(dice, sizeClass, pipsHtml, customSizePx);
 }
 
 function getRarityBgIcon(rarity) {
