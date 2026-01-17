@@ -554,12 +554,76 @@ function gameLoop() {
         drawGrid(ctx, gameMap.grid);
     }
     
-    // [수정] mobs -> entities 렌더링
+    // 1. 타게팅 라인 그리기 (주사위 -> 몹)
+    if (gameState && gameState.grid) {
+        drawTargetLines(ctx, gameState.grid, gameState.entities);
+    }
+
+    // 2. 엔티티 그리기
     if (gameState && gameState.entities) {
         drawEntities(ctx, gameState.entities);
     }
     
+    // 3. [NEW] 투사체 그리기
+    if (gameState && gameState.projectiles) {
+        drawProjectiles(ctx, gameState.projectiles);
+    }
+    
     animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+// [NEW] 타게팅 라인 (레이저)
+function drawTargetLines(ctx, grid, entities) {
+    if (!grid || !entities) return;
+    
+    // 엔티티 ID로 빠르게 찾기 위해 맵 생성
+    const entityMap = {};
+    entities.forEach(e => entityMap[e.id] = e);
+    
+    // 그리드 픽셀 크기 비율 (1080p -> 실제화면)
+    const scale = canvas.clientWidth / 1080; 
+
+    grid.forEach((diceData, idx) => {
+        // diceData는 서버의 cell['dice'] (id, level, target_id 등 포함)
+        // 하지만 gameMap.grid[idx]에 좌표(cx, cy)가 있음
+        if (diceData && diceData.target_id) {
+            const target = entityMap[diceData.target_id];
+            if (target) {
+                const startX = gameMap.grid[idx].cx;
+                const startY = gameMap.grid[idx].cy;
+                
+                ctx.beginPath();
+                ctx.lineWidth = 2; // 적당한 두께
+                ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)'; // Red-500, 반투명
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(target.x, target.y);
+                ctx.stroke();
+                
+                // 타겟 위에 작은 표적 표시 (선택사항)
+                ctx.beginPath();
+                ctx.arc(target.x, target.y, 5, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+                ctx.fill();
+            }
+        }
+    });
+}
+
+// [NEW] 투사체 렌더링
+function drawProjectiles(ctx, projectiles) {
+    projectiles.forEach(p => {
+        ctx.beginPath();
+        ctx.fillStyle = '#facc15'; // Yellow-400 (기본 탄환)
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 꼬리 효과 (Trail) - 간단하게
+        ctx.beginPath();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+        // 속도 반대 방향으로 짧은 선
+        // (정확한 방향을 모르니 생략하거나, 이전 위치를 저장해야 함. 지금은 원만 그리기)
+    });
 }
 
 // [NEW] 엔티티 렌더링 함수

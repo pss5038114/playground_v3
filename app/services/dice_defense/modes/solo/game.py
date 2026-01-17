@@ -20,6 +20,10 @@ class SoloGameSession:
         # [NEW] 엔티티 관리 (기존 mobs 대체)
         self.entities = [] 
         self.entity_id_counter = 0
+
+        # [NEW] 투사체 관리
+        self.projectiles = [] 
+        self.projectile_id_counter = 0
         
         self.last_spawn_time = time.time()
         self.spawn_interval = 1.0 
@@ -69,29 +73,101 @@ class SoloGameSession:
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
         
-        # 1. 몹(엔티티) 스폰
+        # 1. 몹 스폰 (기존 유지)
         if current_time - self.last_spawn_time >= self.spawn_interval:
-            self._spawn_entity('normal_mob') # [NEW] 타입 지정 스폰
+            self._spawn_entity('normal_mob')
             self.last_spawn_time = current_time
             
-        # 2. 엔티티 상태 업데이트 (이동 등)
+        # 2. 엔티티(몹) 이동 (기존 유지)
         active_entities = []
-        for entity_state in self.entities:
-            # 해당 엔티티의 로직 클래스 가져오기
-            manager = get_entity_manager(entity_state['type'])
+        # 엔티티 딕셔너리 맵핑 (ID로 빠른 조회용)
+        entity_map = {} 
+        
+        for entity in self.entities:
+            manager = get_entity_manager(entity['type'])
+            manager.update_move(entity, self.pixel_path, dt)
             
-            # 이동 로직 위임
-            manager.update_move(entity_state, self.pixel_path, dt)
-            
-            # 도착 체크
-            if entity_state.get('finished'):
+            if entity.get('finished'):
                 self.lives -= 1
             else:
-                active_entities.append(entity_state)
+                active_entities.append(entity)
+                entity_map[entity['id']] = entity # 맵핑 저장
                 
         self.entities = active_entities
         
+        # 3. [NEW] 주사위 공격 처리
+        for cell in self.grid:
+            dice = cell['dice']
+            if dice:
+                # 좌표 정보 주입 (한 번만 하면 되지만 안전하게 매번 확인)
+                if 'cx' not in dice:
+                    dice['cx'] = cell['cx']
+                    dice['cy'] = cell['cy']
+                
+                # 로직 가져오기
+                logic = get_dice_logic(dice['id'])
+                
+                # 공격 시도
+                attack_result = logic.update_attack(dice, self.entities, dt, current_time)
+                
+                # 투사체 생성 요청이 오면 리스트에 추가
+                if attack_result and attack_result['type'] == 'projectile':
+                    self._spawn_projectile(attack_result)
+
+        # 4. [NEW] 투사체 이동 및 충돌 처리
+        self._update_projectiles(dt, entity_map)
+        
         return self.get_broadcast_state()
+
+    # [NEW] 투사체 생성 함수
+    def _spawn_projectile(self, info):
+        self.projectile_id_counter += 1
+        self.projectiles.append({
+            'id': self.projectile_id_counter,
+            'x': info['start_x'],
+            'y': info['start_y'],
+            'target_id': info['target_id'],
+            'speed': info['speed'],
+            'damage': info['damage'],
+            'hit': False
+        })
+
+    def _update_projectiles(self, dt, entity_map):
+        active_projectiles = []
+        
+        for proj in self.projectiles:
+            target = entity_map.get(proj['target_id'])
+            
+            # 타겟이 사라졌으면 투사체도 소멸 (혹은 마지막 위치로 이동하게 할 수 있음)
+            if not target:
+                continue
+                
+            # 타겟 방향으로 이동
+            dx = target['x'] - proj['x']
+            dy = target['y'] - proj['y']
+            dist = math.sqrt(dx*dx + dy*dy)
+            
+            move_dist = proj['speed'] * dt
+            
+            # 충돌 판정 (히트박스)
+            # 타겟의 히트박스 반지름 + 투사체 반지름(약 5)
+            hit_threshold = target['hitbox_radius'] + 5 
+            
+            if dist <= hit_threshold or (dist <= move_dist):
+                # 명중!
+                target['hp'] -= proj['damage']
+                if target['hp'] <= 0:
+                    # 몹 처치 (다음 프레임에 active_entities에서 빠짐)
+                    # 처치 보상(SP) 로직 추가 가능
+                    self.sp += 5 
+                    pass
+            else:
+                # 이동
+                proj['x'] += (dx / dist) * move_dist
+                proj['y'] += (dy / dist) * move_dist
+                active_projectiles.append(proj)
+                
+        self.projectiles = active_projectiles
 
     # [NEW] 엔티티 생성 함수
     def _spawn_entity(self, entity_type: str):
@@ -154,7 +230,8 @@ class SoloGameSession:
             "lives": self.lives,
             "wave": self.wave,
             "grid": [cell['dice'] for cell in self.grid],
-            "entities": self.entities # [NEW] 이름 변경 (mobs -> entities)
+            "entities": self.entities,
+            "projectiles": self.projectiles # [NEW] 투사체 전송
         }
 
     def get_initial_state(self):
