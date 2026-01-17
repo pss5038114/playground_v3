@@ -43,109 +43,94 @@ async function runLoadingSequence() {
     
     try {
         updateLoading(10, "Connecting to server...");
-        // TODO: 웹소켓 연결 로직
-        await sleep(500);
-
-        updateLoading(40, "Fetching user deck...");
-        // await를 써도 에러가 나지 않도록 함수 내부에 안전장치를 마련했습니다.
-        await initPowerUpUI();
-
-        updateLoading(40, "Fetching map data...");
-        // 서버 데이터 모의 (여기서 맵 데이터 생성)
-        gameMap = getMockMapData(); 
-        await sleep(500);
-
-        updateLoading(100, "Ready to Battle!");
         await sleep(300);
 
-        // 로딩 화면 제거 & UI 표시
-        loadingScreen.style.opacity = '0';
-        loadingScreen.style.pointerEvents = 'none';
+        updateLoading(30, "Fetching User Deck...");
         
-        setTimeout(() => {
-            loadingScreen.style.display = 'none'; // 완전히 가리기
-        }, 500);
+        // [핵심] 여기서 UI 초기화를 기다립니다. (에러나도 게임은 시작되게 try-catch 내부 처리)
+        await initPowerUpUI(); 
 
-        // 인게임 UI 보이기
+        updateLoading(60, "Fetching Map Data...");
+        gameMap = getMockMapData(); 
+        await sleep(300);
+
+        updateLoading(100, "Ready to Battle!");
+        await sleep(200);
+
+        // 로딩 화면 제거
+        if(loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
+        }
+
         if(uiTop) uiTop.classList.remove('hidden');
         if(uiBottom) {
             uiBottom.classList.remove('hidden');
-            uiBottom.classList.add('flex');
+            uiBottom.classList.add('flex'); // flex display 강제
         }
 
         console.log("Game Loop Starting...");
-        // 게임 루프 시작
         requestAnimationFrame(gameLoop);
 
     } catch (e) {
         console.error("Loading Failed:", e);
-        alert("게임 로딩에 실패했습니다. 로비로 돌아갑니다.");
-        window.location.href = 'index.html'; // 로비로 강제 이동
+        alert("로딩 중 오류가 발생했습니다.");
     }
 }
 
-// [신규] 하단 파워업 버튼에 주사위 그리기
+// [수정됨] 파워업 UI 초기화 (데이터 직접 호출)
 async function initPowerUpUI() {
-    // 1. myId가 있는지 확인 (state.js 또는 localStorage)
-    const username = typeof myId !== 'undefined' ? myId : localStorage.getItem('username');
-    if (!username) return;
+    // localStorage에 저장된 ID 사용 (없으면 에러)
+    const username = localStorage.getItem('username');
+    if (!username) {
+        console.error("No username found in localStorage");
+        return;
+    }
 
     try {
-        // 2. 서버에서 내 덱과 주사위 목록 가져오기 (api.js의 함수 활용)
-        // fetchMyDice()가 완료되어 currentDiceList가 채워져야 함
-        if (typeof fetchMyDice === 'function') await fetchMyDice();
-        
-        // 덱 정보 가져오기
-        const res = await fetch(`${API_DICE}/deck/${username}`);
-        if (!res.ok) return;
-        
-        const data = await res.json();
-        // 현재 선택된 프리셋(1번) 덱 슬롯 (id 배열)
-        const activeSlots = data.decks["1"].slots; 
+        // 1. 주사위 목록(상세 정보) 가져오기
+        const listRes = await fetch(`/api/dice/list/${username}`);
+        const diceList = await listRes.json();
 
-        const slots = document.querySelectorAll('.dice-slot');
+        // 2. 장착 덱 정보 가져오기
+        const deckRes = await fetch(`/api/dice/deck/${username}`);
+        const deckData = await deckRes.json();
         
-        activeSlots.forEach((diceId, idx) => {
-            // currentDiceList에서 상세 정보 찾기
-            const diceInfo = currentDiceList.find(d => d.id === diceId);
-            if (diceInfo && slots[idx]) {
-                // 주사위 눈이 없는 파워업 전용 아이콘 생성
-                slots[idx].innerHTML = renderPowerUpDiceIcon(diceInfo, "w-14 h-14");
+        // 현재 프리셋(1번)의 슬롯 배열 ["fire", "wind", ...]
+        const currentDeckSlots = deckData.decks["1"].slots;
+
+        // 3. UI 슬롯 채우기
+        const uiSlots = document.querySelectorAll('#ui-bottom .dice-slot');
+        
+        currentDeckSlots.forEach((diceId, idx) => {
+            if (!uiSlots[idx]) return;
+
+            // 상세 정보 찾기
+            const diceInfo = diceList.find(d => d.id === diceId);
+            
+            if (diceInfo) {
+                // [핵심] pips=0 으로 설정하여 눈이 없는 파워업 전용 아이콘 생성
+                // w-full h-full로 부모 컨테이너 꽉 채우기
+                const iconHtml = renderDiceIcon(diceInfo, "w-full h-full", 0);
                 
-                // 슬롯 중앙에 LV 표시
-                const lvSpan = document.createElement('span');
-                lvSpan.className = "absolute inset-0 flex items-center justify-center text-slate-400 font-black text-xs pointer-events-none z-20";
-                lvSpan.innerText = `Lv.${diceInfo.class_level || 1}`;
-                slots[idx].appendChild(lvSpan);
+                // 기존 내용 비우고 새로 삽입
+                uiSlots[idx].innerHTML = iconHtml;
+
+                // 중앙에 LV 텍스트 덮어쓰기 (기존 span이 있다면 제거하거나 덮어씀)
+                // utils.js의 renderDiceIcon이 반환한 HTML 위에 얹음
+                const lvBadge = document.createElement('span');
+                lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-xs pointer-events-none z-20";
+                lvBadge.innerText = `Lv.${diceInfo.class_level}`;
+                
+                uiSlots[idx].appendChild(lvBadge);
             }
         });
+        console.log("PowerUp UI Initialized with Deck:", currentDeckSlots);
+
     } catch (err) {
-        console.error("PowerUp UI 초기화 중 오류:", err);
+        console.error("Failed to init PowerUp UI:", err);
+        // 에러 나도 게임은 멈추지 않게 함
     }
-}
-
-// [신규] 파워업 전용 주사위 렌더러 (utils.js 참조, 주사위 눈 제거)
-function renderPowerUpDiceIcon(dice, sizeClass) {
-    let sizeIndex = 14; 
-    const match = sizeClass.match(/w-(\d+)/);
-    if (match) sizeIndex = parseInt(match[1], 10);
-    
-    const borderWidth = Math.max(2, sizeIndex * 0.2);
-    const fontSize = sizeIndex * 4 * 0.85; 
-
-    const { borderColor, effectClasses, customStyle } = getDiceVisualClasses(dice);
-    
-    let finalCustomStyle = `${customStyle} border-width: ${borderWidth}px; border-style: solid;`;
-    const symbolIcon = dice.symbol || "ri-dice-fill";
-
-    // 배경 아이콘 (주사위 눈 대신 심볼을 크게 배치)
-    const bgSymbolHtml = `<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10 text-slate-400 z-0" style="font-size: ${fontSize}px;"><i class="${symbolIcon}"></i></div>`;
-    
-    // [중요] 기존 renderDiceIcon에서 주사위 눈(dice-content) 부분만 삭제함
-    return `
-        <div class="dice-face ${sizeClass} ${borderColor} ${effectClasses} relative flex items-center justify-center overflow-hidden" style="${finalCustomStyle}">
-            ${bgSymbolHtml}
-        </div>`;
 }
 
 function updateLoading(percent, text) {
