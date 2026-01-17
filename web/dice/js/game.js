@@ -1,5 +1,7 @@
 // web/dice/js/game.js
 
+const API_BASE_URL = "https://api.pyosh.cloud/api";
+
 // 전역 변수
 let canvas, ctx;
 let gameMap = null;
@@ -71,24 +73,27 @@ async function runLoadingSequence() {
     }
 }
 
-// [핵심 수정] 파워업 UI 초기화
+// [수정됨] 파워업 UI 초기화
 async function initPowerUpUI() {
-    // 1. SessionStorage 우선 확인 (auth.js와 통일)
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
     
     if (!username) {
-        console.error("로그인 정보(username)를 찾을 수 없습니다. (재로그인 필요)");
+        console.error("로그인 정보(username)를 찾을 수 없습니다.");
         return;
     }
 
     try {
-        // 병렬 요청으로 속도 향상
+        console.log(`[Game] Fetching data for ${username}...`);
+
+        // [수정] 절대 경로(API_BASE_URL) 사용
         const [listRes, deckRes] = await Promise.all([
-            fetch(`/api/dice/list/${username}`),
-            fetch(`/api/dice/deck/${username}`)
+            fetch(`${API_BASE_URL}/dice/list/${username}`),
+            fetch(`${API_BASE_URL}/dice/deck/${username}`)
         ]);
 
-        if (!listRes.ok || !deckRes.ok) throw new Error("API 요청 실패");
+        // 에러 확인 (HTML이 왔는지 체크)
+        if (!listRes.ok) throw new Error(`List API Error: ${listRes.status}`);
+        if (!deckRes.ok) throw new Error(`Deck API Error: ${deckRes.status}`);
 
         const diceList = await listRes.json();
         const deckData = await deckRes.json();

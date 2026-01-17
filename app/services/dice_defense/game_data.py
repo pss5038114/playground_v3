@@ -28,7 +28,7 @@ DICE_DATA = {
     },
     "ice": {
         "name": "Ice", "rarity": "Common", "color": "bg-blue-300", 
-        "symbol": "ri-snowflake-line", # 눈송이 (안되면 ri-snowy-fill)
+        "symbol": "ri-snowflake-fill", # 눈송이
         "desc": "적을 느리게 만듭니다.",
         "stats": { "atk": {"base": 30, "c": 3, "p": 30}, "speed": {"base": 1.5, "c": -0.02, "p": 0}, "target": "앞쪽", "specials": [{"name": "얼음 효과", "icon": "ri-snowflake-line", "base": 5, "c": 0.5, "p": 2, "format": "{}%"}] }
     },
