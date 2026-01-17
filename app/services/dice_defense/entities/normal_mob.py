@@ -8,7 +8,7 @@ class NormalMob(BaseEntity):
             "type": "normal_mob",
             "hp": 100,
             "max_hp": 100,
-            "speed": 250,       # 속도 조절
+            "speed": 100,       # 속도 조절
             "radius": 30,       # 시각적 크기 (기존 24보다 크게)
             "hitbox_radius": 30 # 히트박스 크기 (일단 시각적 크기와 동일하게)
         }
