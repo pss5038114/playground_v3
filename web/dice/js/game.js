@@ -110,25 +110,41 @@ async function runLoadingSequence(presetIndex) {
     }
 }
 
+// [수정] 로딩 텍스트 업데이트 기능 추가
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
+    const txtEl = document.getElementById('loading-text'); // HTML에 이 ID가 있어야 함
+    
     if(bar) bar.style.width = `${percent}%`;
+    if(txtEl && text) txtEl.innerText = text;
 }
 
 // ----------------------------------------------------------------------
 // 3. WebSocket 연결 및 핸들러
 // ----------------------------------------------------------------------
 function connectWebSocket(gid, deckDetails) {
-    // 프로토콜 자동 감지 (https -> wss, http -> ws)
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/game/${gid}`;
-    
-    console.log("Connecting WS:", wsUrl);
-    socket = new WebSocket(wsUrl);
+    // [수정] API 도메인 기반으로 WebSocket 주소 생성
+    // API_DICE가 "https://api.pyosh.cloud/api/dice" 형태라고 가정
+    try {
+        const apiObj = new URL(API_DICE);
+        const protocol = apiObj.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = apiObj.host; // "api.pyosh.cloud" (포트 포함)
+        
+        // 백엔드 main.py의 경로: @app.websocket("/ws/game/{game_id}")
+        const wsUrl = `${protocol}//${host}/ws/game/${gid}`;
+        
+        console.log("Connecting WS:", wsUrl);
+        socket = new WebSocket(wsUrl);
+    } catch (e) {
+        console.error("Invalid API URL:", e);
+        return;
+    }
 
     socket.onopen = () => {
         console.log("WebSocket Connected");
-        updateLoading(90, "Synchronizing...");
+        updateLoading(100, "Ready!");
+        // 약간의 딜레이 후 게임 시작 (로딩바 꽉 찬거 보여주기)
+        setTimeout(() => finalizeLoading(gameState, deckDetails), 200); 
     };
 
     socket.onmessage = (event) => {
@@ -137,9 +153,12 @@ function connectWebSocket(gid, deckDetails) {
     };
 
     socket.onclose = (e) => {
-        console.warn("WebSocket Closed:", e);
-        alert("서버 연결이 끊어졌습니다.");
-        window.location.href = 'index.html';
+        console.warn("WebSocket Closed:", e.code, e.reason);
+        // 비정상 종료(1006)인 경우에만 알림
+        if (e.code !== 1000) {
+            alert("서버 연결이 실패했습니다. (API 서버 상태를 확인해주세요)");
+            window.location.href = 'index.html';
+        }
     };
     
     socket.onerror = (error) => {
