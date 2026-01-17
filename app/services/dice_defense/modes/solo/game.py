@@ -91,74 +91,69 @@ class SoloGameSession:
                 entity_map[entity['id']] = entity
         self.entities = active_entities
         
-        # 3. [수정] 주사위 공격 처리
+        # 3. 주사위 공격
         for cell in self.grid:
             dice = cell['dice']
             if dice:
-                # 좌표 정보 주입
-                if 'cx' not in dice:
-                    dice['cx'] = cell['cx']
-                    dice['cy'] = cell['cy']
+                if 'cx' not in dice: dice['cx'] = cell['cx']; dice['cy'] = cell['cy']
                 
                 logic = get_dice_logic(dice['id'])
                 
-                # [수정] 주사위 크기(cell['w']) 전달 -> 눈 위치 계산용
-                attack_result = logic.update_attack(
+                # projectiles_list는 이제 리스트로 반환됨 (create_projectiles가 리스트 반환)
+                projectiles_list = logic.update_attack(
                     dice, self.entities, dt, current_time, dice_size=cell['w']
                 )
                 
-                if attack_result and attack_result['type'] == 'projectile':
-                    self._spawn_projectile(attack_result)
+                if projectiles_list:
+                    self._spawn_projectiles(projectiles_list)
 
-        # 4. 투사체 이동 (유지)
-        self._update_projectiles(dt, entity_map)
+        # 4. 투사체 이동
+        self._update_projectiles(dt, entity_map) # entity_map은 위에서 생성된 것 사용
         
         return self.get_broadcast_state()
 
-    # [NEW] 투사체 생성 함수
-    def _spawn_projectile(self, info):
-        self.projectile_id_counter += 1
-        self.projectiles.append({
-            'id': self.projectile_id_counter,
-            'x': info['start_x'],
-            'y': info['start_y'],
-            'target_id': info['target_id'],
-            'speed': info['speed'],
-            'damage': info['damage'],
-            'hit': False
-        })
+    # [수정] 투사체 생성 (리스트 처리)
+    def _spawn_projectiles(self, proj_list):
+        for info in proj_list:
+            self.projectile_id_counter += 1
+            self.projectiles.append({
+                'id': self.projectile_id_counter,
+                'dice_id': info['dice_id'], # [중요] 누가 쐈는지 기록
+                'x': info['start_x'],
+                'y': info['start_y'],
+                'target_id': info['target_id'],
+                'speed': info['speed'],
+                'damage': info['damage'],
+                'hit': False
+            })
 
+    # [수정] 투사체 업데이트 및 [3] 데미지 로직 위임
     def _update_projectiles(self, dt, entity_map):
         active_projectiles = []
         
         for proj in self.projectiles:
             target = entity_map.get(proj['target_id'])
             
-            # 타겟이 사라졌으면 투사체도 소멸 (혹은 마지막 위치로 이동하게 할 수 있음)
-            if not target:
-                continue
+            if not target: continue # 타겟 소실 시 투사체 삭제 (또는 유도 해제)
                 
-            # 타겟 방향으로 이동
             dx = target['x'] - proj['x']
             dy = target['y'] - proj['y']
             dist = math.sqrt(dx*dx + dy*dy)
-            
             move_dist = proj['speed'] * dt
             
-            # 충돌 판정 (히트박스)
-            # 타겟의 히트박스 반지름 + 투사체 반지름(약 5)
             hit_threshold = target['hitbox_radius'] + 5 
             
             if dist <= hit_threshold or (dist <= move_dist):
-                # 명중!
-                target['hp'] -= proj['damage']
-                if target['hp'] <= 0:
-                    # 몹 처치 (다음 프레임에 active_entities에서 빠짐)
-                    # 처치 보상(SP) 로직 추가 가능
-                    self.sp += 5 
-                    pass
+                # [Hit 발생!]
+                # 여기서 직접 데미지를 주지 않고, 주사위 로직에게 위임
+                logic = get_dice_logic(proj['dice_id'])
+                
+                # [3] 특수 데미지 로직 실행 (전체 엔티티 리스트 전달 -> 스플래시/체인 등 처리용)
+                logic.on_hit(target, proj, self.entities)
+                
+                # 투사체 소멸 (관통 로직이 있다면 여기서 처리 가능)
+                # target['hp'] 체크는 다음 update 루프에서 처리됨
             else:
-                # 이동
                 proj['x'] += (dx / dist) * move_dist
                 proj['y'] += (dy / dist) * move_dist
                 active_projectiles.append(proj)
