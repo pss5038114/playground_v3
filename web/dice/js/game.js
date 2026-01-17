@@ -1,21 +1,23 @@
 // web/dice/js/game.js
-// [핵심 수정] API 주소 자동 감지 (어디서 실행하든 8000번 포트 바라보기)
-const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? "http://localhost:8000/api"  // 로컬 개발 환경 (Live Server 등)
-    : "/api";                      // 배포 환경 (같은 도메인)
+
+// [중요] 백엔드 API 주소 고정 (auth.js와 동일하게 설정)
+// 사용자님의 배포 환경(Cloudflare Tunnel)에 맞춤
+const API_BASE_URL = "https://api.pyosh.cloud/api";
 
 // 전역 변수
 let canvas, ctx;
 let gameMap = null;
 let currentMode = 'solo';
 let animationFrameId;
-let gameSP = 100; // 초기 SP (나중에 서버와 동기화 필요)
-let inGameDiceLevels = [1, 1, 1, 1, 1]; // 슬롯별 파워업 레벨 (1~5)
-let battleDiceData = []; // 현재 덱의 주사위 스탯 정보 저장용
 
-// 1. 페이지 로드 시 초기화
+// 전투 상태 변수 (전투 끝나면 초기화됨)
+let gameSP = 100; 
+let inGameDiceLevels = [1, 1, 1, 1, 1]; // 파워업 레벨 (1~5)
+let battleDiceData = []; // 주사위 스탯 정보 캐싱
+
+// 1. 페이지 로드
 window.onload = async function() {
-    console.log("Game Script Loaded.");
+    console.log("[Game] Script Loaded. Target API:", API_BASE_URL);
     
     const urlParams = new URLSearchParams(window.location.search);
     currentMode = urlParams.get('mode') || 'solo';
@@ -24,7 +26,6 @@ window.onload = async function() {
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 로딩 시퀀스 시작
     await runLoadingSequence();
 };
 
@@ -37,31 +38,33 @@ function setupLeaveWarning() {
     });
 }
 
-// 3. 로딩 시뮬레이션
+// 3. 로딩 시퀀스
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
     const uiTop = document.getElementById('ui-top');
     const uiBottom = document.getElementById('ui-bottom');
-    // [중요] 전투 시작 시 상태 초기화
-    gameSP = 100;
-    inGameDiceLevels = [1, 1, 1, 1, 1];
-    updateSPDisplay(); // SP 화면 갱신
-
+    
     try {
+        // [초기화] 전투 상태 리셋
+        gameSP = 100;
+        inGameDiceLevels = [1, 1, 1, 1, 1];
+        updateSPDisplay();
+
         updateLoading(10, "Connecting to server...");
         await sleep(200);
 
-        updateLoading(30, "Fetching User Deck...");
-        // [수정됨] 에러 없이 데이터를 불러오도록 수정된 함수 호출
+        updateLoading(30, "Loading Deck & Stats...");
+        // 여기서 덱 정보와 스탯을 가져옴
         await initPowerUpUI(); 
 
-        updateLoading(60, "Fetching Map Data...");
+        updateLoading(60, "Loading Map...");
         gameMap = getMockMapData(); 
         await sleep(200);
 
-        updateLoading(100, "Ready to Battle!");
+        updateLoading(100, "Battle Start!");
         await sleep(200);
 
+        // UI 표시
         if(loadingScreen) {
             loadingScreen.style.opacity = '0';
             setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
@@ -73,88 +76,78 @@ async function runLoadingSequence() {
             uiBottom.classList.add('flex');
         }
 
-        console.log("Game Loop Starting...");
+        console.log("[Game] Loop Starting...");
         requestAnimationFrame(gameLoop);
 
     } catch (e) {
-        console.error("Loading Failed:", e);
-        // 에러가 나도 게임은 멈추지 않게 처리
+        console.error("[Game] Loading Failed:", e);
+        alert("게임 로딩 중 오류가 발생했습니다.\n" + e.message);
     }
 }
 
-// [수정됨] 파워업 UI 초기화 (에러 처리 강화)
+// [핵심] 파워업 UI 초기화 & 데이터 로딩
 async function initPowerUpUI() {
-    // 세션 혹은 로컬 스토리지에서 ID 확인
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
     
     if (!username) {
-        console.error("[Game] 로그인 정보가 없습니다.");
+        console.error("[Game] User not logged in.");
         return;
     }
 
     try {
-        console.log(`[Game] Fetching deck for ${username}...`);
-
-        // [중요] API_BASE_URL 사용하여 절대 경로로 요청
+        // 병렬 요청으로 덱과 주사위 목록 가져오기
         const [listRes, deckRes] = await Promise.all([
             fetch(`${API_BASE_URL}/dice/list/${username}`),
             fetch(`${API_BASE_URL}/dice/deck/${username}`)
         ]);
 
-        // HTML 응답(에러 페이지)이 왔는지 체크
-        const listContentType = listRes.headers.get("content-type");
-        const deckContentType = deckRes.headers.get("content-type");
-        
-        if (listContentType && listContentType.includes("text/html")) {
-            throw new Error("서버 주소가 잘못되었습니다. (HTML 응답 수신)");
-        }
-
-        if (!listRes.ok || !deckRes.ok) throw new Error("API 요청 실패");
+        if (!listRes.ok) throw new Error("주사위 목록 로딩 실패");
+        if (!deckRes.ok) throw new Error("덱 정보 로딩 실패");
 
         const diceList = await listRes.json();
         const deckData = await deckRes.json();
         
-        // 데이터 파싱
+        // 현재 장착된 덱 (1번 프리셋)
         const currentDeckSlots = deckData.decks && deckData.decks["1"] ? deckData.decks["1"].slots : [];
 
         if (currentDeckSlots.length === 0) {
-            console.warn("[Game] 장착된 덱이 없습니다.");
+            console.warn("[Game] 덱이 비어있습니다.");
             return;
         }
 
-        // 전투용 데이터 캐싱
+        // [중요] 전투용 데이터 캐싱 (id로 상세 정보 찾아서 저장)
         battleDiceData = currentDeckSlots.map(id => diceList.find(d => d.id === id));
 
-        // UI 렌더링
         const uiSlots = document.querySelectorAll('#ui-bottom .dice-slot');
         
+        // UI 그리기
         currentDeckSlots.forEach((diceId, idx) => {
             const diceInfo = battleDiceData[idx];
             if (!diceInfo || !uiSlots[idx]) return;
 
-            // 주사위 아이콘 (눈 없음: pips=0)
+            // 1. 주사위 아이콘 (눈 없음: pips=0)
             uiSlots[idx].innerHTML = renderDiceIcon(diceInfo, "w-full h-full", 0);
 
-            // 레벨 배지
+            // 2. 레벨 뱃지 (파워업 레벨)
             const lvBadge = document.createElement('span');
             lvBadge.id = `dice-lv-${idx}`;
             lvBadge.className = "absolute inset-0 flex items-center justify-center text-slate-500 font-black text-sm pointer-events-none z-20 drop-shadow-sm";
-            lvBadge.innerText = `Lv.${inGameDiceLevels[idx]}`;
+            lvBadge.innerText = `Lv.${inGameDiceLevels[idx]}`; // 초기값 1
             uiSlots[idx].appendChild(lvBadge);
 
-            // 버튼 업데이트
+            // 3. 버튼 초기화
             updatePowerUpButton(idx);
         });
-        console.log("[Game] PowerUp UI Initialized.");
+
+        console.log("[Game] PowerUp UI Ready.");
 
     } catch (err) {
         console.error("[Game] Init Error:", err);
-        // 사용자에게 덱 로딩 실패를 알리지 않고 조용히 넘어가거나, 
-        // alert("덱 정보를 불러오지 못했습니다."); 라고 띄울 수 있음.
+        throw err; // runLoadingSequence에서 잡도록 던짐
     }
 }
 
-// [신규] 파워업 버튼 상태 업데이트 함수
+// [기능] 파워업 버튼 업데이트 (비용 표시 / MAX 처리)
 function updatePowerUpButton(idx) {
     const btns = document.querySelectorAll('#ui-bottom .power-btn');
     if (!btns[idx]) return;
@@ -162,74 +155,78 @@ function updatePowerUpButton(idx) {
     const level = inGameDiceLevels[idx];
     const btn = btns[idx];
     
-    // 기존 내용 비우기
     btn.innerHTML = "";
 
-    // 최대 레벨 체크
+    // 최대 레벨(5) 체크 (충전 주사위 예외 처리는 나중에 추가 가능)
     if (level >= 5) {
         btn.innerHTML = `<span class="text-xs font-black text-red-400">MAX</span>`;
         btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
         return;
     }
 
-    // 다음 레벨 비용 계산 (Lv.1 -> 100, Lv.2 -> 200...)
+    // 비용 계산: 현재레벨 * 100 (1->2: 100, 2->3: 200...)
     const cost = level * 100;
     
-    // 버튼 내용 (번개 아이콘 + 비용)
+    // 버튼 UI
     btn.innerHTML = `
         <i class="ri-flashlight-fill text-yellow-500 text-[10px]"></i>
         <span class="text-[10px] text-slate-700 font-bold font-mono ml-0.5">${cost}</span>
     `;
     btn.disabled = false;
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
 }
 
-// [신규] 파워업 액션 함수 (HTML onclick="powerUp(0)" 등에서 호출)
+// [액션] 파워업 실행 (HTML onclick 연결)
 window.powerUp = function(idx) {
     const level = inGameDiceLevels[idx];
     
-    // 1. 만렙 체크
-    if (level >= 5) {
-        console.log("Max Level Reached");
-        return;
-    }
+    if (level >= 5) return;
 
-    // 2. 비용 체크
     const cost = level * 100;
+    
     if (gameSP < cost) {
-        // SP 부족 효과 (흔들림 등) 주면 좋음
-        console.log("Not enough SP");
-        alert("SP가 부족합니다!"); // 임시 알림
+        // SP 부족 시각 효과 (버튼 흔들기 등 - 추후 구현)
+        alert("SP가 부족합니다!");
         return;
     }
 
-    // 3. 실행
+    // 실행
     gameSP -= cost;
-    inGameDiceLevels[idx]++; // 레벨 증가
+    inGameDiceLevels[idx]++;
     
-    // 4. UI 갱신
+    // UI 갱신
     updateSPDisplay();
-    updatePowerUpButton(idx); // 버튼 비용 갱신
+    updatePowerUpButton(idx);
     
-    // 주사위 위 레벨 텍스트 갱신
+    // 레벨 뱃지 갱신
     const badge = document.getElementById(`dice-lv-${idx}`);
     if (badge) badge.innerText = `Lv.${inGameDiceLevels[idx]}`;
 
-    // [디버그] 스탯 변화 로그 출력
+    // 데미지 계산 로그 (검증용)
     const diceInfo = battleDiceData[idx];
-    if (diceInfo && diceInfo.atk) {
-        // 공격력 공식: base + (class_lv-1)*c + (power_up-1)*p
-        // diceInfo.atk는 객체임 {base:20, c:..., p:15} 라고 가정
-        // 하지만 보통 API 응답은 평탄화되어 오거나 구조가 다를 수 있으니 game_data.py 구조를 따름
-        // 여기선 간단히 로그만 찍습니다.
-        console.log(`[PowerUp] ${diceInfo.name} Lv.${level} -> Lv.${level+1}`);
+    if (diceInfo) {
+        // 공식: base + (class-1)*c + (powerup-1)*p
+        // diceInfo에 서버에서 받은 c, p 값이 있다고 가정 (없으면 기본값 0)
+        const base = diceInfo.base_atk || 10;
+        const c = diceInfo.atk_per_lvl || 0; // 클래스업 계수
+        const p = diceInfo.p || 10;          // 파워업 계수 (임시값, 서버 데이터 확인 필요)
+        const classLv = diceInfo.class_level || 1;
+        const powerLv = inGameDiceLevels[idx];
+
+        const damage = base + (classLv - 1) * c + (powerLv - 1) * p;
+        console.log(`[PowerUp] ${diceInfo.name}: Lv.${powerLv} -> DMG: ${damage}`);
     }
 };
 
-// [신규] SP 표시 갱신
+// [UI] SP 표시 갱신
 function updateSPDisplay() {
     const spEl = document.getElementById('game-sp');
     if (spEl) spEl.innerText = gameSP;
 }
+
+// ... (기존 캔버스 설정, 맵 데이터, 그리기 함수들 그대로 유지) ...
+// (위쪽 코드에 이어붙여 사용하시면 됩니다)
 
 function updateLoading(percent, text) {
     const bar = document.getElementById('loading-bar');
@@ -238,50 +235,34 @@ function updateLoading(percent, text) {
     if(txt) txt.innerText = text;
 }
 
-// 4. 캔버스 설정
 function setupCanvas() {
     canvas = document.getElementById('game-canvas');
     const container = document.getElementById('game-container');
     if(!canvas || !container) return;
     ctx = canvas.getContext('2d');
-
     const w = container.clientWidth;
     const h = container.clientHeight;
     const targetRatio = 1080 / 1920;
     const containerRatio = w / h;
-
     let finalW, finalH;
-    if (containerRatio > targetRatio) {
-        finalH = h;
-        finalW = h * targetRatio;
-    } else {
-        finalW = w;
-        finalH = w / targetRatio;
-    }
-
-    canvas.width = 1080;  
-    canvas.height = 1920; 
-    canvas.style.width = `${finalW}px`;
-    canvas.style.height = `${finalH}px`;
+    if (containerRatio > targetRatio) { finalH = h; finalW = h * targetRatio; } 
+    else { finalW = w; finalH = w / targetRatio; }
+    canvas.width = 1080; canvas.height = 1920; 
+    canvas.style.width = `${finalW}px`; canvas.style.height = `${finalH}px`;
 }
 
-// 5. 게임 루프
 function gameLoop() {
     if(!ctx) return;
-
     ctx.clearRect(0, 0, 1080, 1920);
-    ctx.fillStyle = "#f3f4f6"; // 배경: 밝은 회색
+    ctx.fillStyle = "#f3f4f6"; 
     ctx.fillRect(0, 0, 1080, 1920);
-
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
-
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// --- Helper Functions ---
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function getMockMapData() {
@@ -289,11 +270,8 @@ function getMockMapData() {
     const offsetX = (width - (7 * unit)) / 2;
     const offsetY = (height - (5 * unit)) / 2;
     const toPixel = (ux, uy) => ({ x: offsetX + ux * unit, y: offsetY + uy * unit });
-
-    // 역 U자 (∩)
     const logicPath = [ {x: 0.5, y: 4.0}, {x: 0.5, y: -0.5}, {x: 6.5, y: -0.5}, {x: 6.5, y: 4.0} ];
     const path = logicPath.map(p => toPixel(p.x, p.y));
-
     const grid = [];
     const rows = 3, cols = 5, cellSize = unit * 0.9; 
     for(let r=0; r<rows; r++){
@@ -307,28 +285,16 @@ function getMockMapData() {
 
 function drawPath(ctx, path) {
     if(path.length < 2) return;
-    ctx.beginPath();
-    ctx.lineWidth = 100;
-    ctx.strokeStyle = "#d1d5db"; // 도로: 회색
-    ctx.lineCap = "butt"; ctx.lineJoin = "round"; 
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#3b82f6"; // 중앙선: 파란색
-    ctx.setLineDash([]); 
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke();
+    ctx.beginPath(); ctx.lineWidth = 100; ctx.strokeStyle = "#d1d5db"; ctx.lineCap = "butt"; ctx.lineJoin = "round"; 
+    ctx.moveTo(path[0].x, path[0].y); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y); ctx.stroke();
+    ctx.beginPath(); ctx.lineWidth = 4; ctx.strokeStyle = "#3b82f6"; ctx.setLineDash([]); 
+    ctx.moveTo(path[0].x, path[0].y); for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y); ctx.stroke();
 }
 
 function drawGrid(ctx, grid) {
     ctx.lineWidth = 2;
     grid.forEach((cell) => {
-        ctx.fillStyle = "#ffffff"; // 슬롯: 흰색
-        ctx.strokeStyle = "#e5e7eb";
+        ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#e5e7eb";
         const r = 16, x=cell.x, y=cell.y, w=cell.w, h=cell.h;
         ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
         ctx.fill(); ctx.stroke();
@@ -336,6 +302,14 @@ function drawGrid(ctx, grid) {
 }
 
 // UI 함수들
-window.spawnDice = function() { console.log("Spawn!"); };
-window.powerUp = function(idx) { console.log("Power Up:", idx); };
+window.spawnDice = function() { 
+    const cost = 10;
+    if(gameSP >= cost) {
+        gameSP -= cost;
+        updateSPDisplay();
+        console.log("Spawn!"); 
+    } else {
+        alert("SP가 부족합니다.");
+    }
+};
 window.confirmSurrender = function() { if(confirm("나가시겠습니까?")) location.href='index.html'; };
