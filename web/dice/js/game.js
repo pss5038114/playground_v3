@@ -1,29 +1,22 @@
 // web/dice/js/game.js
 
-// [중요] API 주소 설정 (배포 환경 vs 로컬 개발 환경)
-// window.location.hostname이 'localhost'나 '127.0.0.1'이면 로컬 API 사용
-// 그 외(pyosh.cloud 등)면 배포된 API 주소 사용
-const API_BASE_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? "http://localhost:8000/api"      // 로컬 Python 서버
-    : "https://api.pyosh.cloud/api";   // 배포된 Cloudflare Tunnel 주소
+const API_BASE_URL = "https://api.pyosh.cloud/api";
 
-// 전역 변수 (중복 선언 방지를 위해 window 객체에 할당하거나 var 사용 권장, 여기선 let 유지하되 최상단 배치)
-// 만약 'canvas' 에러가 계속 나면 이 파일이 두 번 로드되고 있다는 뜻입니다.
-let canvas, ctx;
-let gameMap = null;
-let currentMode = 'solo';
-let animationFrameId;
+// 전역 변수 선언 (중복 선언 방지를 위해 var 사용하거나, 파일이 한 번만 로드되는지 확인 필요)
+var canvas, ctx;
+var gameMap = null;
+var currentMode = 'solo';
+var animationFrameId;
 
 // 전투 상태 변수
-let gameSP = 100; 
-let inGameDiceLevels = [1, 1, 1, 1, 1]; 
-let battleDiceData = []; 
+var gameSP = 100; 
+var inGameDiceLevels = [1, 1, 1, 1, 1]; 
+var battleDiceData = []; 
 
-// 1. 페이지 로드
+// 1. 페이지 로드 시 초기화
 window.onload = async function() {
-    console.log(`[Game] Init. API Target: ${API_BASE_URL}`);
+    console.log(`[Game] Script Loaded. API Target: ${API_BASE_URL}`);
     
-    // URL 파라미터 확인
     const urlParams = new URLSearchParams(window.location.search);
     currentMode = urlParams.get('mode') || 'solo';
 
@@ -31,7 +24,7 @@ window.onload = async function() {
     setupCanvas();
     window.addEventListener('resize', setupCanvas);
 
-    // 로딩 시작
+    // 로딩 시퀀스 시작
     await runLoadingSequence();
 };
 
@@ -44,38 +37,39 @@ function setupLeaveWarning() {
     });
 }
 
-// 3. 로딩 시퀀스
+// 3. 로딩 시뮬레이션
 async function runLoadingSequence() {
     const loadingScreen = document.getElementById('game-loading');
     const uiTop = document.getElementById('ui-top');
     const uiBottom = document.getElementById('ui-bottom');
     
     try {
-        // 전투 상태 초기화
+        // 상태 초기화
         gameSP = 100;
         inGameDiceLevels = [1, 1, 1, 1, 1];
         updateSPDisplay();
 
         updateLoading(10, "Connecting to server...");
-        await sleep(300);
+        await sleep(200);
 
         updateLoading(30, "Fetching Deck Info...");
-        // 여기서 덱 정보 로드
+        // 덱 정보 가져오기
         await initPowerUpUI(); 
 
         updateLoading(60, "Loading Map...");
         gameMap = getMockMapData(); 
-        await sleep(300);
+        await sleep(200);
 
         updateLoading(100, "Battle Start!");
         await sleep(300);
 
-        // 로딩 화면 제거 & UI 표시
+        // 로딩 화면 제거
         if(loadingScreen) {
             loadingScreen.style.opacity = '0';
             setTimeout(() => { loadingScreen.style.display = 'none'; }, 500);
         }
 
+        // UI 표시
         if(uiTop) uiTop.classList.remove('hidden');
         if(uiBottom) {
             uiBottom.classList.remove('hidden');
@@ -83,43 +77,51 @@ async function runLoadingSequence() {
         }
 
         console.log("[Game] Loop Starting...");
-        if(animationFrameId) cancelAnimationFrame(animationFrameId); // 기존 루프 정지
+        if(animationFrameId) cancelAnimationFrame(animationFrameId);
         requestAnimationFrame(gameLoop);
 
     } catch (e) {
         console.error("[Game] Fatal Error:", e);
-        alert(`게임 로딩 실패!\n${e.message}`);
+        // 에러가 나도 멈추지 않게 하려면 alert 제거 가능
+        alert(`게임 로딩 중 오류가 발생했습니다.\n${e.message}`);
     }
 }
 
-// [핵심] 파워업 UI 및 데이터 로딩
+// [핵심] 파워업 UI 초기화 & 데이터 로딩
 async function initPowerUpUI() {
     const username = sessionStorage.getItem('username') || localStorage.getItem('username');
     
     if (!username) {
-        console.error("[Game] 로그인 정보 없음");
-        // 로그인 안 되어 있으면 테스트용 더미 데이터라도 보여주려면 여기서 처리
+        console.error("[Game] 로그인 정보가 없습니다.");
         return;
     }
 
     try {
-        // [수정] API_BASE_URL 변수 사용
+        console.log(`[Game] Fetching data for ${username}...`);
+
+        // [수정] 절대 경로(API_BASE_URL) 사용
         const [listRes, deckRes] = await Promise.all([
             fetch(`${API_BASE_URL}/dice/list/${username}`),
             fetch(`${API_BASE_URL}/dice/deck/${username}`)
         ]);
 
-        if (!listRes.ok) throw new Error(`Dice List Error: ${listRes.status}`);
-        if (!deckRes.ok) throw new Error(`Deck Info Error: ${deckRes.status}`);
+        // HTML 응답 체크 (주소 오류 시 발생)
+        const contentType = listRes.headers.get("content-type");
+        if (contentType && contentType.includes("text/html")) {
+            throw new Error("서버 주소가 잘못되었습니다. (HTML 응답)");
+        }
+
+        if (!listRes.ok) throw new Error(`Dice List API Error: ${listRes.status}`);
+        if (!deckRes.ok) throw new Error(`Deck API Error: ${deckRes.status}`);
 
         const diceList = await listRes.json();
         const deckData = await deckRes.json();
         
-        // 1번 프리셋 가져오기
+        // 1번 프리셋 덱 가져오기
         const currentDeckSlots = deckData.decks && deckData.decks["1"] ? deckData.decks["1"].slots : [];
 
         if (currentDeckSlots.length === 0) {
-            console.warn("[Game] 덱 정보가 없습니다.");
+            console.warn("[Game] 장착된 덱이 없습니다.");
             return;
         }
 
@@ -151,7 +153,7 @@ async function initPowerUpUI() {
 
     } catch (err) {
         console.error("[Game] Init UI Error:", err);
-        throw err; // 상위 runLoadingSequence에서 잡아서 alert 띄움
+        throw err; // 상위에서 잡아서 처리
     }
 }
 
@@ -182,7 +184,8 @@ window.powerUp = function(idx) {
 
     const cost = level * 100;
     if (gameSP < cost) {
-        alert("SP 부족!");
+        // 흔들림 효과 등 추가 가능
+        console.log("SP 부족");
         return;
     }
 
@@ -208,7 +211,7 @@ window.spawnDice = function() {
         updateSPDisplay();
         console.log("Spawn!");
     } else {
-        alert("SP 부족!");
+        console.log("SP 부족");
     }
 };
 
@@ -294,3 +297,16 @@ function drawGrid(ctx, grid) {
         ctx.fill(); ctx.stroke();
     });
 }
+
+// UI 함수들
+window.spawnDice = function() { 
+    const cost = 10;
+    if(gameSP >= cost) {
+        gameSP -= cost;
+        updateSPDisplay();
+        console.log("Spawn!"); 
+    } else {
+        // alert("SP가 부족합니다."); // 잦은 alert 방지
+    }
+};
+window.confirmSurrender = function() { if(confirm("나가시겠습니까?")) location.href='index.html'; };
