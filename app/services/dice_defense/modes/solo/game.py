@@ -1,7 +1,19 @@
 # app/services/dice_defense/modes/solo/game.py
+import uuid
 
 class SoloGameSession:
-    def __init__(self):
+    def __init__(self, user_id: int, deck: list):
+        self.game_id = str(uuid.uuid4())
+        self.user_id = user_id
+        self.deck = deck  # ['fire', 'ice', ...] (주사위 ID 리스트)
+        
+        # 게임 상태 초기화
+        self.sp = 100       # 초기 SP
+        self.lives = 3      # 초기 라이프
+        self.wave = 1       # 현재 웨이브
+        self.is_over = False
+        
+        # 맵 설정 (기존 코드 유지)
         self.width = 1080
         self.height = 1920
         self.unit = 140
@@ -9,14 +21,12 @@ class SoloGameSession:
         self.offset_x = (self.width - (7 * self.unit)) // 2
         self.offset_y = (self.height - (5 * self.unit)) // 2 
         
-        # [수정됨] 몬스터 경로 (역 U자 형태 '∩' - 하단 연장)
-        # Y=2.5가 그리드 맨 아래 칸의 중심입니다.
-        # 시작/끝 지점을 Y=4.0까지 늘려서 그리드 밖으로 길게 뺍니다.
+        # 몬스터 경로 (역 U자 형태)
         self.path = [
-            {'x': 0.5, 'y': 4.0},  # Start (왼쪽 하단 외부) -> 수정됨(2.5 -> 4.0)
-            {'x': 0.5, 'y': -0.5}, # 위로 올라감
-            {'x': 6.5, 'y': -0.5}, # 오른쪽으로 이동
-            {'x': 6.5, 'y': 4.0},  # End (오른쪽 하단 외부) -> 수정됨(2.5 -> 4.0)
+            {'x': 0.5, 'y': 4.0},  # Start
+            {'x': 0.5, 'y': -0.5}, 
+            {'x': 6.5, 'y': -0.5}, 
+            {'x': 6.5, 'y': 4.0},  # End
         ]
         
         self.pixel_path = [self._to_pixel(p['x'], p['y']) for p in self.path]
@@ -33,17 +43,12 @@ class SoloGameSession:
     def _init_grid(self):
         rows = 3
         cols = 5
-        
-        # 그리드 셀 크기
         cell_size = int(self.unit * 0.9)
         
         for r in range(rows):
             for c in range(cols):
-                # 논리적 좌표 (1.5, 0.5) 부터 시작
-                # Col 1 center = 1.5, Row 1 center = 0.5
                 logic_x = 1.5 + c
                 logic_y = 0.5 + r
-                
                 center_pos = self._to_pixel(logic_x, logic_y)
                 
                 self.grid.append({
@@ -52,15 +57,25 @@ class SoloGameSession:
                     'y': center_pos['y'] - cell_size // 2,
                     'w': cell_size,
                     'h': cell_size,
-                    'cx': center_pos['x'], # 중심좌표 (타게팅용)
+                    'cx': center_pos['x'],
                     'cy': center_pos['y'],
-                    'dice': None
+                    'dice': None # 여기에 배치된 주사위 정보가 들어갈 예정
                 })
 
-    def get_map_data(self):
+    def get_initial_state(self):
+        """클라이언트에게 보낼 초기 게임 데이터"""
         return {
-            "width": self.width,
-            "height": self.height,
-            "path": self.pixel_path,
-            "grid": self.grid
+            "game_id": self.game_id,
+            "map": {
+                "width": self.width,
+                "height": self.height,
+                "path": self.pixel_path,
+                "grid": self.grid
+            },
+            "state": {
+                "sp": self.sp,
+                "lives": self.lives,
+                "wave": self.wave,
+                "deck": self.deck # 덱에 포함된 주사위 ID 목록
+            }
         }
