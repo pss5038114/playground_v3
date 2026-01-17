@@ -545,61 +545,79 @@ function setupCanvas() {
 function gameLoop() {
     if(!ctx) return;
 
-    // 배경 지우기
     ctx.clearRect(0, 0, 1080, 1920);
     ctx.fillStyle = "#1f2937"; 
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // 맵 그리기
     if(gameMap) {
         drawPath(ctx, gameMap.path);
         drawGrid(ctx, gameMap.grid);
     }
     
-    // [NEW] 몹 그리기
-    if (gameState && gameState.mobs) {
-        drawMobs(ctx, gameState.mobs);
+    // [수정] mobs -> entities 렌더링
+    if (gameState && gameState.entities) {
+        drawEntities(ctx, gameState.entities);
     }
     
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// [NEW] 몹 렌더링 함수
-function drawMobs(ctx, mobs) {
-    if (!mobs) return;
+// [NEW] 엔티티 렌더링 함수
+function drawEntities(ctx, entities) {
+    if (!entities) return;
     
-    mobs.forEach(mob => {
-        // 1. 몹 본체 (빨간 원)
+    entities.forEach(entity => {
+        // --- 1. 히트박스 (Hitbox) ---
+        // 실제 피격 판정 범위 (디버깅용 노란 실선)
+        if (entity.hitbox_radius) {
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#facc15'; // Yellow-400
+            ctx.setLineDash([5, 5]); // 점선
+            ctx.arc(entity.x, entity.y, entity.hitbox_radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]); // 점선 초기화
+        }
+
+        // --- 2. 본체 (Visual Body) ---
         ctx.beginPath();
-        ctx.fillStyle = '#ef4444'; // Red-500
+        // 타입별 색상 분기 가능
+        ctx.fillStyle = entity.type === 'normal_mob' ? '#ef4444' : '#64748b'; 
+        
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 10;
-        ctx.arc(mob.x, mob.y, 24, 0, Math.PI * 2); // 반지름 24px
-        ctx.fill();
-        ctx.shadowBlur = 0; // 쉐도우 초기화
         
-        // 2. 테두리
+        // 서버에서 보내준 radius 사용
+        const visualRadius = entity.radius || 20;
+        ctx.arc(entity.x, entity.y, visualRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // 테두리
         ctx.lineWidth = 3;
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
-        // 3. 체력바 (몹 위에 표시)
-        const barWidth = 60;
+        // --- 3. 체력바 ---
+        const barWidth = visualRadius * 2.5;
         const barHeight = 8;
-        const hpPercent = mob.hp / mob.max_hp;
+        const hpPercent = entity.hp / entity.max_hp;
         
-        // 배경 (회색)
+        const barX = entity.x - barWidth / 2;
+        const barY = entity.y - visualRadius - 15;
+
+        // 배경
         ctx.fillStyle = '#374151'; 
-        ctx.fillRect(mob.x - barWidth/2, mob.y - 45, barWidth, barHeight);
+        ctx.fillRect(barX, barY, barWidth, barHeight);
         
-        // 체력 (초록색)
+        // 체력
         ctx.fillStyle = '#22c55e';
-        ctx.fillRect(mob.x - barWidth/2, mob.y - 45, barWidth * hpPercent, barHeight);
+        ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
         
         // 체력바 테두리
         ctx.lineWidth = 1;
         ctx.strokeStyle = '#000000';
-        ctx.strokeRect(mob.x - barWidth/2, mob.y - 45, barWidth, barHeight);
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
     });
 }
 

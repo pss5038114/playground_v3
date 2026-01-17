@@ -3,10 +3,10 @@ import uuid
 import random
 import time
 import math
-from app.services.dice_defense.dice import get_dice_logic 
+from app.services.dice_defense.dice import get_dice_logic
+from app.services.dice_defense.entities import get_entity_manager # [NEW]
 
 class SoloGameSession:
-    # ... (기존 __init__, _init_grid, update, _spawn_mob, _move_mob 등 유지) ...
     def __init__(self, user_id: int, deck: list):
         self.game_id = str(uuid.uuid4())
         self.user_id = user_id
@@ -17,11 +17,14 @@ class SoloGameSession:
         self.lives = 3
         self.wave = 1
         
-        self.mobs = []
-        self.mob_id_counter = 0
+        # [NEW] 엔티티 관리 (기존 mobs 대체)
+        self.entities = [] 
+        self.entity_id_counter = 0
+        
         self.last_spawn_time = time.time()
         self.spawn_interval = 1.0 
         
+        # 맵 설정 (기존 유지)
         self.width = 1080
         self.height = 1920
         self.unit = 140
@@ -60,122 +63,87 @@ class SoloGameSession:
                     'dice': None 
                 })
 
+    # [수정] 메인 업데이트 루프
     def update(self):
         current_time = time.time()
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
         
+        # 1. 몹(엔티티) 스폰
         if current_time - self.last_spawn_time >= self.spawn_interval:
-            self._spawn_mob()
+            self._spawn_entity('normal_mob') # [NEW] 타입 지정 스폰
             self.last_spawn_time = current_time
             
-        active_mobs = []
-        for mob in self.mobs:
-            reached_end = self._move_mob(mob, dt)
-            if reached_end:
+        # 2. 엔티티 상태 업데이트 (이동 등)
+        active_entities = []
+        for entity_state in self.entities:
+            # 해당 엔티티의 로직 클래스 가져오기
+            manager = get_entity_manager(entity_state['type'])
+            
+            # 이동 로직 위임
+            manager.update_move(entity_state, self.pixel_path, dt)
+            
+            # 도착 체크
+            if entity_state.get('finished'):
                 self.lives -= 1
             else:
-                active_mobs.append(mob)
-        self.mobs = active_mobs
+                active_entities.append(entity_state)
+                
+        self.entities = active_entities
         
         return self.get_broadcast_state()
 
-    def _spawn_mob(self):
+    # [NEW] 엔티티 생성 함수
+    def _spawn_entity(self, entity_type: str):
+        self.entity_id_counter += 1
         start_node = self.pixel_path[0]
-        self.mob_id_counter += 1
-        new_mob = {
-            'id': self.mob_id_counter,
-            'hp': 100, 'max_hp': 100, 'speed': 300,
-            'path_index': 0, 'x': start_node['x'], 'y': start_node['y']
-        }
-        self.mobs.append(new_mob)
-
-    def _move_mob(self, mob, dt):
-        if mob['path_index'] >= len(self.pixel_path) - 1: return True
-        target = self.pixel_path[mob['path_index'] + 1]
-        dx = target['x'] - mob['x']
-        dy = target['y'] - mob['y']
-        dist = math.sqrt(dx**2 + dy**2)
-        move_dist = mob['speed'] * dt
         
-        if move_dist >= dist:
-            mob['x'] = target['x']
-            mob['y'] = target['y']
-            mob['path_index'] += 1
-            if mob['path_index'] >= len(self.pixel_path) - 1: return True
-        else:
-            mob['x'] += (dx / dist) * move_dist
-            mob['y'] += (dy / dist) * move_dist
-        return False
+        # Factory를 통해 초기 상태 생성
+        manager = get_entity_manager(entity_type)
+        new_entity_state = manager.create_state(self.entity_id_counter, start_node)
+        
+        self.entities.append(new_entity_state)
 
+    # [기존 로직 유지]
     def process_command(self, command: dict):
         ctype = command.get('type')
-        print(f"[Game {self.game_id}] Command received: {ctype}") # 로그 추가
-        
-        if ctype == 'SPAWN':
-            return self._spawn_dice()
-        
-        elif ctype == 'MERGE':
-            return self._handle_merge(command)
-            
+        if ctype == 'SPAWN': return self._spawn_dice()
+        elif ctype == 'MERGE': return self._handle_merge(command)
         return None
 
     def _spawn_dice(self):
         if self.sp < self.spawn_cost: return None
         empty_indices = [i for i, cell in enumerate(self.grid) if cell['dice'] is None]
         if not empty_indices: return None
-        
         target_idx = random.choice(empty_indices)
         dice_id = random.choice(self.deck)
-        
         self.grid[target_idx]['dice'] = { 'id': dice_id, 'level': 1 }
         self.sp -= self.spawn_cost
         self.spawn_cost += 10
         return True
 
-    # [수정] 결합 로직 (로그 추가)
     def _handle_merge(self, command):
         try:
             src_idx = command.get('source_index')
             tgt_idx = command.get('target_index')
-            
-            print(f"Merge Request: {src_idx} -> {tgt_idx}") # 로그
-
-            if src_idx is None or tgt_idx is None: return None
-            if src_idx == tgt_idx: return None
+            if src_idx is None or tgt_idx is None or src_idx == tgt_idx: return None
             if not (0 <= src_idx < len(self.grid)) or not (0 <= tgt_idx < len(self.grid)): return None
 
             src_cell = self.grid[src_idx]
             tgt_cell = self.grid[tgt_idx]
-            
             src_dice = src_cell['dice']
             tgt_dice = tgt_cell['dice']
             
-            if not src_dice or not tgt_dice:
-                print("Merge Failed: One of dice is None")
-                return None
+            if not src_dice or not tgt_dice: return None
             
-            # 로직 가져오기
             logic = get_dice_logic(src_dice['id'])
-            
-            # 결합 가능 확인
             if logic.can_merge_with(src_dice, tgt_dice):
-                print(f"Merging {src_dice['id']} Lv.{src_dice['level']}...") # 로그
-                
-                # 결합 실행
                 new_dice_state = logic.on_merge(src_dice, tgt_dice, self.deck)
-                
-                # 그리드 반영
                 self.grid[tgt_idx]['dice'] = new_dice_state
                 self.grid[src_idx]['dice'] = None
-                
                 return True
-            else:
-                print("Merge Failed: Logic rejected (Different ID or Level)")
-                
-        except Exception as e:
-            print(f"Merge Error: {e}")
-            
+        except Exception:
+            pass
         return None
 
     def get_broadcast_state(self):
@@ -186,7 +154,7 @@ class SoloGameSession:
             "lives": self.lives,
             "wave": self.wave,
             "grid": [cell['dice'] for cell in self.grid],
-            "mobs": self.mobs
+            "entities": self.entities # [NEW] 이름 변경 (mobs -> entities)
         }
 
     def get_initial_state(self):
