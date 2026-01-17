@@ -131,34 +131,33 @@ function initGameUI(state, deckList) {
     document.getElementById('game-sp').innerText = state.sp;
     
     // 3. 덱 슬롯 렌더링 (하단 바)
-    // .dice-slot 요소들을 찾아서 채워넣음
     const slots = document.querySelectorAll('.dice-slot');
     
     deckList.forEach((dice, idx) => {
         if (idx >= slots.length) return;
         const slot = slots[idx];
         
-        // 기존 내용 비우기 (Lv 텍스트 제외하고 싶다면 구조 변경 필요, 여기선 덮어쓰거나 추가)
-        // play.html 구조상 <span>Lv.1</span>이 있음. 이를 유지하면서 배경색/아이콘 변경.
+        // [수정] 클래스 초기화 (renderDiceIcon이 비주얼을 담당하므로 배경색/테두리 클래스 제거)
+        // flex, items-center 등 레이아웃용 클래스만 남김
+        slot.className = "aspect-square relative dice-slot flex items-center justify-center cursor-pointer";
         
-        // 배경색 적용 (Tailwind 클래스 제거 후 style로 직접 적용 or 클래스 교체)
-        // dice.color는 "bg-red-500" 같은 클래스임.
-        slot.className = `aspect-square rounded-lg border border-slate-200 relative dice-slot flex items-center justify-center group shadow-inner ${dice.color}`;
-        
-        // 아이콘 추가
-        // 기존 span(Lv.1)을 유지하기 위해 innerHTML을 조심스럽게 다룸
+        // 기존 Lv 텍스트 유지 (없으면 기본값 Lv.1)
         const lvSpan = slot.querySelector('span');
-        const lvText = lvSpan ? lvSpan.outerHTML : '<span class="text-white font-bold text-xs pointer-events-none z-10">Lv.1</span>';
+        const lvText = lvSpan ? lvSpan.innerText : 'Lv.1';
         
-        // Remix Icon 클래스
-        const iconClass = dice.symbol || 'ri-dice-fill';
+        // [NEW] utils.js의 renderDiceIcon 사용하여 눈 없는 주사위(0) 생성
+        // 'w-full h-full'로 부모(slot) 크기에 꽉 차게 렌더링
+        const diceHtml = renderDiceIcon(dice, "w-full h-full", 0);
         
         slot.innerHTML = `
-            <i class="${iconClass} text-4xl text-white opacity-90"></i>
-            <div class="absolute bottom-1 right-1">${lvText}</div>
+            ${diceHtml}
+            <div class="absolute bottom-1 right-1 z-20 pointer-events-none">
+                <span class="text-slate-600 font-bold text-[10px] bg-white/60 px-1 rounded backdrop-blur-[1px] shadow-sm">${lvText}</span>
+            </div>
         `;
         
-        // 파워업 버튼 연결 등은 추후 구현
+        // 추후 파워업 버튼 연결 구현 시 활용
+        // const powerBtn = slot.nextElementSibling; // button.power-btn
     });
 }
 
