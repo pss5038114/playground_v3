@@ -1,48 +1,86 @@
-<div class="flex flex-col h-full">
-    <div class="p-6 pb-2">
-        <h2 class="text-3xl font-black text-white italic tracking-tighter">
-            SOLO <span class="text-blue-500">MODE</span>
-        </h2>
-        <p class="text-slate-400 text-sm mt-1">끝없이 몰려오는 적들을 막아내세요!</p>
+<div class="flex flex-col items-center justify-center h-full w-full pb-20 relative">
+    
+    <div class="text-center mb-6 animate-fade-in-down">
+        <h1 class="text-4xl font-black text-slate-800 tracking-tighter mb-2">
+            <span class="text-blue-600">DICE</span> DEFENSE
+        </h1>
+        <p class="text-slate-500 text-sm font-medium">최고의 덱으로 웨이브를 막아내세요!</p>
     </div>
 
-    <div class="flex-1 overflow-y-auto p-6 pt-2">
-        
-        <div class="bg-slate-800/50 rounded-2xl p-4 border border-white/5 mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <span class="text-white font-bold flex items-center gap-2">
-                    <i class="ri-stack-fill text-blue-500"></i> Select Deck
-                </span>
-                <button onclick="location.href='lobby_deck.html'" class="text-xs text-slate-400 hover:text-white underline">
-                    Edit Decks
-                </button>
+    <div class="w-full px-4 mb-8 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="bg-white rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
+            
+            <div id="home-deck-name" class="text-center text-xs font-bold text-slate-400 bg-slate-50 py-1.5 rounded-lg mx-auto w-1/2 truncate mb-4">
+                Loading...
             </div>
 
-            <div class="flex gap-3 justify-center mb-4">
-                <button id="preset-btn-1" onclick="selectLobbyPreset(1)" class="w-10 h-10 rounded-lg font-bold text-lg transition-all bg-blue-600 text-white shadow-lg ring-2 ring-blue-400 scale-110">1</button>
-                <button id="preset-btn-2" onclick="selectLobbyPreset(2)" class="w-10 h-10 rounded-lg font-bold text-lg transition-all bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white">2</button>
-                <button id="preset-btn-3" onclick="selectLobbyPreset(3)" class="w-10 h-10 rounded-lg font-bold text-lg transition-all bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white">3</button>
+            <div id="home-deck-slots-container" class="flex w-full justify-between gap-2 mb-4">
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+            </div>
+
+            <div class="flex justify-center gap-1.5 overflow-x-auto scrollbar-hide py-1" id="home-preset-btn-container">
                 </div>
 
-            <div class="h-24 rounded-xl bg-slate-900/80 flex items-center justify-center border border-white/5 border-dashed">
-                <span class="text-slate-500 text-xs">Deck Preview Area</span>
-                </div>
-        </div>
-
-        <div class="bg-blue-600/10 rounded-2xl p-4 border border-blue-500/20">
-            <h3 class="text-blue-400 font-bold mb-2 text-sm">⚠️ Rule Info</h3>
-            <ul class="text-slate-300 text-xs space-y-1 list-disc list-inside opacity-80">
-                <li>30 Wave 마다 보스 몬스터가 등장합니다.</li>
-                <li>생명력 3개를 모두 잃으면 게임이 종료됩니다.</li>
-                <li>친구와 기록을 경쟁해보세요!</li>
-            </ul>
         </div>
     </div>
 
-    <div class="p-6 bg-slate-900 border-t border-white/5">
-        <button onclick="startSoloGame()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-4 rounded-2xl text-xl shadow-lg shadow-blue-900/50 active:scale-95 transition-all flex items-center justify-center gap-2">
-            <span>GAME START</span>
-            <i class="ri-arrow-right-circle-fill opacity-50"></i>
+    <div class="w-full px-4 animate-fade-in-up" style="animation-delay: 0.2s;">
+        <button onclick="openGameModePopup()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 group relative overflow-hidden">
+            <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            <span class="text-xl font-black italic tracking-wider">GAME START</span>
+            <i class="ri-arrow-right-s-line text-2xl group-hover:translate-x-1 transition-transform"></i>
         </button>
+    </div>
+
+    <div id="gamemode-popup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden" onclick="if(event.target === this) closeGameModePopup()">
+            <div class="bg-white rounded-[2rem] p-6 w-[90%] max-w-sm shadow-2xl animate-scale-up relative">
+                
+                <button onclick="closeGameModePopup()" class="absolute top-5 right-5 text-slate-300 hover:text-slate-500 transition-colors z-10">
+                    <i class="ri-close-circle-fill text-2xl"></i>
+                </button>
+
+                <h2 class="text-2xl font-black text-center text-slate-800 mb-6 italic tracking-tight">
+                    SELECT MODE
+                </h2>
+
+                <div class="grid grid-cols-2 gap-3">
+                    
+                    <button onclick="selectMode('pvp')" class="col-span-2 h-20 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl text-white flex items-center justify-between px-6 shadow-lg shadow-indigo-200 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                        <div class="flex flex-col items-start">
+                            <span class="font-black text-xl italic tracking-wider">1v1 BATTLE</span>
+                            <span class="text-[10px] font-bold opacity-80 bg-black/20 px-2 py-0.5 rounded-full mt-1">경쟁전</span>
+                        </div>
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <i class="ri-swords-fill text-2xl"></i>
+                        </div>
+                    </button>
+                    
+                    <button onclick="selectMode('coop')" class="h-28 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-orange-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-earth-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">CO-OP</span>
+                        <span class="text-[9px] opacity-80">랜덤 협동</span>
+                    </button>
+                    
+                    <button onclick="selectMode('solo')" class="h-28 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-user-3-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">SOLO</span>
+                        <span class="text-[9px] opacity-80">혼자 하기</span>
+                    </button>
+
+                    <button onclick="selectMode('friend')" class="col-span-2 h-14 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
+                        <i class="ri-shake-hands-fill text-lg"></i>
+                        <span class="font-bold text-sm">FRIENDLY MATCH</span>
+                        <span class="bg-white/20 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1">친구</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
