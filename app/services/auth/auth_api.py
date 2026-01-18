@@ -66,7 +66,7 @@ async def check_nick_duplicate(nickname: str):
 async def signup(user: AuthModel):
     if not (4 <= len(user.username) <= 15): raise HTTPException(status_code=400, detail="아이디 길이 오류")
     if not (1 <= len(user.nickname) <= 15): raise HTTPException(status_code=400, detail="닉네임 길이 오류")
-    if not re.match(r"^\d{4}$", user.birthdate): raise HTTPException(status_code=400, detail="생일 형식 오류")
+    if not re.match(r"^\d{4}$", user.birthdate): raise HTTPException(status_code=400, detail="2차 비밀번호 4자리 형식 오류")
 
     conn = get_db_connection()
     try:
@@ -175,7 +175,7 @@ async def change_password(data: PasswordChangeModel):
         if not user or not verify_password(data.old_password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="현재 비밀번호 불일치")
         if user["birthdate"] != data.birthdate:
-            raise HTTPException(status_code=400, detail="생일 불일치")
+            raise HTTPException(status_code=400, detail="2차 비밀번호 4자리 불일치")
 
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE username = ?",
