@@ -1,135 +1,86 @@
-<div id="tab-home" class="flex flex-col h-full animate-fade-in pb-20">
-    <header class="p-6 bg-slate-900 sticky top-0 z-20 shadow-lg border-b border-slate-800">
-        <div class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20">
-                    <span id="home-lvl">1</span>
-                </div>
-                <div>
-                    <h2 class="text-white font-black text-xl tracking-tight leading-none" id="home-username">Player</h2>
-                    <div class="text-slate-400 text-xs font-medium mt-1 flex items-center gap-1">
-                        <i class="ri-trophy-fill text-yellow-500"></i>
-                        <span id="home-rank-score">1000</span>
-                    </div>
-                </div>
-            </div>
-            <button onclick="window.location.href='../mypage.html'" class="w-10 h-10 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors flex items-center justify-center">
-                <i class="ri-settings-4-fill text-lg"></i>
-            </button>
-        </div>
+<div class="flex flex-col items-center justify-center h-full w-full pb-20 relative">
+    
+    <div class="text-center mb-6 animate-fade-in-down">
+        <h1 class="text-4xl font-black text-slate-800 tracking-tighter mb-2">
+            <span class="text-blue-600">DICE</span> DEFENSE
+        </h1>
+        <p class="text-slate-500 text-sm font-medium">최고의 덱으로 웨이브를 막아내세요!</p>
+    </div>
 
-        <div class="grid grid-cols-2 gap-3">
-            <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 flex items-center gap-3 backdrop-blur-sm">
-                <div class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center text-yellow-500">
-                    <i class="ri-copper-coin-fill"></i>
-                </div>
-                <div>
-                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gold</div>
-                    <div class="text-white font-black font-mono leading-none" id="home-gold">0</div>
-                </div>
-                <button class="ml-auto w-6 h-6 rounded bg-yellow-500 text-slate-900 flex items-center justify-center text-xs hover:bg-yellow-400">
-                    <i class="ri-add-line font-bold"></i>
-                </button>
-            </div>
-            <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 flex items-center gap-3 backdrop-blur-sm">
-                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500">
-                    <i class="ri-vip-diamond-fill"></i>
-                </div>
-                <div>
-                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gem</div>
-                    <div class="text-white font-black font-mono leading-none" id="home-gem">0</div>
-                </div>
-                <button class="ml-auto w-6 h-6 rounded bg-blue-500 text-white flex items-center justify-center text-xs hover:bg-blue-400">
-                    <i class="ri-add-line font-bold"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <main class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
-        
-        <section>
-            <div class="flex justify-between items-end mb-3 px-1">
-                <h3 class="text-white font-black text-lg flex items-center gap-2">
-                    <i class="ri-stack-fill text-blue-500"></i> BATTLE DECK
-                </h3>
-                <button onclick="switchTab('deck')" class="text-xs text-blue-400 font-bold hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-2 py-1 rounded hover:bg-blue-500/20 transition-colors">
-                    EDIT <i class="ri-arrow-right-s-line"></i>
-                </button>
-            </div>
+    <div class="w-full px-4 mb-8 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="bg-white rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
             
-            <div class="bg-slate-800 rounded-2xl p-1 border border-slate-700 shadow-xl relative overflow-hidden group">
-                <div class="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
-                <div id="home-deck-preview" class="grid grid-cols-5 gap-1 relative z-10 p-2">
-                    <div class="aspect-square bg-slate-700/50 rounded-xl animate-pulse"></div>
-                    <div class="aspect-square bg-slate-700/50 rounded-xl animate-pulse delay-75"></div>
-                    <div class="aspect-square bg-slate-700/50 rounded-xl animate-pulse delay-100"></div>
-                    <div class="aspect-square bg-slate-700/50 rounded-xl animate-pulse delay-150"></div>
-                    <div class="aspect-square bg-slate-700/50 rounded-xl animate-pulse delay-200"></div>
-                </div>
-            </div>
-        </section>
-
-        <section>
-            <h3 class="text-white font-black text-lg mb-3 px-1 flex items-center gap-2">
-                <i class="ri-gamepad-fill text-purple-500"></i> GAME MODE
-            </h3>
-            
-            <div class="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide px-1">
-                <button onclick="selectLobbyPreset(1)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-blue-600 text-white font-black border-2 border-blue-400 shadow-lg shadow-blue-500/20 transition-all active:scale-95">1</button>
-                <button onclick="selectLobbyPreset(2)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">2</button>
-                <button onclick="selectLobbyPreset(3)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">3</button>
-                <button onclick="selectLobbyPreset(4)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">4</button>
-                <button onclick="selectLobbyPreset(5)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">5</button>
-                <button onclick="selectLobbyPreset(6)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">6</button>
-                <button onclick="selectLobbyPreset(7)" class="preset-btn shrink-0 w-10 h-10 rounded-lg bg-slate-800 text-slate-500 font-bold border-2 border-transparent hover:bg-slate-700 hover:text-slate-300 transition-all active:scale-95">7</button>
+            <div id="home-deck-name" class="text-center text-xs font-bold text-slate-400 bg-slate-50 py-1.5 rounded-lg mx-auto w-1/2 truncate mb-4">
+                Loading...
             </div>
 
-            <div class="grid grid-cols-1 gap-4">
-                <div class="relative group overflow-hidden rounded-2xl bg-slate-800 p-1 opacity-60 grayscale cursor-not-allowed border border-slate-700">
-                    <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x200?galaxy')] bg-cover bg-center opacity-20"></div>
-                    <div class="relative z-10 p-4 flex justify-between items-center">
-                        <div>
-                            <div class="text-xs font-bold text-slate-400 mb-1 bg-slate-900/80 inline-block px-2 py-0.5 rounded">COMING SOON</div>
-                            <h4 class="text-white font-black text-2xl italic tracking-tighter">PvP BATTLE</h4>
-                            <p class="text-slate-400 text-xs mt-1 font-medium">Ranked Match</p>
-                        </div>
-                        <div class="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center text-slate-500">
-                            <i class="ri-sword-fill text-2xl"></i>
-                        </div>
-                    </div>
+            <div id="home-deck-slots-container" class="flex w-full justify-between gap-2 mb-4">
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+                <div class="w-12 h-12 bg-slate-50 rounded-xl border-2 border-slate-100 flex items-center justify-center"><i class="ri-loader-4-line animate-spin text-slate-300"></i></div>
+            </div>
+
+            <div class="flex justify-center gap-1.5 overflow-x-auto scrollbar-hide py-1" id="home-preset-btn-container">
                 </div>
 
-                <button onclick="startSoloGame()" class="relative group overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-1 transition-transform active:scale-[0.98] shadow-lg shadow-blue-500/20 border border-blue-400/30">
-                    <div class="absolute inset-0 bg-[url('https://source.unsplash.com/random/400x200?cyberpunk')] bg-cover bg-center opacity-30 mix-blend-overlay transition-opacity group-hover:opacity-50"></div>
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+        </div>
+    </div>
 
-                    <div class="relative z-10 p-5 flex justify-between items-center">
-                        <div class="text-left">
-                            <div class="text-[10px] font-bold text-blue-200 mb-1 tracking-wider">SINGLE PLAYER</div>
-                            <h4 class="text-white font-black text-3xl italic tracking-tighter drop-shadow-md">SOLO MODE</h4>
-                            <p class="text-blue-100 text-xs mt-1 font-medium flex items-center gap-1">
-                                <i class="ri-flashlight-fill text-yellow-300"></i> Cost: 0
-                            </p>
-                        </div>
-                        <div class="w-14 h-14 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/20 group-hover:bg-white/20 transition-colors shadow-inner">
-                            <i class="ri-play-fill text-3xl ml-1"></i>
-                        </div>
-                    </div>
+    <div class="w-full px-4 animate-fade-in-up" style="animation-delay: 0.2s;">
+        <button onclick="openGameModePopup()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2 group relative overflow-hidden">
+            <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+            <span class="text-xl font-black italic tracking-wider">GAME START</span>
+            <i class="ri-arrow-right-s-line text-2xl group-hover:translate-x-1 transition-transform"></i>
+        </button>
+    </div>
+
+    <div id="gamemode-popup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden" onclick="if(event.target === this) closeGameModePopup()">
+            <div class="bg-white rounded-[2rem] p-6 w-[90%] max-w-sm shadow-2xl animate-scale-up relative">
+                
+                <button onclick="closeGameModePopup()" class="absolute top-5 right-5 text-slate-300 hover:text-slate-500 transition-colors z-10">
+                    <i class="ri-close-circle-fill text-2xl"></i>
                 </button>
-            </div>
-        </section>
-        
-        <section class="pb-safe">
-            <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-4 flex items-center justify-between text-white shadow-lg shadow-purple-500/20">
-                <div>
-                    <div class="text-xs font-bold text-purple-200 mb-1">EVENT</div>
-                    <div class="font-black text-lg">Daily Login Bonus</div>
+
+                <h2 class="text-2xl font-black text-center text-slate-800 mb-6 italic tracking-tight">
+                    SELECT MODE
+                </h2>
+
+                <div class="grid grid-cols-2 gap-3">
+                    
+                    <button onclick="selectMode('pvp')" class="col-span-2 h-20 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl text-white flex items-center justify-between px-6 shadow-lg shadow-indigo-200 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                        <div class="flex flex-col items-start">
+                            <span class="font-black text-xl italic tracking-wider">1v1 BATTLE</span>
+                            <span class="text-[10px] font-bold opacity-80 bg-black/20 px-2 py-0.5 rounded-full mt-1">경쟁전</span>
+                        </div>
+                        <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                            <i class="ri-swords-fill text-2xl"></i>
+                        </div>
+                    </button>
+                    
+                    <button onclick="selectMode('coop')" class="h-28 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-orange-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-earth-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">CO-OP</span>
+                        <span class="text-[9px] opacity-80">랜덤 협동</span>
+                    </button>
+                    
+                    <button onclick="selectMode('solo')" class="h-28 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-2xl text-white flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-100 active:scale-95 transition-transform relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <i class="ri-user-3-fill text-3xl mb-1"></i>
+                        <span class="font-black text-sm">SOLO</span>
+                        <span class="text-[9px] opacity-80">혼자 하기</span>
+                    </button>
+
+                    <button onclick="selectMode('friend')" class="col-span-2 h-14 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl text-white flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
+                        <i class="ri-shake-hands-fill text-lg"></i>
+                        <span class="font-bold text-sm">FRIENDLY MATCH</span>
+                        <span class="bg-white/20 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1">친구</span>
+                    </button>
                 </div>
-                <button class="bg-white text-purple-600 px-4 py-2 rounded-lg font-bold text-xs shadow-md hover:bg-purple-50 transition-colors">
-                    CLAIM
-                </button>
             </div>
-        </section>
-    </main>
+        </div>
+    </div>
 </div>
